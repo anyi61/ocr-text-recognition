@@ -38,3 +38,6 @@ temp/
 TODO.md
 NOTES.md
 PRIVATE.md
+
+# Claude Code settings
+.claude/
