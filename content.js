@@ -14,6 +14,78 @@
   let overlay = null;
   let tooltip = null;
 
+  // 进度通知相关变量
+  let progressNotification = null;
+  let progressTimer = null;
+  let progressStartTime = null;
+  let isCancelled = false;
+
+  // 注入进度通知样式
+  const progressStyles = document.createElement('style');
+  progressStyles.textContent = `
+    #ocr-progress-notification {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      color: #fff;
+      padding: 16px 24px;
+      border-radius: 12px;
+      z-index: 1000004;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      animation: ocr-progress-fadeIn 0.3s ease;
+    }
+    @keyframes ocr-progress-fadeIn {
+      from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+    .ocr-progress-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .ocr-progress-spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #667eea;
+      border-radius: 50%;
+      animation: ocr-spin 1s linear infinite;
+    }
+    @keyframes ocr-spin {
+      to { transform: rotate(360deg); }
+    }
+    .ocr-progress-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .ocr-progress-message {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .ocr-progress-time {
+      font-size: 12px;
+      color: rgba(255,255,255,0.7);
+    }
+    .ocr-progress-cancel {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.2s;
+    }
+    .ocr-progress-cancel:hover {
+      background: rgba(255,255,255,0.3);
+    }
+  `;
+  document.head.appendChild(progressStyles);
+
   // 创建遮罩层
   function createOverlay() {
     overlay = document.createElement('div');
@@ -87,6 +159,7 @@
   // 清理资源
   function cleanup() {
     isCapturing = false;
+    isCancelled = false;
     if (overlay) {
       overlay.remove();
       overlay = null;
@@ -108,6 +181,7 @@
   // 完全清理所有资源（用于页面卸载时）
   function fullCleanup() {
     cleanup();
+    hideProgressNotification();
     // 移除运行时消息监听器
     chrome.runtime.onMessage.removeListener(messageListener);
     // 标记为未初始化
@@ -161,14 +235,18 @@
   // 截取并识别
   async function captureAndRecognize(rect) {
     try {
-      showNotification('正在截图...', 'info');
+      showProgressNotification('正在截图...', false);
 
       // 发送消息给background进行截图（因为content script无法直接调用chrome.tabs.captureVisibleTab）
       const response = await chrome.runtime.sendMessage({
         action: 'captureVisibleTab'
       });
 
+      // 检查是否被取消
+      if (isCancelled) return;
+
       if (!response || !response.dataUrl) {
+        hideProgressNotification();
         showNotification('截图失败', 'error');
         return;
       }
@@ -176,7 +254,11 @@
       // 裁剪选区
       const croppedImage = await cropImage(response.dataUrl, rect);
 
-      showNotification('正在识别文字...', 'info');
+      // 检查是否被取消
+      if (isCancelled) return;
+
+      // 更新为识别阶段，显示取消按钮
+      showProgressNotification('正在识别文字...', true);
 
       // 发送给background进行OCR识别
       const ocrResponse = await chrome.runtime.sendMessage({
@@ -184,15 +266,25 @@
         imageData: croppedImage
       });
 
+      // 检查是否被取消
+      if (isCancelled) return;
+
+      // 计算识别用时
+      const elapsed = progressStartTime ? Math.floor((Date.now() - progressStartTime) / 1000) : 0;
+      hideProgressNotification();
+
       if (ocrResponse && ocrResponse.success) {
         showResultPopup(ocrResponse.text);
-        showNotification('识别完成！', 'success');
+        showNotification(`识别完成！用时 ${elapsed} 秒`, 'success');
       } else {
         showNotification(ocrResponse?.error || '识别失败', 'error');
       }
     } catch (error) {
-      console.error('截图识别失败:', error);
-      showNotification('识别失败: ' + error.message, 'error');
+      hideProgressNotification();
+      if (!isCancelled) {
+        console.error('截图识别失败:', error);
+        showNotification('识别失败: ' + error.message, 'error');
+      }
     }
   }
 
@@ -461,6 +553,76 @@
       notification.style.animation = 'fadeOut 0.3s ease forwards';
       setTimeout(() => notification.remove(), 300);
     }, 3000);
+  }
+
+  // 显示进度通知（带加载动画和计时器）
+  function showProgressNotification(message, showCancel = false) {
+    // 移除已有进度通知
+    hideProgressNotification();
+
+    isCancelled = false;
+    const notification = document.createElement('div');
+    notification.id = 'ocr-progress-notification';
+    notification.innerHTML = `
+      <div class="ocr-progress-content">
+        <div class="ocr-progress-spinner"></div>
+        <div class="ocr-progress-info">
+          <div class="ocr-progress-message">${message}</div>
+          <div class="ocr-progress-time">已用时: 0 秒</div>
+        </div>
+        ${showCancel ? '<button class="ocr-progress-cancel">取消</button>' : ''}
+      </div>
+    `;
+
+    document.body.appendChild(notification);
+    progressNotification = notification;
+    progressStartTime = Date.now();
+
+    // 启动计时器
+    const timeEl = notification.querySelector('.ocr-progress-time');
+    progressTimer = setInterval(() => {
+      if (timeEl) {
+        const elapsed = Math.floor((Date.now() - progressStartTime) / 1000);
+        timeEl.textContent = `已用时: ${elapsed} 秒`;
+      }
+    }, 1000);
+
+    // 绑定取消按钮
+    if (showCancel) {
+      const cancelBtn = notification.querySelector('.ocr-progress-cancel');
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+          isCancelled = true;
+          hideProgressNotification();
+          showNotification('已取消识别', 'warning');
+        });
+      }
+    }
+
+    return notification;
+  }
+
+  // 更新进度通知消息
+  function updateProgressNotification(message) {
+    if (progressNotification) {
+      const msgEl = progressNotification.querySelector('.ocr-progress-message');
+      if (msgEl) {
+        msgEl.textContent = message;
+      }
+    }
+  }
+
+  // 隐藏进度通知
+  function hideProgressNotification() {
+    if (progressTimer) {
+      clearInterval(progressTimer);
+      progressTimer = null;
+    }
+    if (progressNotification) {
+      progressNotification.remove();
+      progressNotification = null;
+    }
+    progressStartTime = null;
   }
 
   // 启动截图模式
