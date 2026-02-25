@@ -155,10 +155,64 @@ async function handleOCR(imageData, sendResponse) {
         throw new Error('未知的API提供商');
     }
 
+    // 保存到历史记录
+    await saveToHistory(ocrResult);
+
     sendResponse({ success: true, text: ocrResult });
   } catch (error) {
     console.error('OCR识别失败:', error);
     sendResponse({ success: false, error: error.message });
+  }
+}
+
+// 保存识别结果到历史记录（最近10条）
+async function saveToHistory(text) {
+  try {
+    const result = await chrome.storage.local.get(['ocrHistory']);
+    let history = result.ocrHistory || [];
+
+    // 添加新记录到开头
+    const newRecord = {
+      id: Date.now(),
+      text: text,
+      timestamp: Date.now(),
+      date: new Date().toLocaleString('zh-CN')
+    };
+
+    history.unshift(newRecord);
+
+    // 只保留最近10条
+    if (history.length > 10) {
+      history = history.slice(0, 10);
+    }
+
+    await chrome.storage.local.set({ ocrHistory: history });
+  } catch (error) {
+    console.error('保存历史记录失败:', error);
+  }
+}
+
+// 辅助函数：安全地解析错误响应
+async function parseErrorResponse(response) {
+  try {
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const data = await response.json();
+      return data.error?.message || data.error?.code || JSON.stringify(data);
+    }
+    const text = await response.text();
+    return text || `HTTP ${response.status}`;
+  } catch (e) {
+    return `HTTP ${response.status}`;
+  }
+}
+
+// 辅助函数：安全地解析 JSON 响应
+async function safeJsonParse(response) {
+  try {
+    return await response.json();
+  } catch (e) {
+    throw new Error('服务器返回了无效的 JSON 数据');
   }
 }
 
@@ -167,39 +221,47 @@ async function callClaudeAPI(base64Image, config) {
   const model = config.model || 'claude-3-opus-20240229';
   const prompt = config.prompt || '请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。';
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': config.apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: model,
-      max_tokens: 4096,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: prompt },
-          {
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: 'image/png',
-              data: base64Image
+  let response;
+  try {
+    response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': config.apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 4096,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: 'image/png',
+                data: base64Image
+              }
             }
-          }
-        ]
-      }]
-    })
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || `API请求失败: ${response.status}`);
+          ]
+        }]
+      })
+    });
+  } catch (networkError) {
+    if (networkError.name === 'TypeError' || networkError.message?.includes('fetch')) {
+      throw new Error('网络连接失败，请检查网络或代理设置');
+    }
+    throw networkError;
   }
 
-  const data = await response.json();
+  if (!response.ok) {
+    const errorMsg = await parseErrorResponse(response);
+    throw new Error(`Claude API错误: ${errorMsg}`);
+  }
+
+  const data = await safeJsonParse(response);
   return data.content?.[0]?.text || '';
 }
 
@@ -208,74 +270,112 @@ async function callOpenAIAPI(base64Image, config) {
   const model = config.model || 'gpt-4o';
   const prompt = config.prompt || '请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。';
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.apiKey}`
-    },
-    body: JSON.stringify({
-      model: model,
-      max_tokens: 4096,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: prompt },
-          {
-            type: 'image_url',
-            image_url: {
-              url: `data:image/png;base64,${base64Image}`
+  let response;
+  try {
+    response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 4096,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:image/png;base64,${base64Image}`
+              }
             }
-          }
-        ]
-      }]
-    })
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || `API请求失败: ${response.status}`);
+          ]
+        }]
+      })
+    });
+  } catch (networkError) {
+    if (networkError.name === 'TypeError' || networkError.message?.includes('fetch')) {
+      throw new Error('网络连接失败，请检查网络或代理设置');
+    }
+    throw networkError;
   }
 
-  const data = await response.json();
+  if (!response.ok) {
+    const errorMsg = await parseErrorResponse(response);
+    throw new Error(`OpenAI API错误: ${errorMsg}`);
+  }
+
+  const data = await safeJsonParse(response);
   return data.choices?.[0]?.message?.content || '';
 }
 
 // 调用百度OCR API
 async function callBaiduOCR(base64Image, config) {
-  // 首先获取access_token
-  const tokenResponse = await fetch(
-    `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${config.apiKey}&client_secret=${config.customSecret || ''}`,
-    { method: 'POST' }
-  );
+  let tokenResponse;
+  try {
+    // 首先获取access_token
+    tokenResponse = await fetch(
+      `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${config.apiKey}&client_secret=${config.customSecret || ''}`,
+      { method: 'POST' }
+    );
+  } catch (networkError) {
+    throw new Error('网络连接失败，无法连接到百度服务器');
+  }
 
   if (!tokenResponse.ok) {
-    throw new Error('获取百度access_token失败');
+    const errorText = await tokenResponse.text();
+    throw new Error(`获取百度access_token失败: ${errorText || tokenResponse.status}`);
   }
 
-  const tokenData = await tokenResponse.json();
+  let tokenData;
+  try {
+    tokenData = await tokenResponse.json();
+  } catch (e) {
+    throw new Error('百度服务器返回了无效的数据格式');
+  }
+
+  if (tokenData.error) {
+    throw new Error(`百度认证失败: ${tokenData.error_description || tokenData.error}`);
+  }
+
   const accessToken = tokenData.access_token;
+  if (!accessToken) {
+    throw new Error('未能获取百度access_token，请检查API Key和Secret');
+  }
 
   // 调用OCR接口
-  const ocrResponse = await fetch(
-    `https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic?access_token=${accessToken}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: `image=${encodeURIComponent(base64Image)}`
-    }
-  );
-
-  if (!ocrResponse.ok) {
-    throw new Error('百度OCR请求失败');
+  let ocrResponse;
+  try {
+    ocrResponse = await fetch(
+      `https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic?access_token=${accessToken}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `image=${encodeURIComponent(base64Image)}`
+      }
+    );
+  } catch (networkError) {
+    throw new Error('网络连接失败，无法发送OCR请求');
   }
 
-  const ocrData = await ocrResponse.json();
+  if (!ocrResponse.ok) {
+    const errorText = await ocrResponse.text();
+    throw new Error(`百度OCR请求失败: ${errorText || ocrResponse.status}`);
+  }
+
+  let ocrData;
+  try {
+    ocrData = await ocrResponse.json();
+  } catch (e) {
+    throw new Error('百度OCR返回了无效的数据格式');
+  }
 
   if (ocrData.error_code) {
-    throw new Error(`百度OCR错误: ${ocrData.error_msg}`);
+    throw new Error(`百度OCR错误: ${ocrData.error_msg || ocrData.error_code}`);
   }
 
   // 合并识别结果
@@ -292,34 +392,43 @@ async function callCustomAPI(base64Image, config) {
     throw new Error('未配置自定义API端点');
   }
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.apiKey}`
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: prompt },
-          {
-            type: 'image_url',
-            image_url: {
-              url: `data:image/png;base64,${base64Image}`
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:image/png;base64,${base64Image}`
+              }
             }
-          }
-        ]
-      }]
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`自定义API请求失败: ${response.status}`);
+          ]
+        }]
+      })
+    });
+  } catch (networkError) {
+    if (networkError.name === 'TypeError' || networkError.message?.includes('fetch')) {
+      throw new Error(`网络连接失败，无法连接到自定义API: ${endpoint}`);
+    }
+    throw networkError;
   }
 
-  const data = await response.json();
+  if (!response.ok) {
+    const errorMsg = await parseErrorResponse(response);
+    throw new Error(`自定义API错误: ${errorMsg}`);
+  }
+
+  const data = await safeJsonParse(response);
   // 尝试常见的响应格式
   return data.choices?.[0]?.message?.content
     || data.content?.[0]?.text
@@ -341,36 +450,44 @@ async function callAliyunOCR(base64Image, config) {
   const model = config.customModel || 'qwen-vl-max';
   const prompt = config.prompt || '请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。';
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: model,
-      max_tokens: 4096,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: prompt },
-          {
-            type: 'image_url',
-            image_url: {
-              url: `data:image/png;base64,${base64Image}`
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 4096,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:image/png;base64,${base64Image}`
+              }
             }
-          }
-        ]
-      }]
-    })
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || `阿里云OCR请求失败: ${response.status}`);
+          ]
+        }]
+      })
+    });
+  } catch (networkError) {
+    if (networkError.name === 'TypeError' || networkError.message?.includes('fetch')) {
+      throw new Error('网络连接失败，请检查网络连接');
+    }
+    throw networkError;
   }
 
-  const data = await response.json();
+  if (!response.ok) {
+    const errorMsg = await parseErrorResponse(response);
+    throw new Error(`阿里云OCR错误: ${errorMsg}`);
+  }
+
+  const data = await safeJsonParse(response);
   return data.choices?.[0]?.message?.content || '';
 }
 
@@ -379,35 +496,43 @@ async function callZhipuAPI(base64Image, config) {
   const model = config.model || 'glm-4v';
   const prompt = config.prompt || '请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。';
 
-  const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.apiKey}`
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: prompt },
-          {
-            type: 'image_url',
-            image_url: {
-              url: `data:image/png;base64,${base64Image}`
+  let response;
+  try {
+    response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:image/png;base64,${base64Image}`
+              }
             }
-          }
-        ]
-      }]
-    })
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || `智谱AI请求失败: ${response.status}`);
+          ]
+        }]
+      })
+    });
+  } catch (networkError) {
+    if (networkError.name === 'TypeError' || networkError.message?.includes('fetch')) {
+      throw new Error('网络连接失败，请检查网络连接');
+    }
+    throw networkError;
   }
 
-  const data = await response.json();
+  if (!response.ok) {
+    const errorMsg = await parseErrorResponse(response);
+    throw new Error(`智谱AI错误: ${errorMsg}`);
+  }
+
+  const data = await safeJsonParse(response);
   return data.choices?.[0]?.message?.content || '';
 }
 
@@ -421,36 +546,44 @@ async function callOpenAICompatibleAPI(base64Image, config) {
     throw new Error('未配置API端点');
   }
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.apiKey}`
-    },
-    body: JSON.stringify({
-      model: model,
-      max_tokens: 4096,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: prompt },
-          {
-            type: 'image_url',
-            image_url: {
-              url: `data:image/png;base64,${base64Image}`
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: 4096,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:image/png;base64,${base64Image}`
+              }
             }
-          }
-        ]
-      }]
-    })
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || `API请求失败: ${response.status}`);
+          ]
+        }]
+      })
+    });
+  } catch (networkError) {
+    if (networkError.name === 'TypeError' || networkError.message?.includes('fetch')) {
+      throw new Error(`网络连接失败，无法连接到API: ${endpoint}`);
+    }
+    throw networkError;
   }
 
-  const data = await response.json();
+  if (!response.ok) {
+    const errorMsg = await parseErrorResponse(response);
+    throw new Error(`API错误: ${errorMsg}`);
+  }
+
+  const data = await safeJsonParse(response);
   // 兼容不同格式的响应
   return data.choices?.[0]?.message?.content
     || data.choices?.[0]?.delta?.content

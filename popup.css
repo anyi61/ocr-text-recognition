@@ -240,3 +240,74 @@ body {
   color: #721c24;
   font-size: 13px;
 }
+
+/* 历史记录区域 */
+.history-area {
+  margin-bottom: 16px;
+  border-top: 1px solid #e8e8e8;
+  padding-top: 16px;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.history-header h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.history-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.history-item {
+  padding: 10px 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.history-item:hover {
+  background: #e9ecef;
+}
+
+.history-item-text {
+  font-size: 12px;
+  color: #333;
+  line-height: 1.5;
+  margin-bottom: 6px;
+  word-break: break-all;
+}
+
+.history-item-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #888;
+}
+
+.history-copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  color: #667eea;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.history-copy-btn:hover {
+  background: rgba(102, 126, 234, 0.1);
+}

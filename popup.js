@@ -10,6 +10,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const configTip = document.getElementById('configTip');
   const resultText = document.getElementById('resultText');
   const statusText = document.getElementById('statusText');
+  const historyArea = document.getElementById('historyArea');
+  const historyList = document.getElementById('historyList');
+  const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
   // 检查是否已配置API（支持多API配置）
   const checkConfig = async () => {
@@ -35,8 +38,95 @@ document.addEventListener('DOMContentLoaded', async () => {
     return true;
   };
 
-  // 初始化检查
+  // 加载历史记录
+  const loadHistory = async () => {
+    try {
+      const result = await chrome.storage.local.get(['ocrHistory']);
+      const history = result.ocrHistory || [];
+
+      if (history.length === 0) {
+        historyArea.classList.add('hidden');
+        return;
+      }
+
+      historyArea.classList.remove('hidden');
+      historyList.innerHTML = '';
+
+      history.forEach((item, index) => {
+        const historyItem = document.createElement('div');
+        historyItem.className = 'history-item';
+
+        // 截断显示文本
+        const displayText = item.text.length > 50 ? item.text.substring(0, 50) + '...' : item.text;
+
+        historyItem.innerHTML = `
+          <div class="history-item-text" title="${escapeHtml(item.text)}">${escapeHtml(displayText)}</div>
+          <div class="history-item-meta">
+            <span>${item.date}</span>
+            <button class="history-copy-btn" data-index="${index}" title="复制">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+          </div>
+        `;
+
+        historyList.appendChild(historyItem);
+      });
+
+      // 绑定复制按钮事件
+      document.querySelectorAll('.history-copy-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const index = parseInt(btn.dataset.index);
+          const text = history[index].text;
+          try {
+            await navigator.clipboard.writeText(text);
+            btn.innerHTML = `
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            `;
+            setTimeout(() => {
+              btn.innerHTML = `
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              `;
+            }, 1500);
+          } catch (err) {
+            console.error('复制失败:', err);
+          }
+        });
+      });
+    } catch (error) {
+      console.error('加载历史记录失败:', error);
+    }
+  };
+
+  // 清空历史记录
+  const clearHistory = async () => {
+    if (confirm('确定要清空所有历史记录吗？')) {
+      await chrome.storage.local.remove(['ocrHistory']);
+      historyArea.classList.add('hidden');
+    }
+  };
+
+  // HTML转义函数
+  const escapeHtml = (text) => {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  };
+
+  // 初始化
   await checkConfig();
+  await loadHistory();
+
+  // 清空历史按钮事件
+  clearHistoryBtn.addEventListener('click', clearHistory);
 
   // 配置提示点击事件
   configTip.addEventListener('click', () => {

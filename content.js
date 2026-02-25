@@ -105,6 +105,15 @@
     document.removeEventListener('keydown', onKeyDown);
   }
 
+  // 完全清理所有资源（用于页面卸载时）
+  function fullCleanup() {
+    cleanup();
+    // 移除运行时消息监听器
+    chrome.runtime.onMessage.removeListener(messageListener);
+    // 标记为未初始化
+    window.ocrCaptureInitialized = false;
+  }
+
   // 鼠标按下
   function onMouseDown(e) {
     if (e.button !== 0) return; // 只处理左键
@@ -467,14 +476,20 @@
     document.addEventListener('keydown', onKeyDown);
   }
 
-  // 监听来自popup的消息
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // 消息监听器（命名函数，便于移除）
+  function messageListener(request, sender, sendResponse) {
     if (request.action === 'startCapture') {
       startCapture();
       sendResponse({ success: true });
     }
     return true;
-  });
+  }
+
+  // 监听来自popup的消息
+  chrome.runtime.onMessage.addListener(messageListener);
+
+  // 页面卸载时清理资源，防止内存泄漏
+  window.addEventListener('beforeunload', fullCleanup);
 
   console.log('OCR文字识别助手已加载');
 })();
