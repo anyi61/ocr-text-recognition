@@ -522,3 +522,66 @@ async function testAPIConnection(config, sendResponse) {
     sendResponse({ success: false, error: error.message });
   }
 }
+
+// 监听键盘快捷键
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command === 'start-capture') {
+    try {
+      // 获取当前活动标签页
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+      if (!tab) {
+        console.error('无法获取当前标签页');
+        return;
+      }
+
+      // 检查是否已配置API
+      const result = await chrome.storage.local.get(['apiProvider', 'apiConfigs', 'apiKey']);
+      const provider = result.apiProvider || 'claude';
+      const configs = result.apiConfigs || {};
+
+      let hasApiKey = false;
+      if (configs[provider] && configs[provider].apiKey) {
+        hasApiKey = true;
+      } else if (provider === 'claude' && result.apiKey) {
+        hasApiKey = true;
+      }
+
+      if (!hasApiKey) {
+        // 显示通知提示用户配置API
+        chrome.notifications.create({
+          type: 'basic',
+          iconUrl: 'icons/icon128.png',
+          title: 'OCR文字识别助手',
+          message: '请先配置API密钥后再使用快捷键截图'
+        });
+        return;
+      }
+
+      // 向内容脚本发送消息，启动截图模式
+      await chrome.tabs.sendMessage(tab.id, { action: 'startCapture' });
+    } catch (error) {
+      console.error('快捷键启动截图失败:', error);
+      // 可能是内容脚本未加载，尝试注入
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab) {
+          await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: ['content.js']
+          });
+          // 再次尝试启动截图
+          await chrome.tabs.sendMessage(tab.id, { action: 'startCapture' });
+        }
+      } catch (injectError) {
+        console.error('注入内容脚本失败:', injectError);
+        chrome.notifications.create({
+          type: 'basic',
+          iconUrl: 'icons/icon128.png',
+          title: 'OCR文字识别助手',
+          message: '无法在当前页面使用截图功能，请刷新页面后重试'
+        });
+      }
+    }
+  }
+});

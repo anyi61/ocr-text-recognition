@@ -10,6 +10,15 @@
     "clipboardWrite",
     "notifications"
   ],
+  "commands": {
+    "start-capture": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S",
+        "mac": "Command+Shift+S"
+      },
+      "description": "开始截图识别"
+    }
+  },
   "host_permissions": [
     "<all_urls>"
   ],
