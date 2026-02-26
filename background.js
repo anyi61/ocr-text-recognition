@@ -216,38 +216,21 @@ async function safeJsonParse(response) {
   }
 }
 
-// 调用Claude API
-async function callClaudeAPI(base64Image, config) {
-  const model = config.model || 'claude-3-opus-20240229';
-  const prompt = config.prompt || '请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。';
-
+/**
+ * 通用 API 请求函数
+ * @param {string} endpoint - API 端点
+ * @param {object} headers - 请求头
+ * @param {object} body - 请求体
+ * @param {string} errorPrefix - 错误信息前缀
+ * @returns {Promise<object>} 返回解析后的 JSON 数据
+ */
+async function apiRequest(endpoint, headers, body, errorPrefix) {
   let response;
   try {
-    response = await fetch('https://api.anthropic.com/v1/messages', {
+    response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': config.apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: model,
-        max_tokens: 4096,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: 'image/png',
-                data: base64Image
-              }
-            }
-          ]
-        }]
-      })
+      headers,
+      body: JSON.stringify(body)
     });
   } catch (networkError) {
     if (networkError.name === 'TypeError' || networkError.message?.includes('fetch')) {
@@ -258,10 +241,65 @@ async function callClaudeAPI(base64Image, config) {
 
   if (!response.ok) {
     const errorMsg = await parseErrorResponse(response);
-    throw new Error(`Claude API错误: ${errorMsg}`);
+    throw new Error(`${errorPrefix}: ${errorMsg}`);
   }
 
-  const data = await safeJsonParse(response);
+  return await safeJsonParse(response);
+}
+
+/**
+ * 构建 OpenAI 兼容格式的请求体
+ * @param {string} model - 模型名称
+ * @param {string} prompt - 提示词
+ * @param {string} base64Image - base64 图片
+ * @returns {object} 请求体
+ */
+function buildOpenAIRequestBody(model, prompt, base64Image) {
+  return {
+    model,
+    max_tokens: 4096,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'text', text: prompt },
+        {
+          type: 'image_url',
+          image_url: {
+            url: `data:image/png;base64,${base64Image}`
+          }
+        }
+      ]
+    }]
+  };
+}
+
+// 调用Claude API
+async function callClaudeAPI(base64Image, config) {
+  const model = config.model || 'claude-3-opus-20240229';
+  const prompt = config.prompt || '请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。';
+
+  const body = buildOpenAIRequestBody(model, prompt, base64Image);
+  // Claude 使用不同的图片格式
+  body.messages[0].content[1] = {
+    type: 'image',
+    source: {
+      type: 'base64',
+      media_type: 'image/png',
+      data: base64Image
+    }
+  };
+
+  const data = await apiRequest(
+    'https://api.anthropic.com/v1/messages',
+    {
+      'Content-Type': 'application/json',
+      'x-api-key': config.apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body,
+    'Claude API错误'
+  );
+
   return data.content?.[0]?.text || '';
 }
 
@@ -270,44 +308,16 @@ async function callOpenAIAPI(base64Image, config) {
   const model = config.model || 'gpt-4o';
   const prompt = config.prompt || '请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。';
 
-  let response;
-  try {
-    response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`
-      },
-      body: JSON.stringify({
-        model: model,
-        max_tokens: 4096,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:image/png;base64,${base64Image}`
-              }
-            }
-          ]
-        }]
-      })
-    });
-  } catch (networkError) {
-    if (networkError.name === 'TypeError' || networkError.message?.includes('fetch')) {
-      throw new Error('网络连接失败，请检查网络或代理设置');
-    }
-    throw networkError;
-  }
+  const data = await apiRequest(
+    'https://api.openai.com/v1/chat/completions',
+    {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${config.apiKey}`
+    },
+    buildOpenAIRequestBody(model, prompt, base64Image),
+    'OpenAI API错误'
+  );
 
-  if (!response.ok) {
-    const errorMsg = await parseErrorResponse(response);
-    throw new Error(`OpenAI API错误: ${errorMsg}`);
-  }
-
-  const data = await safeJsonParse(response);
   return data.choices?.[0]?.message?.content || '';
 }
 
@@ -392,43 +402,16 @@ async function callCustomAPI(base64Image, config) {
     throw new Error('未配置自定义API端点');
   }
 
-  let response;
-  try {
-    response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:image/png;base64,${base64Image}`
-              }
-            }
-          ]
-        }]
-      })
-    });
-  } catch (networkError) {
-    if (networkError.name === 'TypeError' || networkError.message?.includes('fetch')) {
-      throw new Error(`网络连接失败，无法连接到自定义API: ${endpoint}`);
-    }
-    throw networkError;
-  }
+  const data = await apiRequest(
+    endpoint,
+    {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${config.apiKey}`
+    },
+    buildOpenAIRequestBody(model, prompt, base64Image),
+    '自定义API错误'
+  );
 
-  if (!response.ok) {
-    const errorMsg = await parseErrorResponse(response);
-    throw new Error(`自定义API错误: ${errorMsg}`);
-  }
-
-  const data = await safeJsonParse(response);
   // 尝试常见的响应格式
   return data.choices?.[0]?.message?.content
     || data.content?.[0]?.text
@@ -445,49 +428,19 @@ async function callAliyunOCR(base64Image, config) {
     throw new Error('阿里云OCR需要API Key');
   }
 
-  // 使用阿里云DashScope兼容模式 - 支持OpenAI格式
-  const endpoint = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
   const model = config.customModel || 'qwen-vl-max';
   const prompt = config.prompt || '请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。';
 
-  let response;
-  try {
-    response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: model,
-        max_tokens: 4096,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:image/png;base64,${base64Image}`
-              }
-            }
-          ]
-        }]
-      })
-    });
-  } catch (networkError) {
-    if (networkError.name === 'TypeError' || networkError.message?.includes('fetch')) {
-      throw new Error('网络连接失败，请检查网络连接');
-    }
-    throw networkError;
-  }
+  const data = await apiRequest(
+    'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+    {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    buildOpenAIRequestBody(model, prompt, base64Image),
+    '阿里云OCR错误'
+  );
 
-  if (!response.ok) {
-    const errorMsg = await parseErrorResponse(response);
-    throw new Error(`阿里云OCR错误: ${errorMsg}`);
-  }
-
-  const data = await safeJsonParse(response);
   return data.choices?.[0]?.message?.content || '';
 }
 
@@ -496,43 +449,33 @@ async function callZhipuAPI(base64Image, config) {
   const model = config.model || 'glm-4v';
   const prompt = config.prompt || '请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。';
 
-  let response;
-  try {
-    response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:image/png;base64,${base64Image}`
-              }
-            }
-          ]
-        }]
-      })
-    });
-  } catch (networkError) {
-    if (networkError.name === 'TypeError' || networkError.message?.includes('fetch')) {
-      throw new Error('网络连接失败，请检查网络连接');
-    }
-    throw networkError;
-  }
+  // 智谱API不支持 max_tokens 参数，需要手动构建请求体
+  const body = {
+    model,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'text', text: prompt },
+        {
+          type: 'image_url',
+          image_url: {
+            url: `data:image/png;base64,${base64Image}`
+          }
+        }
+      ]
+    }]
+  };
 
-  if (!response.ok) {
-    const errorMsg = await parseErrorResponse(response);
-    throw new Error(`智谱AI错误: ${errorMsg}`);
-  }
+  const data = await apiRequest(
+    'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+    {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${config.apiKey}`
+    },
+    body,
+    '智谱AI错误'
+  );
 
-  const data = await safeJsonParse(response);
   return data.choices?.[0]?.message?.content || '';
 }
 
@@ -546,44 +489,16 @@ async function callOpenAICompatibleAPI(base64Image, config) {
     throw new Error('未配置API端点');
   }
 
-  let response;
-  try {
-    response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`
-      },
-      body: JSON.stringify({
-        model: model,
-        max_tokens: 4096,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'text', text: prompt },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:image/png;base64,${base64Image}`
-              }
-            }
-          ]
-        }]
-      })
-    });
-  } catch (networkError) {
-    if (networkError.name === 'TypeError' || networkError.message?.includes('fetch')) {
-      throw new Error(`网络连接失败，无法连接到API: ${endpoint}`);
-    }
-    throw networkError;
-  }
+  const data = await apiRequest(
+    endpoint,
+    {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${config.apiKey}`
+    },
+    buildOpenAIRequestBody(model, prompt, base64Image),
+    'API错误'
+  );
 
-  if (!response.ok) {
-    const errorMsg = await parseErrorResponse(response);
-    throw new Error(`API错误: ${errorMsg}`);
-  }
-
-  const data = await safeJsonParse(response);
   // 兼容不同格式的响应
   return data.choices?.[0]?.message?.content
     || data.choices?.[0]?.delta?.content
