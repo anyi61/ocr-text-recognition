@@ -52,6 +52,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const testBtn = document.getElementById('testBtn');
   const statusMessage = document.getElementById('statusMessage');
 
+  // 导入导出按钮
+  const exportBtn = document.getElementById('exportBtn');
+  const importBtn = document.getElementById('importBtn');
+  const importFileInput = document.getElementById('importFileInput');
+
   /**
    * 根据提供商显示对应的配置区块
    * @param {string} provider - API提供商类型
@@ -349,6 +354,304 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  /**
+   * 导出配置到JSON文件
+   * @async
+   * @returns {Promise<void>}
+   * @description 将当前配置导出为JSON文件下载，不包含敏感的历史记录数据
+   */
+  async function exportConfig() {
+    try {
+      showStatus('正在导出配置...', 'loading');
+
+      // 获取当前配置（仅导出配置数据，不包含历史记录）
+      const result = await chrome.storage.local.get([
+        'apiProvider', 'apiConfigs', 'prompt', 'language'
+      ]);
+
+      // 构建导出数据结构
+      const exportData = {
+        version: '1.0.0',
+        exportDate: new Date().toISOString(),
+        appName: 'OCR文字识别助手',
+        config: {
+          apiProvider: result.apiProvider || 'claude',
+          apiConfigs: result.apiConfigs || {},
+          prompt: result.prompt || '',
+          language: result.language || 'auto'
+        }
+      };
+
+      // 创建并下载JSON文件
+      const jsonString = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+
+      // 创建临时下载链接
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ocr-config-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+
+      // 清理
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showStatus('配置已成功导出', 'success');
+    } catch (error) {
+      console.error('导出配置失败:', error);
+      showStatus('导出失败: ' + error.message, 'error');
+    }
+  }
+
+  /**
+   * 验证导入的配置数据
+   * @param {Object} data - 待验证的配置数据
+   * @returns {{valid: boolean, error: string|null, config: Object|null}}
+   * @description 验证JSON格式和必要字段，返回验证结果
+   */
+  function validateImportData(data) {
+    // 检查基本结构
+    if (!data || typeof data !== 'object') {
+      return { valid: false, error: '无效的配置文件格式', config: null };
+    }
+
+    // 检查是否有config字段（新格式）或直接是配置（兼容旧格式）
+    let config = data.config || data;
+
+    if (!config || typeof config !== 'object') {
+      return { valid: false, error: '配置文件缺少必要的配置数据', config: null };
+    }
+
+    // 验证apiProvider
+    const validProviders = ['claude', 'openai', 'baidu', 'aliyun', 'zhipu', 'openai-compatible', 'custom'];
+    if (config.apiProvider && !validProviders.includes(config.apiProvider)) {
+      return { valid: false, error: '无效的API提供商类型: ' + config.apiProvider, config: null };
+    }
+
+    // 验证apiConfigs结构
+    if (config.apiConfigs && typeof config.apiConfigs !== 'object') {
+      return { valid: false, error: 'apiConfigs格式无效', config: null };
+    }
+
+    // 验证各个API配置的结构
+    if (config.apiConfigs) {
+      const validConfigKeys = ['claude', 'openai', 'baidu', 'aliyun', 'zhipu', 'openaiCompatible', 'custom'];
+      for (const key of Object.keys(config.apiConfigs)) {
+        if (!validConfigKeys.includes(key)) {
+          console.warn('未知的API配置键:', key);
+          continue;
+        }
+        const apiConfig = config.apiConfigs[key];
+        if (typeof apiConfig !== 'object') {
+          return { valid: false, error: `apiConfigs.${key} 格式无效`, config: null };
+        }
+      }
+    }
+
+    // 验证prompt和language
+    if (config.prompt !== undefined && typeof config.prompt !== 'string') {
+      return { valid: false, error: 'prompt格式无效', config: null };
+    }
+
+    if (config.language !== undefined && typeof config.language !== 'string') {
+      return { valid: false, error: 'language格式无效', config: null };
+    }
+
+    return { valid: true, error: null, config: config };
+  }
+
+  /**
+   * 显示确认对话框
+   * @param {string} title - 对话框标题
+   * @param {string} message - 对话框消息
+   * @param {Object} configInfo - 配置信息对象
+   * @returns {Promise<boolean>}
+   * @description 显示模态确认对话框，返回用户选择结果
+   */
+  function showConfirmDialog(title, message, configInfo) {
+    return new Promise((resolve) => {
+      // 构建配置信息HTML
+      let infoHtml = '';
+      if (configInfo) {
+        infoHtml = `
+          <div class="config-info">
+            <p><strong>API提供商:</strong> ${configInfo.apiProvider || 'claude'}</p>
+            ${configInfo.exportDate ? `<p><strong>导出时间:</strong> ${new Date(configInfo.exportDate).toLocaleString()}</p>` : ''}
+          </div>
+        `;
+      }
+
+      // 创建对话框HTML
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal-dialog">
+          <h3>${title}</h3>
+          <p>${message}</p>
+          ${infoHtml}
+          <p class="warning-text">此操作将覆盖当前所有配置，是否继续？</p>
+          <div class="modal-actions">
+            <button class="btn btn-secondary" id="modalCancel">取消</button>
+            <button class="btn btn-primary" id="modalConfirm">确认导入</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+
+      // 触发动画
+      requestAnimationFrame(() => {
+        overlay.classList.add('active');
+      });
+
+      // 绑定事件
+      const cancelBtn = overlay.querySelector('#modalCancel');
+      const confirmBtn = overlay.querySelector('#modalConfirm');
+
+      const closeDialog = (result) => {
+        overlay.classList.remove('active');
+        setTimeout(() => {
+          document.body.removeChild(overlay);
+          resolve(result);
+        }, 300);
+      };
+
+      cancelBtn.addEventListener('click', () => closeDialog(false));
+      confirmBtn.addEventListener('click', () => closeDialog(true));
+
+      // 点击遮罩关闭
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          closeDialog(false);
+        }
+      });
+
+      // ESC键关闭
+      const escHandler = (e) => {
+        if (e.key === 'Escape') {
+          document.removeEventListener('keydown', escHandler);
+          closeDialog(false);
+        }
+      };
+      document.addEventListener('keydown', escHandler);
+    });
+  }
+
+  /**
+   * 导入配置文件
+   * @param {Event} event - 文件选择事件
+   * @returns {Promise<void>}
+   * @description 读取并验证JSON配置文件，确认后应用配置
+   */
+  async function importConfig(event) {
+    const file = event.target.files[0];
+    if (!file) {
+      return;
+    }
+
+    // 重置文件输入，允许重复选择同一文件
+    event.target.value = '';
+
+    // 检查文件类型
+    if (!file.name.endsWith('.json') && file.type !== 'application/json') {
+      showStatus('请选择JSON格式的配置文件', 'error');
+      return;
+    }
+
+    showStatus('正在读取配置文件...', 'loading');
+
+    try {
+      // 读取文件内容
+      const content = await file.text();
+      let data;
+
+      try {
+        data = JSON.parse(content);
+      } catch (parseError) {
+        showStatus('配置文件格式错误，请确保是有效的JSON', 'error');
+        return;
+      }
+
+      // 验证配置数据
+      const validation = validateImportData(data);
+      if (!validation.valid) {
+        showStatus('配置验证失败: ' + validation.error, 'error');
+        return;
+      }
+
+      // 显示确认对话框
+      const confirmed = await showConfirmDialog(
+        '导入配置确认',
+        '即将导入配置文件，请确认以下信息：',
+        {
+          apiProvider: validation.config.apiProvider,
+          exportDate: data.exportDate
+        }
+      );
+
+      if (!confirmed) {
+        showStatus('已取消导入', 'error');
+        return;
+      }
+
+      // 应用配置
+      showStatus('正在应用配置...', 'loading');
+
+      // 构建要保存的配置
+      const settingsToSave = {
+        apiProvider: validation.config.apiProvider || 'claude',
+        apiConfigs: validation.config.apiConfigs || {},
+        prompt: validation.config.prompt || '',
+        language: validation.config.language || 'auto'
+      };
+
+      // 为了兼容性，也保存旧格式字段
+      if (settingsToSave.apiConfigs.claude) {
+        settingsToSave.apiKey = settingsToSave.apiConfigs.claude.apiKey || '';
+        settingsToSave.model = settingsToSave.apiConfigs.claude.model || 'claude-3-opus-20240229';
+      }
+      if (settingsToSave.apiConfigs.openai) {
+        settingsToSave.openaiApiKey = settingsToSave.apiConfigs.openai.apiKey || '';
+        settingsToSave.openaiModel = settingsToSave.apiConfigs.openai.model || 'gpt-4o';
+      }
+      if (settingsToSave.apiConfigs.baidu) {
+        settingsToSave.baiduApiKey = settingsToSave.apiConfigs.baidu.apiKey || '';
+        settingsToSave.customSecret = settingsToSave.apiConfigs.baidu.secret || '';
+      }
+      if (settingsToSave.apiConfigs.aliyun) {
+        settingsToSave.aliyunApiKey = settingsToSave.apiConfigs.aliyun.apiKey || '';
+        settingsToSave.aliyunModel = settingsToSave.apiConfigs.aliyun.model || 'qwen-vl-max';
+      }
+      if (settingsToSave.apiConfigs.zhipu) {
+        settingsToSave.zhipuApiKey = settingsToSave.apiConfigs.zhipu.apiKey || '';
+        settingsToSave.zhipuModel = settingsToSave.apiConfigs.zhipu.model || 'glm-4v';
+      }
+      if (settingsToSave.apiConfigs.openaiCompatible) {
+        settingsToSave.compatibleEndpoint = settingsToSave.apiConfigs.openaiCompatible.endpoint || '';
+        settingsToSave.compatibleApiKey = settingsToSave.apiConfigs.openaiCompatible.apiKey || '';
+        settingsToSave.compatibleModel = settingsToSave.apiConfigs.openaiCompatible.model || '';
+      }
+      if (settingsToSave.apiConfigs.custom) {
+        settingsToSave.customEndpoint = settingsToSave.apiConfigs.custom.endpoint || '';
+        settingsToSave.customApiKey = settingsToSave.apiConfigs.custom.apiKey || '';
+        settingsToSave.customModel = settingsToSave.apiConfigs.custom.model || '';
+      }
+
+      // 保存到chrome.storage
+      await chrome.storage.local.set(settingsToSave);
+
+      // 重新加载页面设置
+      await loadSettings();
+
+      showStatus('配置已成功导入！', 'success');
+    } catch (error) {
+      console.error('导入配置失败:', error);
+      showStatus('导入失败: ' + error.message, 'error');
+    }
+  }
+
   // 事件监听
   apiProvider.addEventListener('change', async (e) => {
     showConfigSection(e.target.value);
@@ -357,6 +660,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   testBtn.addEventListener('click', testConnection);
+
+  // 导入导出按钮事件
+  exportBtn.addEventListener('click', exportConfig);
+  importBtn.addEventListener('click', () => importFileInput.click());
+  importFileInput.addEventListener('change', importConfig);
 
   // 加载设置
   await loadSettings();
