@@ -49,7 +49,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const language = document.getElementById('language');
 
   // 按钮
-  const saveBtn = document.getElementById('saveBtn');
   const testBtn = document.getElementById('testBtn');
   const statusMessage = document.getElementById('statusMessage');
 
@@ -238,14 +237,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   /**
    * 自动保存所有输入框的变更
-   * @description 为所有输入框和选择框添加blur事件监听，失去焦点时自动保存
+   * @description 为所有输入框和选择框添加blur事件监听，失去焦点时自动保存并显示提示
    */
   function setupAutoSave() {
-    const allInputs = document.querySelectorAll('input, select');
+    const allInputs = document.querySelectorAll('input, select, textarea');
     allInputs.forEach(input => {
       input.addEventListener('blur', async () => {
         // 当输入框失去焦点时自动保存
         await saveSettings();
+        // 显示自动保存提示
+        showStatus('已自动保存', 'success');
       });
     });
   }
@@ -349,11 +350,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // 事件监听
-  apiProvider.addEventListener('change', (e) => {
+  apiProvider.addEventListener('change', async (e) => {
     showConfigSection(e.target.value);
+    // 切换API时自动保存当前选择
+    await saveSettings();
   });
 
-  saveBtn.addEventListener('click', saveSettings);
   testBtn.addEventListener('click', testConnection);
 
   // 加载设置
