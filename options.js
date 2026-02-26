@@ -1,4 +1,7 @@
-// options.js - 设置页面逻辑
+/**
+ * @fileoverview options.js - OCR文字识别助手设置页面逻辑
+ * @description 处理设置页面的配置加载、保存、API测试等功能
+ */
 
 document.addEventListener('DOMContentLoaded', async () => {
   // 获取DOM元素
@@ -50,7 +53,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const testBtn = document.getElementById('testBtn');
   const statusMessage = document.getElementById('statusMessage');
 
-  // 根据提供商显示对应的配置区块
+  /**
+   * 根据提供商显示对应的配置区块
+   * @param {string} provider - API提供商类型
+   */
   function showConfigSection(provider) {
     claudeConfig.classList.add('hidden');
     openaiConfig.classList.add('hidden');
@@ -85,7 +91,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // 加载保存的设置
+  /**
+   * 加载保存的设置
+   * @async
+   * @returns {Promise<void>}
+   * @description 从chrome.storage加载所有API配置和设置，兼容新旧配置格式
+   */
   async function loadSettings() {
     // 统一从 apiConfigs 对象中加载各API配置，同时兼容旧版配置
     const result = await chrome.storage.local.get([
@@ -153,7 +164,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // 保存设置 - 保存所有API配置，不只是当前选中的
+  /**
+   * 保存设置
+   * @async
+   * @returns {Promise<void>}
+   * @description 保存所有API配置到chrome.storage，同时兼容新旧格式
+   */
   async function saveSettings() {
     const provider = apiProvider.value;
 
@@ -220,7 +236,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     showStatus('设置已保存', 'success');
   }
 
-  // 自动保存所有输入框的变更
+  /**
+   * 自动保存所有输入框的变更
+   * @description 为所有输入框和选择框添加blur事件监听，失去焦点时自动保存
+   */
   function setupAutoSave() {
     const allInputs = document.querySelectorAll('input, select');
     allInputs.forEach(input => {
@@ -231,7 +250,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // 测试API连接
+  /**
+   * 测试API连接
+   * @async
+   * @returns {Promise<void>}
+   * @description 使用当前选中的API配置进行连接测试
+   */
   async function testConnection() {
     const provider = apiProvider.value;
     const testBtn = document.getElementById('testBtn');
@@ -306,7 +330,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     testBtn.disabled = false;
   }
 
-  // 显示状态消息
+  /**
+   * 显示状态消息
+   * @param {string} message - 状态消息内容
+   * @param {string} type - 消息类型 (success|error|loading)
+   * @description 在页面上方显示状态消息，非loading类型5秒后自动隐藏
+   */
   function showStatus(message, type) {
     statusMessage.textContent = message;
     statusMessage.className = 'status-message ' + type;

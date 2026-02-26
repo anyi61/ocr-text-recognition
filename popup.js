@@ -1,3 +1,8 @@
+/**
+ * @fileoverview popup.js - OCR文字识别助手弹出窗口逻辑
+ * @description 处理弹出窗口的UI交互、历史记录显示和复制功能
+ */
+
 // popup.js - 弹出窗口逻辑
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -38,7 +43,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     return true;
   };
 
-  // 加载历史记录
+  /**
+   * 加载历史记录
+   * @async
+   * @returns {Promise<void>}
+   * @description 从存储中加载识别历史记录并显示在popup中
+   */
   const loadHistory = async () => {
     try {
       const result = await chrome.storage.local.get(['ocrHistory']);
@@ -106,7 +116,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
-  // 清空历史记录
+  /**
+   * 清空历史记录
+   * @async
+   * @returns {Promise<void>}
+   */
   const clearHistory = async () => {
     if (confirm('确定要清空所有历史记录吗？')) {
       await chrome.storage.local.remove(['ocrHistory']);
@@ -114,7 +128,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
-  // HTML转义函数
+  /**
+   * HTML转义函数
+   * @param {string} text - 原始文本
+   * @returns {string} 转义后的HTML安全文本
+   * @description 防止XSS攻击，将特殊字符转换为HTML实体
+   */
   const escapeHtml = (text) => {
     const div = document.createElement('div');
     div.textContent = text;

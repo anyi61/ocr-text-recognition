@@ -1,12 +1,22 @@
-// content.js - 内容脚本，处理页面截图选区
+/**
+ * @fileoverview content.js - OCR文字识别助手内容脚本
+ * @description 处理页面截图选区、图片裁剪、结果显示和进度通知
+ */
 
 (function() {
-  // 防止重复注入
-  if (window.ocrCaptureInitialized) {
-    return;
-  }
-  window.ocrCaptureInitialized = true;
+  /**
+   * 选区矩形信息
+   * @typedef {Object} Rect
+   * @property {number} left - 左坐标
+   * @property {number} top - 上坐标
+   * @property {number} width - 宽度
+   * @property {number} height - 高度
+   */
 
+  /**
+   * 截图状态
+   * @type {boolean}
+   */
   let isCapturing = false;
   let startX = 0;
   let startY = 0;
@@ -86,7 +96,10 @@
   `;
   document.head.appendChild(progressStyles);
 
-  // 创建遮罩层
+  /**
+   * 创建遮罩层和提示文字
+   * @description 创建全屏半透明遮罩和操作提示
+   */
   function createOverlay() {
     overlay = document.createElement('div');
     overlay.id = 'ocr-capture-overlay';
@@ -124,7 +137,10 @@
     document.body.appendChild(tooltip);
   }
 
-  // 创建选区框
+  /**
+   * 创建选区框元素
+   * @description 创建用于显示用户选择区域的DOM元素
+   */
   function createSelectionBox() {
     selectionBox = document.createElement('div');
     selectionBox.id = 'ocr-selection-box';
@@ -139,7 +155,13 @@
     document.body.appendChild(selectionBox);
   }
 
-  // 更新选区框
+  /**
+   * 更新选区框位置和大小
+   * @param {number} x1 - 起始X坐标
+   * @param {number} y1 - 起始Y坐标
+   * @param {number} x2 - 结束X坐标
+   * @param {number} y2 - 结束Y坐标
+   */
   function updateSelectionBox(x1, y1, x2, y2) {
     const left = Math.min(x1, x2);
     const top = Math.min(y1, y2);
@@ -156,7 +178,10 @@
     tooltip.textContent = `${Math.round(width)} × ${Math.round(height)} 像素 - 松开鼠标完成截图`;
   }
 
-  // 清理资源
+  /**
+   * 清理截图相关资源
+   * @description 移除遮罩层、选区框，重置状态
+   */
   function cleanup() {
     isCapturing = false;
     isCancelled = false;
@@ -178,7 +203,10 @@
     document.removeEventListener('keydown', onKeyDown);
   }
 
-  // 完全清理所有资源（用于页面卸载时）
+  /**
+   * 完全清理所有资源
+   * @description 页面卸载时调用，移除所有DOM元素和事件监听器
+   */
   function fullCleanup() {
     cleanup();
     hideProgressNotification();
@@ -288,7 +316,13 @@
     }
   }
 
-  // 裁剪图片
+  /**
+   * 裁剪图片
+   * @param {string} dataUrl - 原始图片的Data URL
+   * @param {DOMRect} rect - 裁剪区域
+   * @returns {Promise<string>} 裁剪后的图片Data URL
+   * @description 使用Canvas根据选区裁剪图片
+   */
   function cropImage(dataUrl, rect) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -321,7 +355,11 @@
     });
   }
 
-  // 显示结果弹窗
+  /**
+   * 显示结果弹窗
+   * @param {string} text - 识别结果文本
+   * @description 在页面右上角显示识别结果弹窗，包含复制和关闭功能
+   */
   function showResultPopup(text) {
     // 移除已有的结果弹窗
     const existingPopup = document.getElementById('ocr-result-popup');
@@ -498,7 +536,12 @@
     });
   }
 
-  // 显示通知
+  /**
+   * 显示通知
+   * @param {string} message - 通知消息
+   * @param {string} [type='info'] - 通知类型 (info|success|warning|error)
+   * @description 在页面顶部显示临时通知，3秒后自动消失
+   */
   function showNotification(message, type = 'info') {
     // 移除已有通知
     const existing = document.getElementById('ocr-notification');
@@ -555,7 +598,13 @@
     }, 3000);
   }
 
-  // 显示进度通知（带加载动画和计时器）
+  /**
+   * 显示进度通知
+   * @param {string} message - 进度消息
+   * @param {boolean} [showCancel=false] - 是否显示取消按钮
+   * @returns {HTMLElement} 通知元素
+   * @description 显示带加载动画和计时器的进度通知
+   */
   function showProgressNotification(message, showCancel = false) {
     // 移除已有进度通知
     hideProgressNotification();
@@ -602,7 +651,10 @@
     return notification;
   }
 
-  // 更新进度通知消息
+  /**
+   * 更新进度通知消息
+   * @param {string} message - 新的进度消息
+   */
   function updateProgressNotification(message) {
     if (progressNotification) {
       const msgEl = progressNotification.querySelector('.ocr-progress-message');
@@ -612,7 +664,10 @@
     }
   }
 
-  // 隐藏进度通知
+  /**
+   * 隐藏进度通知
+   * @description 清除计时器并移除进度通知元素
+   */
   function hideProgressNotification() {
     if (progressTimer) {
       clearInterval(progressTimer);
@@ -625,7 +680,10 @@
     progressStartTime = null;
   }
 
-  // 启动截图模式
+  /**
+   * 启动截图模式
+   * @description 初始化截图状态，创建遮罩层并绑定鼠标/键盘事件
+   */
   function startCapture() {
     if (isCapturing) return;
 
@@ -638,7 +696,14 @@
     document.addEventListener('keydown', onKeyDown);
   }
 
-  // 消息监听器（命名函数，便于移除）
+  /**
+   * 消息监听器
+   * @param {Object} request - 消息请求
+   * @param {chrome.runtime.MessageSender} sender - 发送者信息
+   * @param {Function} sendResponse - 响应回调
+   * @returns {boolean} 保持消息通道开启
+   * @description 监听来自popup的消息，启动截图模式
+   */
   function messageListener(request, sender, sendResponse) {
     if (request.action === 'startCapture') {
       startCapture();
@@ -647,10 +712,17 @@
     return true;
   }
 
-  // 监听来自popup的消息
+  /**
+   * 监听来自popup的消息
+   * @listens chrome.runtime.onMessage
+   */
   chrome.runtime.onMessage.addListener(messageListener);
 
-  // 页面卸载时清理资源，防止内存泄漏
+  /**
+   * 页面卸载时清理资源
+   * @listens window.beforeunload
+   * @description 防止内存泄漏
+   */
   window.addEventListener('beforeunload', fullCleanup);
 
   console.log('OCR文字识别助手已加载');
