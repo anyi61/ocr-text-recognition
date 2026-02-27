@@ -675,10 +675,10 @@
     isEditMode = false;
     currentRect = null;
 
-    // 更新选区框样式
+    // 移除选区框
     if (selectionBox) {
-      selectionBox.classList.remove('edit-mode');
-      selectionBox.style.pointerEvents = 'none';
+      selectionBox.remove();
+      selectionBox = null;
     }
 
     // 更新提示
@@ -691,14 +691,14 @@
       overlay.style.cursor = 'crosshair';
     }
 
-    // 清除选区框
-    if (selectionBox) {
-      selectionBox.style.display = 'none';
-    }
-
-    // 重新绑定初始事件
+    // 重置起始坐标
     startX = 0;
     startY = 0;
+
+    // 重新绑定初始框选阶段的事件监听器
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
   }
 
   /**
@@ -726,10 +726,22 @@
   // 鼠标按下
   function onMouseDown(e) {
     if (e.button !== 0) return; // 只处理左键
+
+    // 如果正在编辑模式或点击了工具栏/手柄，不处理
+    if (isEditMode) return;
+    if (toolbar && toolbar.contains(e.target)) return;
+    if (handles.some(h => h && h.contains(e.target))) return;
+
     e.preventDefault();
 
     startX = e.clientX;
     startY = e.clientY;
+
+    // 确保选区框不存在或已隐藏
+    if (selectionBox) {
+      selectionBox.remove();
+      selectionBox = null;
+    }
 
     createSelectionBox();
     updateSelectionBox(startX, startY, startX, startY);
@@ -742,7 +754,7 @@
   }
 
   // 鼠标释放
-  async function onMouseUp(e) {
+  async function onMouseUp() {
     if (!selectionBox) return;
 
     const rect = selectionBox.getBoundingClientRect();
@@ -1223,7 +1235,7 @@
    * @returns {boolean} 保持消息通道开启
    * @description 监听来自popup的消息，启动截图模式
    */
-  function messageListener(request, sender, sendResponse) {
+  function messageListener(request, _sender, sendResponse) {
     if (request.action === 'startCapture') {
       startCapture();
       sendResponse({ success: true });
