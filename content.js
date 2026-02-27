@@ -24,15 +24,27 @@
   let overlay = null;
   let tooltip = null;
 
+  // 编辑模式状态
+  let isEditMode = false;           // 是否处于编辑模式
+  let isDragging = false;           // 是否正在拖拽
+  let dragType = null;              // 拖拽类型: 'move' | 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
+  let dragStartX = 0;               // 拖拽起始X
+  let dragStartY = 0;               // 拖拽起始Y
+  let originalRect = null;          // 拖拽前的选区 {left, top, width, height}
+  let toolbar = null;               // 工具栏元素
+  let handles = [];                 // 调整手柄元素数组
+  let currentRect = null;           // 当前选区 {left, top, width, height}
+
   // 进度通知相关变量
   let progressNotification = null;
   let progressTimer = null;
   let progressStartTime = null;
   let isCancelled = false;
 
-  // 注入进度通知样式
+  // 注入进度通知样式和编辑模式样式
   const progressStyles = document.createElement('style');
   progressStyles.textContent = `
+    /* 进度通知样式 */
     #ocr-progress-notification {
       position: fixed;
       top: 20px;
@@ -92,6 +104,110 @@
     }
     .ocr-progress-cancel:hover {
       background: rgba(255,255,255,0.3);
+    }
+
+    /* 编辑模式样式 */
+    .ocr-handle {
+      position: fixed;
+      width: 12px;
+      height: 12px;
+      background: #667eea;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      cursor: pointer;
+      z-index: 1000002;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+    .ocr-handle:hover {
+      transform: scale(1.3);
+      background: #764ba2;
+    }
+    .ocr-handle-nw { cursor: nwse-resize; }
+    .ocr-handle-ne { cursor: nesw-resize; }
+    .ocr-handle-sw { cursor: nesw-resize; }
+    .ocr-handle-se { cursor: nwse-resize; }
+    .ocr-handle-n, .ocr-handle-s { cursor: ns-resize; }
+    .ocr-handle-e, .ocr-handle-w { cursor: ew-resize; }
+
+    /* 工具栏样式 */
+    #ocr-toolbar {
+      position: fixed;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: #333;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      z-index: 1000003;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      animation: ocr-toolbar-fadeIn 0.2s ease;
+    }
+    @keyframes ocr-toolbar-fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .ocr-size-info {
+      color: #fff;
+      font-size: 13px;
+      font-weight: 500;
+      min-width: 100px;
+    }
+    .ocr-size-warning {
+      color: #ff6b6b;
+    }
+    .ocr-toolbar-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .ocr-btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+    .ocr-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .ocr-btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    .ocr-btn-primary:hover:not(:disabled) {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+    .ocr-btn-secondary {
+      background: #555;
+      color: #fff;
+    }
+    .ocr-btn-secondary:hover {
+      background: #666;
+    }
+    .ocr-btn-cancel {
+      background: transparent;
+      color: #aaa;
+      border: 1px solid #555;
+    }
+    .ocr-btn-cancel:hover {
+      background: #444;
+      color: #fff;
+    }
+
+    /* 编辑模式下的选区框 */
+    #ocr-selection-box.edit-mode {
+      pointer-events: auto;
+      cursor: move;
+      border-width: 2px;
+    }
+    #ocr-selection-box.edit-mode:hover {
+      border-color: #764ba2;
     }
   `;
   document.head.appendChild(progressStyles);
@@ -181,7 +297,7 @@
       tooltip.style.background = '#e74c3c';
       selectionBox.style.borderColor = '#e74c3c';
     } else {
-      tooltip.textContent = `${Math.round(width)} × ${Math.round(height)} 像素 - 松开鼠标完成截图`;
+      tooltip.textContent = `${Math.round(width)} × ${Math.round(height)} 像素 - 松开鼠标后可调整选区`;
       tooltip.style.background = '#333';
       selectionBox.style.borderColor = '#667eea';
     }
@@ -193,6 +309,7 @@
    */
   function cleanup() {
     isCapturing = false;
+    isEditMode = false;
     isCancelled = false;
     if (overlay) {
       overlay.remove();
@@ -206,10 +323,390 @@
       tooltip.remove();
       tooltip = null;
     }
+    // 清理编辑模式元素
+    cleanupEditMode();
     document.removeEventListener('mousedown', onMouseDown);
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
     document.removeEventListener('keydown', onKeyDown);
+  }
+
+  /**
+   * 清理编辑模式元素
+   * @description 移除手柄和工具栏
+   */
+  function cleanupEditMode() {
+    // 清理手柄
+    handles.forEach(h => h && h.remove());
+    handles = [];
+    // 清理工具栏
+    if (toolbar) {
+      toolbar.remove();
+      toolbar = null;
+    }
+    // 移除编辑模式事件监听
+    document.removeEventListener('mousemove', onEditModeMouseMove);
+    document.removeEventListener('mouseup', onEditModeMouseUp);
+  }
+
+  /**
+   * 进入编辑模式
+   * @param {Object} rect - 选区位置 {left, top, width, height}
+   * @description 创建调整手柄和工具栏，允许用户调整选区
+   */
+  function enterEditMode(rect) {
+    isEditMode = true;
+    currentRect = { ...rect };
+
+    // 移除初始框选阶段的事件监听器，避免冲突
+    document.removeEventListener('mousedown', onMouseDown);
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+
+    // 更新选区框样式
+    if (selectionBox) {
+      selectionBox.classList.add('edit-mode');
+    }
+
+    // 创建调整手柄
+    createHandles();
+
+    // 创建工具栏
+    createToolbar();
+
+    // 更新提示
+    if (tooltip) {
+      tooltip.textContent = '拖拽调整选区，按Enter确认，ESC取消';
+    }
+
+    // 更新遮罩层光标
+    if (overlay) {
+      overlay.style.cursor = 'default';
+    }
+
+    // 绑定编辑模式事件
+    document.addEventListener('mousemove', onEditModeMouseMove);
+    document.addEventListener('mouseup', onEditModeMouseUp);
+  }
+
+  /**
+   * 创建调整手柄
+   * @description 在选区四角和四边中点创建8个拖拽手柄
+   */
+  function createHandles() {
+    const positions = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+
+    positions.forEach(pos => {
+      const handle = document.createElement('div');
+      handle.className = `ocr-handle ocr-handle-${pos}`;
+      handle.dataset.position = pos;
+      handle.addEventListener('mousedown', onHandleMouseDown);
+      document.body.appendChild(handle);
+      handles.push(handle);
+    });
+
+    updateHandlesPosition();
+  }
+
+  /**
+   * 更新手柄位置
+   * @description 根据当前选区更新所有手柄的位置
+   */
+  function updateHandlesPosition() {
+    if (!currentRect || handles.length === 0) return;
+
+    const { left, top, width, height } = currentRect;
+    const halfSize = 6; // 手柄半径
+
+    const positions = {
+      nw: { x: left, y: top },
+      n: { x: left + width / 2, y: top },
+      ne: { x: left + width, y: top },
+      e: { x: left + width, y: top + height / 2 },
+      se: { x: left + width, y: top + height },
+      s: { x: left + width / 2, y: top + height },
+      sw: { x: left, y: top + height },
+      w: { x: left, y: top + height / 2 }
+    };
+
+    handles.forEach((handle, index) => {
+      if (!handle) return;
+      const pos = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'][index];
+      const { x, y } = positions[pos];
+      handle.style.left = `${x - halfSize}px`;
+      handle.style.top = `${y - halfSize}px`;
+    });
+  }
+
+  /**
+   * 创建工具栏
+   * @description 在选区下方创建操作工具栏
+   */
+  function createToolbar() {
+    toolbar = document.createElement('div');
+    toolbar.id = 'ocr-toolbar';
+    toolbar.innerHTML = `
+      <span class="ocr-size-info">${Math.round(currentRect.width)} × ${Math.round(currentRect.height)} px</span>
+      <div class="ocr-toolbar-buttons">
+        <button class="ocr-btn ocr-btn-primary" id="ocr-confirm-btn">确认识别</button>
+        <button class="ocr-btn ocr-btn-secondary" id="ocr-reselect-btn">重选</button>
+        <button class="ocr-btn ocr-btn-cancel" id="ocr-cancel-btn">取消</button>
+      </div>
+    `;
+
+    document.body.appendChild(toolbar);
+    updateToolbarPosition();
+
+    // 绑定按钮事件
+    const confirmBtn = toolbar.querySelector('#ocr-confirm-btn');
+    const reselectBtn = toolbar.querySelector('#ocr-reselect-btn');
+    const cancelBtn = toolbar.querySelector('#ocr-cancel-btn');
+
+    confirmBtn.addEventListener('click', confirmSelection);
+    reselectBtn.addEventListener('click', reselectArea);
+    cancelBtn.addEventListener('click', cancelCapture);
+  }
+
+  /**
+   * 更新工具栏位置
+   * @description 将工具栏定位在选区下方或上方
+   */
+  function updateToolbarPosition() {
+    if (!toolbar || !currentRect) return;
+
+    const { left, top, width, height } = currentRect;
+    const toolbarHeight = 50;
+    const margin = 10;
+
+    // 默认放在选区下方
+    let toolbarTop = top + height + margin;
+
+    // 如果下方空间不足，放在选区上方
+    if (toolbarTop + toolbarHeight > window.innerHeight) {
+      toolbarTop = top - toolbarHeight - margin;
+    }
+
+    // 确保工具栏在视口内
+    toolbarTop = Math.max(10, toolbarTop);
+
+    // 水平居中于选区
+    let toolbarLeft = left + width / 2;
+
+    // 确保工具栏不超出视口
+    const toolbarWidth = 320;
+    toolbarLeft = Math.max(toolbarWidth / 2 + 10, Math.min(window.innerWidth - toolbarWidth / 2 - 10, toolbarLeft));
+
+    toolbar.style.left = `${toolbarLeft}px`;
+    toolbar.style.top = `${toolbarTop}px`;
+    toolbar.style.transform = 'translateX(-50%)';
+  }
+
+  /**
+   * 更新选区尺寸显示
+   */
+  function updateSizeDisplay() {
+    if (!toolbar || !currentRect) return;
+
+    const sizeInfo = toolbar.querySelector('.ocr-size-info');
+    const confirmBtn = toolbar.querySelector('#ocr-confirm-btn');
+
+    if (currentRect.width < 10 || currentRect.height < 10) {
+      sizeInfo.innerHTML = `<span class="ocr-size-warning">${Math.round(currentRect.width)} × ${Math.round(currentRect.height)} px - 选区太小</span>`;
+      confirmBtn.disabled = true;
+    } else {
+      sizeInfo.textContent = `${Math.round(currentRect.width)} × ${Math.round(currentRect.height)} px`;
+      confirmBtn.disabled = false;
+    }
+  }
+
+  /**
+   * 手柄鼠标按下事件
+   * @param {MouseEvent} e
+   */
+  function onHandleMouseDown(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    isDragging = true;
+    dragType = e.target.dataset.position;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    originalRect = { ...currentRect };
+
+    document.addEventListener('mousemove', onEditModeMouseMove);
+    document.addEventListener('mouseup', onEditModeMouseUp);
+  }
+
+  /**
+   * 选区框鼠标按下事件（移动选区）
+   * @param {MouseEvent} e
+   */
+  function onSelectionMouseDown(e) {
+    if (!isEditMode || isDragging) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    isDragging = true;
+    dragType = 'move';
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    originalRect = { ...currentRect };
+  }
+
+  /**
+   * 编辑模式鼠标移动事件
+   * @param {MouseEvent} e
+   */
+  function onEditModeMouseMove(e) {
+    if (!isDragging || !originalRect) return;
+
+    const deltaX = e.clientX - dragStartX;
+    const deltaY = e.clientY - dragStartY;
+    const minSize = 5;
+
+    let newRect = { ...originalRect };
+
+    switch (dragType) {
+      case 'move':
+        // 移动整个选区
+        newRect.left = Math.max(0, Math.min(window.innerWidth - newRect.width, originalRect.left + deltaX));
+        newRect.top = Math.max(0, Math.min(window.innerHeight - newRect.height, originalRect.top + deltaY));
+        break;
+
+      case 'nw':
+        newRect.left = Math.min(originalRect.left + originalRect.width - minSize, originalRect.left + deltaX);
+        newRect.top = Math.min(originalRect.top + originalRect.height - minSize, originalRect.top + deltaY);
+        newRect.width = originalRect.width - (newRect.left - originalRect.left);
+        newRect.height = originalRect.height - (newRect.top - originalRect.top);
+        break;
+
+      case 'n':
+        newRect.top = Math.min(originalRect.top + originalRect.height - minSize, originalRect.top + deltaY);
+        newRect.height = originalRect.height - (newRect.top - originalRect.top);
+        break;
+
+      case 'ne':
+        newRect.top = Math.min(originalRect.top + originalRect.height - minSize, originalRect.top + deltaY);
+        newRect.width = Math.max(minSize, originalRect.width + deltaX);
+        newRect.height = originalRect.height - (newRect.top - originalRect.top);
+        break;
+
+      case 'e':
+        newRect.width = Math.max(minSize, originalRect.width + deltaX);
+        break;
+
+      case 'se':
+        newRect.width = Math.max(minSize, originalRect.width + deltaX);
+        newRect.height = Math.max(minSize, originalRect.height + deltaY);
+        break;
+
+      case 's':
+        newRect.height = Math.max(minSize, originalRect.height + deltaY);
+        break;
+
+      case 'sw':
+        newRect.left = Math.min(originalRect.left + originalRect.width - minSize, originalRect.left + deltaX);
+        newRect.width = originalRect.width - (newRect.left - originalRect.left);
+        newRect.height = Math.max(minSize, originalRect.height + deltaY);
+        break;
+
+      case 'w':
+        newRect.left = Math.min(originalRect.left + originalRect.width - minSize, originalRect.left + deltaX);
+        newRect.width = originalRect.width - (newRect.left - originalRect.left);
+        break;
+    }
+
+    // 确保选区在视口内
+    newRect.left = Math.max(0, newRect.left);
+    newRect.top = Math.max(0, newRect.top);
+    newRect.width = Math.min(window.innerWidth - newRect.left, newRect.width);
+    newRect.height = Math.min(window.innerHeight - newRect.top, newRect.height);
+
+    currentRect = newRect;
+
+    // 更新选区框显示
+    selectionBox.style.left = `${currentRect.left}px`;
+    selectionBox.style.top = `${currentRect.top}px`;
+    selectionBox.style.width = `${currentRect.width}px`;
+    selectionBox.style.height = `${currentRect.height}px`;
+
+    // 更新手柄和工具栏位置
+    updateHandlesPosition();
+    updateToolbarPosition();
+    updateSizeDisplay();
+  }
+
+  /**
+   * 编辑模式鼠标释放事件
+   * @param {MouseEvent} e
+   */
+  function onEditModeMouseUp(e) {
+    if (isDragging) {
+      isDragging = false;
+      dragType = null;
+      originalRect = null;
+    }
+  }
+
+  /**
+   * 确认选区并开始识别
+   */
+  async function confirmSelection() {
+    if (!currentRect || currentRect.width < 10 || currentRect.height < 10) {
+      showNotification('选区太小，请调整', 'warning');
+      return;
+    }
+
+    // 清理UI（保留选区信息）
+    const rect = { ...currentRect };
+    cleanup();
+
+    // 执行截图
+    await captureAndRecognize(rect);
+  }
+
+  /**
+   * 重新选择区域
+   */
+  function reselectArea() {
+    cleanupEditMode();
+
+    // 重置编辑模式状态
+    isEditMode = false;
+    currentRect = null;
+
+    // 更新选区框样式
+    if (selectionBox) {
+      selectionBox.classList.remove('edit-mode');
+      selectionBox.style.pointerEvents = 'none';
+    }
+
+    // 更新提示
+    if (tooltip) {
+      tooltip.textContent = '按住鼠标左键框选需要识别的文字区域（最小10×10像素），按ESC取消';
+    }
+
+    // 恢复遮罩层光标
+    if (overlay) {
+      overlay.style.cursor = 'crosshair';
+    }
+
+    // 清除选区框
+    if (selectionBox) {
+      selectionBox.style.display = 'none';
+    }
+
+    // 重新绑定初始事件
+    startX = 0;
+    startY = 0;
+  }
+
+  /**
+   * 取消截图
+   */
+  function cancelCapture() {
+    cleanup();
+    showNotification('已取消截图', 'info');
   }
 
   /**
@@ -218,6 +715,7 @@
    */
   function fullCleanup() {
     cleanup();
+    cleanupEditMode();
     hideProgressNotification();
     // 移除运行时消息监听器
     chrome.runtime.onMessage.removeListener(messageListener);
@@ -249,23 +747,35 @@
 
     const rect = selectionBox.getBoundingClientRect();
 
-    // 清理UI
-    cleanup();
-
     // 检查选区大小
     if (rect.width < 10 || rect.height < 10) {
+      cleanup();
       showNotification('选区太小，请重新框选', 'warning');
       return;
     }
 
-    // 执行截图
-    await captureAndRecognize(rect);
+    // 进入编辑模式（不再直接截图）
+    enterEditMode({
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height
+    });
   }
 
   // 键盘事件
   function onKeyDown(e) {
     if (e.key === 'Escape') {
-      cleanup();
+      if (isEditMode) {
+        // 编辑模式下ESC取消
+        cancelCapture();
+      } else {
+        cleanup();
+      }
+    } else if (e.key === 'Enter' && isEditMode) {
+      // 编辑模式下Enter确认
+      e.preventDefault();
+      confirmSelection();
     }
   }
 
