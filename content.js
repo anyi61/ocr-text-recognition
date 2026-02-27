@@ -117,7 +117,7 @@
     // 创建提示文字
     tooltip = document.createElement('div');
     tooltip.id = 'ocr-capture-tooltip';
-    tooltip.textContent = '按住鼠标左键框选需要识别的文字区域，按ESC取消';
+    tooltip.textContent = '按住鼠标左键框选需要识别的文字区域（最小10×10像素），按ESC取消';
     tooltip.style.cssText = `
       position: fixed;
       top: 20px;
@@ -131,6 +131,7 @@
       z-index: 1000000;
       pointer-events: none;
       white-space: nowrap;
+      transition: background 0.2s;
     `;
 
     document.body.appendChild(overlay);
@@ -174,8 +175,16 @@
     selectionBox.style.height = `${height}px`;
     selectionBox.style.display = 'block';
 
-    // 更新提示
-    tooltip.textContent = `${Math.round(width)} × ${Math.round(height)} 像素 - 松开鼠标完成截图`;
+    // 根据选区大小显示不同提示
+    if (width < 10 || height < 10) {
+      tooltip.textContent = `${Math.round(width)} × ${Math.round(height)} 像素 - 选区太小，请扩大`;
+      tooltip.style.background = '#e74c3c';
+      selectionBox.style.borderColor = '#e74c3c';
+    } else {
+      tooltip.textContent = `${Math.round(width)} × ${Math.round(height)} 像素 - 松开鼠标完成截图`;
+      tooltip.style.background = '#333';
+      selectionBox.style.borderColor = '#667eea';
+    }
   }
 
   /**
