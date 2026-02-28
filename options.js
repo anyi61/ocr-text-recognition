@@ -171,11 +171,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   /**
    * 保存设置
    * @async
-   * @returns {Promise<void>}
-   * @description 保存所有API配置到chrome.storage，同时兼容新旧格式
+   * @returns {Promise<boolean>}
+   * @description 保存所有API配置到chrome.storage，同时兼容新旧格式。返回是否保存成功。
    */
   async function saveSettings() {
     const provider = apiProvider.value;
+
+    // 校验当前 provider 配置
+    const validation = validateProviderConfig(provider);
+    if (!validation.valid) {
+      showFieldErrors(validation.fieldErrors, provider);
+      showStatus(validation.message, 'error');
+      return false;
+    }
+
+    // 清除之前的错误状态
+    showFieldErrors([], provider);
 
     // 构建统一的 apiConfigs 对象，每个API独立存储
     const apiConfigs = {
@@ -238,6 +249,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await chrome.storage.local.set(settings);
     showStatus('设置已保存', 'success');
+    return true;
   }
 
   /**
@@ -249,10 +261,163 @@ document.addEventListener('DOMContentLoaded', async () => {
     allInputs.forEach(input => {
       input.addEventListener('blur', async () => {
         // 当输入框失去焦点时自动保存
-        await saveSettings();
-        // 显示自动保存提示
-        showStatus('已自动保存', 'success');
+        const ok = await saveSettings();
+        // 仅在保存成功时显示自动保存提示
+        if (ok) {
+          showStatus('已自动保存', 'success');
+        }
       });
+    });
+  }
+
+  /**
+   * 获取当前Provider的配置
+   * @param {string} provider - API提供商类型
+   * @returns {Object} 配置对象
+   */
+  function getProviderConfig(provider) {
+    switch (provider) {
+      case 'claude':
+        return { apiKey: claudeApiKey.value, model: claudeModel.value };
+      case 'openai':
+        return { apiKey: openaiApiKey.value, model: openaiModel.value };
+      case 'baidu':
+        return { apiKey: baiduApiKey.value, secret: baiduSecret.value };
+      case 'aliyun':
+        return { apiKey: aliyunApiKey.value, model: aliyunModel.value };
+      case 'zhipu':
+        return { apiKey: zhipuApiKey.value, model: zhipuModel.value };
+      case 'openai-compatible':
+        return {
+          endpoint: compatibleEndpoint.value,
+          apiKey: compatibleApiKey.value,
+          model: compatibleModel.value
+        };
+      case 'custom':
+        return {
+          endpoint: customEndpointInput.value,
+          apiKey: customApiKeyInput.value,
+          model: customModelInput.value
+        };
+      default:
+        return {};
+    }
+  }
+
+  /**
+   * 验证Provider配置
+   * @param {string} provider - API提供商类型
+   * @returns {{valid: boolean, message: string, fieldErrors: string[]}}
+   */
+  function validateProviderConfig(provider) {
+    const config = getProviderConfig(provider);
+    const fieldErrors = [];
+
+    switch (provider) {
+      case 'claude':
+      case 'openai':
+      case 'aliyun':
+      case 'zhipu':
+        if (!config.apiKey || config.apiKey.trim() === '') {
+          fieldErrors.push('apiKey');
+        }
+        break;
+
+      case 'baidu':
+        if (!config.apiKey || config.apiKey.trim() === '') {
+          fieldErrors.push('apiKey');
+        }
+        if (!config.secret || config.secret.trim() === '') {
+          fieldErrors.push('secret');
+        }
+        break;
+
+      case 'openai-compatible':
+      case 'custom':
+        if (!config.endpoint || config.endpoint.trim() === '') {
+          fieldErrors.push('endpoint');
+        } else {
+          // 验证URL格式
+          try {
+            new URL(config.endpoint);
+          } catch {
+            fieldErrors.push('endpoint_invalid');
+          }
+        }
+        if (!config.apiKey || config.apiKey.trim() === '') {
+          fieldErrors.push('apiKey');
+        }
+        if (!config.model || config.model.trim() === '') {
+          fieldErrors.push('model');
+        }
+        break;
+    }
+
+    if (fieldErrors.length > 0) {
+      const messages = {
+        apiKey: 'API Key',
+        secret: 'Secret Key',
+        endpoint: 'API 端点',
+        endpoint_invalid: 'API 端点格式无效（需为有效URL）',
+        model: '模型名称'
+      };
+
+      const errorMessages = fieldErrors.map(f => messages[f] || f);
+      return {
+        valid: false,
+        message: '配置不完整：' + errorMessages.join('、') + ' 未填写或格式错误',
+        fieldErrors: fieldErrors
+      };
+    }
+
+    return { valid: true, message: '', fieldErrors: [] };
+  }
+
+  /**
+   * 显示字段错误状态
+   * @param {string[]} fieldErrors - 错误字段列表
+   * @param {string} provider - API提供商类型
+   */
+  function showFieldErrors(fieldErrors, provider) {
+    // 先清除所有错误状态
+    document.querySelectorAll('.input-error').forEach(el => {
+      el.classList.remove('input-error');
+    });
+
+    // 根据provider和字段设置错误状态
+    fieldErrors.forEach(field => {
+      let element = null;
+      switch (provider) {
+        case 'claude':
+          if (field === 'apiKey') element = claudeApiKey;
+          break;
+        case 'openai':
+          if (field === 'apiKey') element = openaiApiKey;
+          break;
+        case 'baidu':
+          if (field === 'apiKey') element = baiduApiKey;
+          if (field === 'secret') element = baiduSecret;
+          break;
+        case 'aliyun':
+          if (field === 'apiKey') element = aliyunApiKey;
+          break;
+        case 'zhipu':
+          if (field === 'apiKey') element = zhipuApiKey;
+          break;
+        case 'openai-compatible':
+          if (field === 'endpoint' || field === 'endpoint_invalid') element = compatibleEndpoint;
+          if (field === 'apiKey') element = compatibleApiKey;
+          if (field === 'model') element = compatibleModel;
+          break;
+        case 'custom':
+          if (field === 'endpoint' || field === 'endpoint_invalid') element = customEndpointInput;
+          if (field === 'apiKey') element = customApiKeyInput;
+          if (field === 'model') element = customModelInput;
+          break;
+      }
+      if (element) {
+        element.classList.add('input-error');
+      }
     });
   }
 
@@ -265,6 +430,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function testConnection() {
     const provider = apiProvider.value;
     const testBtn = document.getElementById('testBtn');
+
+    // 先进行配置校验
+    const validation = validateProviderConfig(provider);
+    if (!validation.valid) {
+      showStatus(validation.message, 'error');
+      showFieldErrors(validation.fieldErrors, provider);
+      return;
+    }
+
+    // 清除之前的错误状态
+    showFieldErrors([], provider);
 
     testBtn.disabled = true;
     showStatus('正在测试连接...', 'loading');
@@ -310,12 +486,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         config.customModel = customModelInput.value;
         config.model = customModelInput.value || config.customModel;
         break;
-    }
-
-    if (!config.apiKey) {
-      showStatus('请先输入API Key', 'error');
-      testBtn.disabled = false;
-      return;
     }
 
     try {
@@ -654,8 +824,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 事件监听
   apiProvider.addEventListener('change', async (e) => {
-    showConfigSection(e.target.value);
-    // 切换API时自动保存当前选择
+    const newProvider = e.target.value;
+    showConfigSection(newProvider);
+    // 切换API时尝试保存当前选择（校验不通过则不保存，但仍允许切换）
     await saveSettings();
   });
 

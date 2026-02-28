@@ -209,8 +209,45 @@
     #ocr-selection-box.edit-mode:hover {
       border-color: #764ba2;
     }
+
+    /* 无障碍：屏幕阅读器专用 */
+    .ocr-sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
   `;
   document.head.appendChild(progressStyles);
+
+  // 创建无障碍状态播报区域
+  let a11yLiveRegion = null;
+  function ensureA11yLiveRegion() {
+    if (!a11yLiveRegion || !document.body.contains(a11yLiveRegion)) {
+      a11yLiveRegion = document.createElement('div');
+      a11yLiveRegion.id = 'ocr-a11y-live';
+      a11yLiveRegion.className = 'ocr-sr-only';
+      a11yLiveRegion.setAttribute('aria-live', 'polite');
+      a11yLiveRegion.setAttribute('aria-atomic', 'true');
+      document.body.appendChild(a11yLiveRegion);
+    }
+  }
+
+  /**
+   * 播报无障碍状态
+   * @param {string} message - 播报消息
+   */
+  function announceA11y(message) {
+    ensureA11yLiveRegion();
+    if (a11yLiveRegion) {
+      a11yLiveRegion.textContent = message;
+    }
+  }
 
   /**
    * 创建遮罩层和提示文字
@@ -445,12 +482,13 @@
   function createToolbar() {
     toolbar = document.createElement('div');
     toolbar.id = 'ocr-toolbar';
+    toolbar.setAttribute('role', 'toolbar');
     toolbar.innerHTML = `
       <span class="ocr-size-info">${Math.round(currentRect.width)} × ${Math.round(currentRect.height)} px</span>
       <div class="ocr-toolbar-buttons">
-        <button class="ocr-btn ocr-btn-primary" id="ocr-confirm-btn">确认识别</button>
-        <button class="ocr-btn ocr-btn-secondary" id="ocr-reselect-btn">重选</button>
-        <button class="ocr-btn ocr-btn-cancel" id="ocr-cancel-btn">取消</button>
+        <button class="ocr-btn ocr-btn-primary" id="ocr-confirm-btn" aria-label="确认识别选区内容">确认识别</button>
+        <button class="ocr-btn ocr-btn-secondary" id="ocr-reselect-btn" aria-label="重新选择截图区域">重选</button>
+        <button class="ocr-btn ocr-btn-cancel" id="ocr-cancel-btn" aria-label="取消截图">取消</button>
       </div>
     `;
 
@@ -795,6 +833,7 @@
   async function captureAndRecognize(rect) {
     try {
       showProgressNotification('正在截图...', false);
+      announceA11y('正在截图');
 
       // 发送消息给background进行截图（因为content script无法直接调用chrome.tabs.captureVisibleTab）
       const response = await chrome.runtime.sendMessage({
@@ -818,6 +857,7 @@
 
       // 更新为识别阶段，显示取消按钮
       showProgressNotification('正在识别文字...', true);
+      announceA11y('正在识别文字');
 
       // 发送给background进行OCR识别
       const ocrResponse = await chrome.runtime.sendMessage({
@@ -835,14 +875,17 @@
       if (ocrResponse && ocrResponse.success) {
         showResultPopup(ocrResponse.text);
         showNotification(`识别完成！用时 ${elapsed} 秒`, 'success');
+        announceA11y(`识别完成，用时 ${elapsed} 秒`);
       } else {
         showNotification(ocrResponse?.error || '识别失败', 'error');
+        announceA11y('识别失败');
       }
     } catch (error) {
       hideProgressNotification();
       if (!isCancelled) {
         console.error('截图识别失败:', error);
         showNotification('识别失败: ' + error.message, 'error');
+        announceA11y('识别失败: ' + error.message);
       }
     }
   }
@@ -1004,34 +1047,37 @@
           background: #e0e0e0;
         }
       </style>
-      <button class="close-btn" title="关闭">
+      <button class="close-btn" title="关闭" aria-label="关闭结果弹窗">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="6" x2="6" y2="18"></line>
           <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
       </button>
       <div class="content">
-        <textarea id="ocr-result-text" placeholder="识别结果...">${text || ''}</textarea>
+        <textarea id="ocr-result-text" placeholder="识别结果..." aria-label="OCR识别结果"></textarea>
         <div class="actions">
-          <button class="btn btn-primary copy-btn">
+          <button class="btn btn-primary copy-btn" aria-label="复制识别结果">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
             复制
           </button>
-          <button class="btn btn-secondary close-popup-btn">关闭</button>
+          <button class="btn btn-secondary close-popup-btn" aria-label="关闭弹窗">关闭</button>
         </div>
       </div>
     `;
 
     document.body.appendChild(popup);
 
+    // 安全赋值：通过 value 属性设置文本，避免 innerHTML 注入风险
+    const textarea = popup.querySelector('#ocr-result-text');
+    textarea.value = text || '';
+
     // 绑定事件
     const closeBtn = popup.querySelector('.close-btn');
     const closePopupBtn = popup.querySelector('.close-popup-btn');
     const copyBtn = popup.querySelector('.copy-btn');
-    const textarea = popup.querySelector('#ocr-result-text');
 
     const close = () => {
       popup.classList.add('closing');
@@ -1106,20 +1152,28 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.2);
       animation: fadeIn 0.3s ease;
     `;
-    notification.innerHTML = `
-      <style>
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-          to { opacity: 1; transform: translateX(-50%) translateY(0); }
-        }
-        @keyframes fadeOut {
-          from { opacity: 1; transform: translateX(-50%) translateY(0); }
-          to { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-        }
-      </style>
-      <span>${icon}</span>
-      <span>${message}</span>
+
+    // 使用 DOM API 构建通知内容，避免 innerHTML 注入风险
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+        to { opacity: 1; transform: translateX(-50%) translateY(0); }
+      }
+      @keyframes fadeOut {
+        from { opacity: 1; transform: translateX(-50%) translateY(0); }
+        to { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+      }
     `;
+    notification.appendChild(style);
+
+    const iconSpan = document.createElement('span');
+    iconSpan.textContent = icon;
+    notification.appendChild(iconSpan);
+
+    const messageSpan = document.createElement('span');
+    messageSpan.textContent = message;
+    notification.appendChild(messageSpan);
 
     document.body.appendChild(notification);
 
