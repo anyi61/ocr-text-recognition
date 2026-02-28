@@ -211,6 +211,18 @@ body {
   transform: none !important;
 }
 
+/* 焦点可见性 */
+.btn:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.btn-primary:focus-visible {
+  outline-color: #fff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.4);
+}
+
 /* 导入导出按钮组 */
 .import-export-actions {
   border-top: none;

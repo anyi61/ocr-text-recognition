@@ -12,7 +12,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   const configTip = document.getElementById('configTip');
   const historyArea = document.getElementById('historyArea');
   const historyList = document.getElementById('historyList');
+  const historyEmptyState = document.getElementById('historyEmptyState');
   const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+  const historyPreview = document.getElementById('historyPreview');
+  const historyPreviewText = document.getElementById('historyPreviewText');
+  const closePreviewBtn = document.getElementById('closePreviewBtn');
+  const previewCopyBtn = document.getElementById('previewCopyBtn');
+
+  // 历史记录数据（用于点击查看）
+  let historyData = [];
 
   // 检查是否已配置API（支持多API配置）
   const checkConfig = async () => {
@@ -39,6 +47,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   /**
+   * 显示历史详情预览
+   * @param {string} text - 识别结果文本
+   */
+  const showHistoryPreview = (text) => {
+    historyPreviewText.value = text;
+    historyPreview.classList.remove('hidden');
+    historyList.classList.add('hidden');
+    historyEmptyState.classList.add('hidden');
+  };
+
+  /**
+   * 隐藏历史详情预览
+   */
+  const hideHistoryPreview = () => {
+    historyPreview.classList.add('hidden');
+    // 根据历史记录数量决定显示列表还是空状态
+    if (historyData.length === 0) {
+      historyList.classList.add('hidden');
+      historyEmptyState.classList.remove('hidden');
+    } else {
+      historyList.classList.remove('hidden');
+    }
+  };
+
+  /**
    * 加载历史记录
    * @async
    * @returns {Promise<void>}
@@ -48,18 +81,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const result = await chrome.storage.local.get(['ocrHistory']);
       const history = result.ocrHistory || [];
+      historyData = history; // 保存数据供点击查看使用
+
+      // 始终显示历史区域
+      historyArea.classList.remove('hidden');
 
       if (history.length === 0) {
-        historyArea.classList.add('hidden');
+        // 显示空状态，隐藏列表和清空按钮
+        historyEmptyState.classList.remove('hidden');
+        historyList.classList.add('hidden');
+        clearHistoryBtn.classList.add('hidden');
         return;
       }
 
-      historyArea.classList.remove('hidden');
+      // 有历史记录：隐藏空状态，显示列表和清空按钮
+      historyEmptyState.classList.add('hidden');
+      historyList.classList.remove('hidden');
+      clearHistoryBtn.classList.remove('hidden');
       historyList.innerHTML = '';
 
       history.forEach((item, index) => {
         const historyItem = document.createElement('div');
         historyItem.className = 'history-item';
+        historyItem.setAttribute('tabindex', '0');
+        historyItem.setAttribute('role', 'button');
+        historyItem.setAttribute('aria-label', `查看历史记录: ${item.text.substring(0, 30)}...`);
 
         // 截断显示文本
         const displayText = item.text.length > 50 ? item.text.substring(0, 50) + '...' : item.text;
@@ -76,6 +122,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             </button>
           </div>
         `;
+
+        // 点击历史项查看详情
+        historyItem.addEventListener('click', () => {
+          showHistoryPreview(history[index].text);
+        });
+
+        // 键盘支持
+        historyItem.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            showHistoryPreview(history[index].text);
+          }
+        });
 
         historyList.appendChild(historyItem);
       });
@@ -121,7 +180,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const clearHistory = async () => {
     if (confirm('确定要清空所有历史记录吗？')) {
       await chrome.storage.local.remove(['ocrHistory']);
-      historyArea.classList.add('hidden');
+      historyData = [];
+      historyEmptyState.classList.remove('hidden');
+      historyList.classList.add('hidden');
+      clearHistoryBtn.classList.add('hidden');
+      // 隐藏预览（会根据 historyData.length 正确显示空状态）
+      historyPreview.classList.add('hidden');
     }
   };
 
@@ -143,6 +207,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 清空历史按钮事件
   clearHistoryBtn.addEventListener('click', clearHistory);
+
+  // 关闭预览按钮事件
+  closePreviewBtn.addEventListener('click', hideHistoryPreview);
+
+  // 预览复制按钮事件
+  previewCopyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(historyPreviewText.value);
+      previewCopyBtn.textContent = '已复制';
+      setTimeout(() => {
+        previewCopyBtn.textContent = '复制全文';
+      }, 1500);
+    } catch (err) {
+      console.error('复制失败:', err);
+    }
+  });
 
   // 配置提示点击事件
   configTip.addEventListener('click', () => {

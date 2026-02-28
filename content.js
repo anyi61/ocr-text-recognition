@@ -13,6 +13,18 @@
    * @property {number} height - 高度
    */
 
+  // ============ 叠层常量统一管理（高基线，避免被宿主页面覆盖）============
+  const Z = {
+    OVERLAY: 1000010,
+    TOOLTIP: 1000020,
+    SELECTION: 1000030,
+    HANDLE: 1000040,
+    TOOLBAR: 1000050,
+    NOTIFICATION: 1000060,
+    PROGRESS: 1000070,
+    RESULT_POPUP: 1000080
+  };
+
   /**
    * 截图状态
    * @type {boolean}
@@ -54,7 +66,7 @@
       color: #fff;
       padding: 16px 24px;
       border-radius: 12px;
-      z-index: 1000004;
+      z-index: ${Z.PROGRESS};
       box-shadow: 0 4px 20px rgba(0,0,0,0.3);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       animation: ocr-progress-fadeIn 0.3s ease;
@@ -115,9 +127,21 @@
       border: 2px solid #fff;
       border-radius: 50%;
       cursor: pointer;
-      z-index: 1000002;
+      z-index: ${Z.HANDLE};
       box-shadow: 0 2px 8px rgba(0,0,0,0.3);
       transition: transform 0.15s ease, background 0.15s ease;
+    }
+    /* 手柄热区扩大到 24px */
+    .ocr-handle::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: transparent;
     }
     .ocr-handle:hover {
       transform: scale(1.3);
@@ -130,6 +154,13 @@
     .ocr-handle-n, .ocr-handle-s { cursor: ns-resize; }
     .ocr-handle-e, .ocr-handle-w { cursor: ew-resize; }
 
+    /* 选区框双层边框 */
+    #ocr-selection-box {
+      border: 2px solid #667eea;
+      outline: 2px solid rgba(255, 255, 255, 0.8);
+      outline-offset: 0;
+    }
+
     /* 工具栏样式 */
     #ocr-toolbar {
       position: fixed;
@@ -140,7 +171,7 @@
       background: #333;
       border-radius: 8px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-      z-index: 1000003;
+      z-index: ${Z.TOOLBAR};
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       animation: ocr-toolbar-fadeIn 0.2s ease;
     }
@@ -198,6 +229,11 @@
     .ocr-btn-cancel:hover {
       background: #444;
       color: #fff;
+    }
+    /* 统一 focus-visible 样式 */
+    .ocr-btn:focus-visible {
+      outline: 2px solid #2563eb;
+      outline-offset: 2px;
     }
 
     /* 编辑模式下的选区框 */
@@ -263,7 +299,7 @@
       width: 100vw;
       height: 100vh;
       background: rgba(0, 0, 0, 0.3);
-      z-index: 999999;
+      z-index: ${Z.OVERLAY};
       cursor: crosshair;
     `;
 
@@ -281,7 +317,7 @@
       padding: 10px 20px;
       border-radius: 6px;
       font-size: 14px;
-      z-index: 1000000;
+      z-index: ${Z.TOOLTIP};
       pointer-events: none;
       white-space: nowrap;
       transition: background 0.2s;
@@ -301,9 +337,11 @@
     selectionBox.style.cssText = `
       position: fixed;
       border: 2px solid #667eea;
+      outline: 2px solid rgba(255, 255, 255, 0.8);
+      outline-offset: 0;
       background: rgba(102, 126, 234, 0.1);
       pointer-events: none;
-      z-index: 1000001;
+      z-index: ${Z.SELECTION};
       display: none;
     `;
     document.body.appendChild(selectionBox);
@@ -952,7 +990,7 @@
       background: #fff;
       border-radius: 12px;
       box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-      z-index: 1000002;
+      z-index: ${Z.RESULT_POPUP};
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       overflow: hidden;
       animation: slideIn 0.3s ease;
@@ -1045,6 +1083,14 @@
         }
         #ocr-result-popup .btn-secondary:hover {
           background: #e0e0e0;
+        }
+        #ocr-result-popup .btn:focus-visible {
+          outline: 2px solid #2563eb;
+          outline-offset: 2px;
+        }
+        #ocr-result-popup .close-btn:focus-visible {
+          outline: 2px solid #2563eb;
+          outline-offset: 2px;
         }
       </style>
       <button class="close-btn" title="关闭" aria-label="关闭结果弹窗">
@@ -1145,7 +1191,7 @@
       padding: 12px 20px;
       border-radius: 8px;
       font-size: 14px;
-      z-index: 1000003;
+      z-index: ${Z.NOTIFICATION};
       display: flex;
       align-items: center;
       gap: 8px;
