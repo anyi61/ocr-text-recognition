@@ -1,0 +1,704 @@
+{
+  "ext_name": {
+    "message": "OCR文字识别助手",
+    "description": "Extension name"
+  },
+  "ext_description": {
+    "message": "截图识别网页文字，突破复制限制",
+    "description": "Extension description"
+  },
+  "command_start_capture": {
+    "message": "开始截图识别",
+    "description": "Keyboard shortcut description"
+  },
+
+  "app_title": {
+    "message": "OCR文字识别助手",
+    "description": "App title in header"
+  },
+  "btn_capture": {
+    "message": "开始截图识别",
+    "description": "Capture button text"
+  },
+  "btn_settings": {
+    "message": "设置",
+    "description": "Settings button"
+  },
+  "btn_theme_toggle": {
+    "message": "切换深色/浅色主题",
+    "description": "Theme toggle button"
+  },
+  "hint_capture": {
+    "message": "点击后在页面上框选需要识别的文字区域",
+    "description": "Capture hint text"
+  },
+  "tip_config_api": {
+    "message": "请先配置API密钥",
+    "description": "API config tip"
+  },
+
+  "history_title": {
+    "message": "最近识别记录",
+    "description": "History section title"
+  },
+  "history_empty_title": {
+    "message": "暂无识别记录",
+    "description": "Empty history title"
+  },
+  "history_empty_hint": {
+    "message": "点击上方按钮开始截图识别",
+    "description": "Empty history hint"
+  },
+  "history_view_detail": {
+    "message": "查看历史记录",
+    "description": "View history detail aria label"
+  },
+  "history_copy": {
+    "message": "复制该条历史记录",
+    "description": "Copy history item"
+  },
+  "history_copied": {
+    "message": "已复制该条历史记录",
+    "description": "History copied"
+  },
+  "btn_clear_history": {
+    "message": "清空历史",
+    "description": "Clear history button"
+  },
+  "btn_close": {
+    "message": "关闭",
+    "description": "Close button"
+  },
+  "btn_close_preview": {
+    "message": "关闭预览",
+    "description": "Close preview button"
+  },
+
+  "preview_title": {
+    "message": "识别结果",
+    "description": "Preview section title"
+  },
+  "btn_copy_all": {
+    "message": "复制全文",
+    "description": "Copy all button"
+  },
+  "btn_copied": {
+    "message": "已复制",
+    "description": "Copied button state"
+  },
+
+  "footer_supported_apis": {
+    "message": "支持 7 种 API：Claude / OpenAI / 智谱AI / 百度OCR / 阿里云 / 通用兼容 / 自定义",
+    "description": "Footer text"
+  },
+
+  "theme_light": {
+    "message": "浅色模式",
+    "description": "Light theme option"
+  },
+  "theme_dark": {
+    "message": "深色模式",
+    "description": "Dark theme option"
+  },
+
+  "confirm_clear_history": {
+    "message": "确定要清空所有历史记录吗？",
+    "description": "Confirm clear history"
+  },
+
+  "msg_capture_failed": {
+    "message": "启动截图失败，请刷新页面后重试",
+    "description": "Capture failed message"
+  },
+  "msg_no_tab": {
+    "message": "无法获取当前标签页",
+    "description": "No tab error"
+  },
+  "msg_config_api_first": {
+    "message": "请先配置API密钥",
+    "description": "Please configure API first"
+  },
+
+  "options_title": {
+    "message": "OCR文字识别助手 - 设置",
+    "description": "Options page title"
+  },
+  "options_header_subtitle": {
+    "message": "配置API密钥和识别偏好",
+    "description": "Options header subtitle"
+  },
+
+  "section_api_provider": {
+    "message": "API 提供商",
+    "description": "API provider section"
+  },
+  "label_select_provider": {
+    "message": "选择OCR服务提供商",
+    "description": "Select provider label"
+  },
+  "help_select_provider": {
+    "message": "选择您想要使用的文字识别服务",
+    "description": "Select provider help text"
+  },
+
+  "section_claude_config": {
+    "message": "Claude 配置",
+    "description": "Claude config section"
+  },
+  "section_openai_config": {
+    "message": "OpenAI 配置",
+    "description": "OpenAI config section"
+  },
+  "section_baidu_config": {
+    "message": "百度智能云 OCR 配置",
+    "description": "Baidu config section"
+  },
+  "section_aliyun_config": {
+    "message": "阿里云 OCR 配置",
+    "description": "Aliyun config section"
+  },
+  "section_zhipu_config": {
+    "message": "智谱AI GLM-4V 配置",
+    "description": "Zhipu config section"
+  },
+  "section_compatible_config": {
+    "message": "通用 OpenAI 兼容接口",
+    "description": "Compatible API section"
+  },
+  "section_custom_config": {
+    "message": "自定义 API 配置",
+    "description": "Custom API section"
+  },
+
+  "label_api_key": {
+    "message": "API Key",
+    "description": "API Key label"
+  },
+  "label_model": {
+    "message": "模型",
+    "description": "Model label"
+  },
+  "label_endpoint": {
+    "message": "API 端点",
+    "description": "Endpoint label"
+  },
+  "label_secret_key": {
+    "message": "Secret Key",
+    "description": "Secret Key label"
+  },
+  "label_model_name": {
+    "message": "模型名称",
+    "description": "Model name label"
+  },
+  "label_model_name_optional": {
+    "message": "模型名称 (可选)",
+    "description": "Model name optional label"
+  },
+
+  "help_claude_key": {
+    "message": "从 Anthropic Console 获取API Key",
+    "description": "Claude key help"
+  },
+  "help_openai_key": {
+    "message": "从 OpenAI Platform 获取API Key",
+    "description": "OpenAI key help"
+  },
+  "help_baidu_key": {
+    "message": "从 百度智能云 获取",
+    "description": "Baidu key help"
+  },
+  "help_aliyun_key": {
+    "message": "从 阿里云DashScope控制台 获取API Key",
+    "description": "Aliyun key help"
+  },
+  "help_zhipu_key": {
+    "message": "从 智谱AI开放平台 获取API Key",
+    "description": "Zhipu key help"
+  },
+  "help_compatible_endpoint": {
+    "message": "支持任何OpenAI格式的API，如硅基流动、DeepSeek、Azure等",
+    "description": "Compatible endpoint help"
+  },
+  "help_custom_endpoint": {
+    "message": "完整的API接口地址",
+    "description": "Custom endpoint help"
+  },
+  "help_model_by_provider": {
+    "message": "根据服务商填写对应的视觉模型名称",
+    "description": "Model help for compatible API"
+  },
+  "help_aliyun_models": {
+    "message": "阿里云DashScope提供的视觉语言模型",
+    "description": "Aliyun models help"
+  },
+
+  "section_advanced": {
+    "message": "高级设置",
+    "description": "Advanced settings section"
+  },
+  "label_theme": {
+    "message": "主题",
+    "description": "Theme label"
+  },
+  "help_theme": {
+    "message": "选择界面主题风格",
+    "description": "Theme help"
+  },
+  "label_prompt": {
+    "message": "自定义识别提示词",
+    "description": "Prompt label"
+  },
+  "help_prompt": {
+    "message": "告诉AI如何识别和处理图片中的文字",
+    "description": "Prompt help"
+  },
+  "label_language": {
+    "message": "主要识别语言",
+    "description": "Language label"
+  },
+  "default_prompt": {
+    "message": "请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。",
+    "description": "Default prompt text"
+  },
+
+  "btn_test_connection": {
+    "message": "测试连接",
+    "description": "Test connection button"
+  },
+  "btn_export_config": {
+    "message": "导出配置",
+    "description": "Export config button"
+  },
+  "btn_import_config": {
+    "message": "导入配置",
+    "description": "Import config button"
+  },
+
+  "section_config_management": {
+    "message": "配置管理",
+    "description": "Config management section"
+  },
+  "help_import_export": {
+    "message": "导出当前配置到JSON文件，或从文件导入配置。",
+    "description": "Import export help"
+  },
+
+  "msg_saved": {
+    "message": "设置已保存",
+    "description": "Settings saved"
+  },
+  "msg_auto_saved": {
+    "message": "已自动保存",
+    "description": "Auto saved"
+  },
+  "msg_field_saved": {
+    "message": "已保存",
+    "description": "Field saved"
+  },
+  "msg_testing": {
+    "message": "正在测试连接...",
+    "description": "Testing connection"
+  },
+  "msg_test_success": {
+    "message": "连接成功！API配置正确",
+    "description": "Test success"
+  },
+  "msg_test_failed": {
+    "message": "连接失败",
+    "description": "Test failed"
+  },
+  "msg_exporting": {
+    "message": "正在导出配置...",
+    "description": "Exporting config"
+  },
+  "msg_export_success": {
+    "message": "配置已成功导出",
+    "description": "Export success"
+  },
+  "msg_importing": {
+    "message": "正在读取配置文件...",
+    "description": "Importing config"
+  },
+  "msg_import_success": {
+    "message": "配置已成功导入！",
+    "description": "Import success"
+  },
+  "msg_import_cancelled": {
+    "message": "已取消导入",
+    "description": "Import cancelled"
+  },
+  "msg_applying_config": {
+    "message": "正在应用配置...",
+    "description": "Applying config"
+  },
+
+  "err_config_incomplete": {
+    "message": "配置不完整",
+    "description": "Config incomplete error"
+  },
+  "err_api_key_empty": {
+    "message": "API Key 不能为空",
+    "description": "API key empty error"
+  },
+  "err_secret_empty": {
+    "message": "Secret Key 不能为空",
+    "description": "Secret key empty error"
+  },
+  "err_endpoint_empty": {
+    "message": "API 端点不能为空",
+    "description": "Endpoint empty error"
+  },
+  "err_endpoint_invalid": {
+    "message": "API 端点格式无效（需为有效URL）",
+    "description": "Endpoint invalid error"
+  },
+  "err_model_empty": {
+    "message": "模型名称不能为空",
+    "description": "Model empty error"
+  },
+  "err_import_invalid_json": {
+    "message": "请选择JSON格式的配置文件",
+    "description": "Invalid JSON file"
+  },
+  "err_import_parse": {
+    "message": "配置文件格式错误，请确保是有效的JSON",
+    "description": "JSON parse error"
+  },
+
+  "card_usage_title": {
+    "message": "使用说明",
+    "description": "Usage card title"
+  },
+  "card_shortcuts_title": {
+    "message": "快捷键",
+    "description": "Shortcuts card title"
+  },
+  "card_recommended_api_title": {
+    "message": "推荐API",
+    "description": "Recommended API title"
+  },
+
+  "usage_step1": {
+    "message": "配置您选择的API提供商的密钥",
+    "description": "Usage step 1"
+  },
+  "usage_step2": {
+    "message": "点击插件图标打开弹出窗口",
+    "description": "Usage step 2"
+  },
+  "usage_step3": {
+    "message": "点击「开始截图识别」按钮",
+    "description": "Usage step 3"
+  },
+  "usage_step4": {
+    "message": "在页面上框选需要识别的文字区域",
+    "description": "Usage step 4"
+  },
+  "usage_step5": {
+    "message": "等待识别完成，复制结果即可",
+    "description": "Usage step 5"
+  },
+
+  "shortcut_capture": {
+    "message": "开始截图识别",
+    "description": "Capture shortcut"
+  },
+  "shortcut_cancel": {
+    "message": "取消截图",
+    "description": "Cancel shortcut"
+  },
+  "shortcut_drag": {
+    "message": "框选区域",
+    "description": "Drag shortcut"
+  },
+  "shortcut_customize_hint": {
+    "message": "提示：可以在 chrome://extensions/shortcuts 中自定义快捷键",
+    "description": "Customize shortcut hint"
+  },
+
+  "api_claude_opus": {
+    "message": "识别准确率最高",
+    "description": "Claude Opus description"
+  },
+  "api_gpt4o": {
+    "message": "速度快，准确率高",
+    "description": "GPT-4o description"
+  },
+  "api_glm4v": {
+    "message": "国产大模型，中文效果好",
+    "description": "GLM-4V description"
+  },
+  "api_baidu": {
+    "message": "中文识别效果好，性价比高",
+    "description": "Baidu description"
+  },
+  "api_aliyun": {
+    "message": "企业级服务，稳定可靠",
+    "description": "Aliyun description"
+  },
+  "api_compatible": {
+    "message": "灵活支持多种服务商",
+    "description": "Compatible API description"
+  },
+
+  "modal_import_title": {
+    "message": "导入配置确认",
+    "description": "Import confirm dialog title"
+  },
+  "modal_import_message": {
+    "message": "即将导入配置文件，请确认以下信息：",
+    "description": "Import confirm message"
+  },
+  "modal_import_warning": {
+    "message": "此操作将覆盖当前所有配置，是否继续？",
+    "description": "Import warning"
+  },
+  "modal_api_provider": {
+    "message": "API提供商",
+    "description": "API provider label in modal"
+  },
+  "modal_export_date": {
+    "message": "导出时间",
+    "description": "Export date label"
+  },
+  "btn_cancel": {
+    "message": "取消",
+    "description": "Cancel button"
+  },
+  "btn_confirm_import": {
+    "message": "确认导入",
+    "description": "Confirm import button"
+  },
+
+  "content_tooltip_start": {
+    "message": "按住鼠标左键框选需要识别的文字区域（最小10×10像素），按ESC取消",
+    "description": "Initial tooltip"
+  },
+  "content_tooltip_edit": {
+    "message": "拖拽调整选区，按Enter确认，ESC取消",
+    "description": "Edit mode tooltip"
+  },
+  "content_tooltip_size_small": {
+    "message": "选区太小，请扩大",
+    "description": "Selection too small"
+  },
+  "content_tooltip_size_ok": {
+    "message": "松开鼠标后可调整选区",
+    "description": "Selection size OK"
+  },
+
+  "content_btn_confirm": {
+    "message": "确认识别",
+    "description": "Confirm button"
+  },
+  "content_btn_reselect": {
+    "message": "重选",
+    "description": "Reselect button"
+  },
+  "content_btn_cancel_capture": {
+    "message": "取消",
+    "description": "Cancel capture button"
+  },
+  "content_btn_undo": {
+    "message": "撤销",
+    "description": "Undo button"
+  },
+
+  "content_aria_confirm": {
+    "message": "确认识别选区内容",
+    "description": "Confirm button aria"
+  },
+  "content_aria_reselect": {
+    "message": "重新选择截图区域",
+    "description": "Reselect button aria"
+  },
+  "content_aria_cancel": {
+    "message": "取消截图",
+    "description": "Cancel button aria"
+  },
+  "content_aria_undo": {
+    "message": "撤销上一步操作",
+    "description": "Undo button aria"
+  },
+  "content_aria_close": {
+    "message": "关闭结果弹窗",
+    "description": "Close button aria"
+  },
+  "content_aria_result": {
+    "message": "OCR识别结果",
+    "description": "Result textarea aria"
+  },
+  "content_aria_copy": {
+    "message": "复制识别结果",
+    "description": "Copy button aria"
+  },
+
+  "content_progress_capturing": {
+    "message": "正在截图...",
+    "description": "Capturing progress"
+  },
+  "content_progress_recognizing": {
+    "message": "正在识别文字...",
+    "description": "Recognizing progress"
+  },
+  "content_progress_cancel": {
+    "message": "取消",
+    "description": "Cancel button in progress"
+  },
+  "content_progress_elapsed": {
+    "message": "已用时",
+    "description": "Elapsed time"
+  },
+  "content_progress_seconds": {
+    "message": "秒",
+    "description": "Seconds"
+  },
+
+  "content_msg_cancelled": {
+    "message": "已取消截图",
+    "description": "Capture cancelled"
+  },
+  "content_msg_recognition_cancelled": {
+    "message": "已取消识别",
+    "description": "Recognition cancelled"
+  },
+  "content_msg_capture_failed": {
+    "message": "截图失败",
+    "description": "Capture failed"
+  },
+  "content_msg_recognition_failed": {
+    "message": "识别失败",
+    "description": "Recognition failed"
+  },
+  "content_msg_done": {
+    "message": "识别完成！用时 {0} 秒",
+    "description": "Recognition done with time"
+  },
+  "content_msg_selection_small": {
+    "message": "选区太小，请重新框选",
+    "description": "Selection too small"
+  },
+  "content_msg_selection_small_edit": {
+    "message": "选区太小，请调整",
+    "description": "Selection too small in edit mode"
+  },
+
+  "content_result_title": {
+    "message": "识别结果...",
+    "description": "Result placeholder"
+  },
+  "content_btn_copy": {
+    "message": "复制",
+    "description": "Copy button"
+  },
+  "content_btn_copy_text": {
+    "message": "复制文字",
+    "description": "Copy text button"
+  },
+
+  "content_a11y_capturing": {
+    "message": "正在截图",
+    "description": "A11y capturing"
+  },
+  "content_a11y_recognizing": {
+    "message": "正在识别文字",
+    "description": "A11y recognizing"
+  },
+  "content_a11y_done": {
+    "message": "识别完成，用时 {0} 秒",
+    "description": "A11y done"
+  },
+  "content_a11y_failed": {
+    "message": "识别失败",
+    "description": "A11y failed"
+  },
+
+  "model_claude_opus": {
+    "message": "Claude 3 Opus (最佳质量)",
+    "description": "Claude Opus model"
+  },
+  "model_claude_sonnet": {
+    "message": "Claude 3 Sonnet (平衡)",
+    "description": "Claude Sonnet model"
+  },
+  "model_claude_haiku": {
+    "message": "Claude 3 Haiku (最快)",
+    "description": "Claude Haiku model"
+  },
+  "model_gpt4o": {
+    "message": "GPT-4o (推荐)",
+    "description": "GPT-4o model"
+  },
+  "model_gpt4o_mini": {
+    "message": "GPT-4o Mini (经济)",
+    "description": "GPT-4o Mini model"
+  },
+  "model_gpt4_turbo": {
+    "message": "GPT-4 Turbo",
+    "description": "GPT-4 Turbo model"
+  },
+  "model_qwen_max": {
+    "message": "qwen-vl-max (推荐)",
+    "description": "Qwen max model"
+  },
+  "model_qwen_plus": {
+    "message": "qwen-vl-plus (经济)",
+    "description": "Qwen plus model"
+  },
+  "model_glm4v": {
+    "message": "GLM-4V (推荐)",
+    "description": "GLM-4V model"
+  },
+  "model_glm4v_plus": {
+    "message": "GLM-4V-Plus",
+    "description": "GLM-4V Plus model"
+  },
+  "language_auto": {
+    "message": "自动检测",
+    "description": "Auto detect language"
+  },
+  "language_zh": {
+    "message": "中文",
+    "description": "Chinese"
+  },
+  "language_en": {
+    "message": "英文",
+    "description": "English"
+  },
+  "language_ja": {
+    "message": "日文",
+    "description": "Japanese"
+  },
+  "language_ko": {
+    "message": "韩文",
+    "description": "Korean"
+  },
+  "options_subtitle": {
+    "message": "配置API密钥和识别偏好",
+    "description": "Options page subtitle"
+  },
+  "help_get_api_key": {
+    "message": "获取API Key",
+    "description": "Get API key suffix"
+  },
+  "label_api_key_client": {
+    "message": "API Key (Client ID)",
+    "description": "API key client id label"
+  },
+  "label_api_key_dashscope": {
+    "message": "API Key (DashScope)",
+    "description": "DashScope API key label"
+  },
+  "label_ui_language": {
+    "message": "界面语言",
+    "description": "UI language label"
+  },
+  "help_ui_language": {
+    "message": "选择插件界面显示语言",
+    "description": "UI language help"
+  },
+  "prompt_placeholder": {
+    "message": "请识别图片中的文字内容，只返回识别到的纯文字...",
+    "description": "Prompt placeholder"
+  }
+}

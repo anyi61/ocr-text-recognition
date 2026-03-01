@@ -4,6 +4,11 @@
  */
 
 (function() {
+  // 使用统一的 OCRI18n API（来自 i18n-runtime.js）
+  OCRI18n.init().catch((error) => {
+    console.error('i18n init failed in content script:', error);
+  });
+
   /**
    * 选区矩形信息
    * @typedef {Object} Rect
@@ -46,6 +51,7 @@
   let toolbar = null;               // 工具栏元素
   let handles = [];                 // 调整手柄元素数组
   let currentRect = null;           // 当前选区 {left, top, width, height}
+  let rectHistory = [];             // 选区历史栈（用于撤销）
 
   // 进度通知相关变量
   let progressNotification = null;
@@ -306,7 +312,7 @@
     // 创建提示文字
     tooltip = document.createElement('div');
     tooltip.id = 'ocr-capture-tooltip';
-    tooltip.textContent = '按住鼠标左键框选需要识别的文字区域（最小10×10像素），按ESC取消';
+    tooltip.textContent = OCRI18n.t('content_tooltip_start');
     tooltip.style.cssText = `
       position: fixed;
       top: 20px;
@@ -368,11 +374,11 @@
 
     // 根据选区大小显示不同提示
     if (width < 10 || height < 10) {
-      tooltip.textContent = `${Math.round(width)} × ${Math.round(height)} 像素 - 选区太小，请扩大`;
+      tooltip.textContent = `${Math.round(width)} × ${Math.round(height)} px - ${OCRI18n.t('content_tooltip_size_small')}`;
       tooltip.style.background = '#e74c3c';
       selectionBox.style.borderColor = '#e74c3c';
     } else {
-      tooltip.textContent = `${Math.round(width)} × ${Math.round(height)} 像素 - 松开鼠标后可调整选区`;
+      tooltip.textContent = `${Math.round(width)} × ${Math.round(height)} px - ${OCRI18n.t('content_tooltip_size_ok')}`;
       tooltip.style.background = '#333';
       selectionBox.style.borderColor = '#667eea';
     }
@@ -419,6 +425,8 @@
       toolbar.remove();
       toolbar = null;
     }
+    // 清空历史栈
+    rectHistory = [];
     // 移除编辑模式事件监听
     document.removeEventListener('mousemove', onEditModeMouseMove);
     document.removeEventListener('mouseup', onEditModeMouseUp);
@@ -432,6 +440,9 @@
   function enterEditMode(rect) {
     isEditMode = true;
     currentRect = { ...rect };
+
+    // 初始化历史栈，记录初始状态
+    rectHistory = [{ ...rect }];
 
     // 移除初始框选阶段的事件监听器，避免冲突
     document.removeEventListener('mousedown', onMouseDown);
@@ -451,7 +462,7 @@
 
     // 更新提示
     if (tooltip) {
-      tooltip.textContent = '拖拽调整选区，按Enter确认，ESC取消';
+      tooltip.textContent = OCRI18n.t('content_tooltip_edit');
     }
 
     // 更新遮罩层光标
@@ -524,9 +535,10 @@
     toolbar.innerHTML = `
       <span class="ocr-size-info">${Math.round(currentRect.width)} × ${Math.round(currentRect.height)} px</span>
       <div class="ocr-toolbar-buttons">
-        <button class="ocr-btn ocr-btn-primary" id="ocr-confirm-btn" aria-label="确认识别选区内容">确认识别</button>
-        <button class="ocr-btn ocr-btn-secondary" id="ocr-reselect-btn" aria-label="重新选择截图区域">重选</button>
-        <button class="ocr-btn ocr-btn-cancel" id="ocr-cancel-btn" aria-label="取消截图">取消</button>
+        <button class="ocr-btn ocr-btn-secondary" id="ocr-undo-btn" aria-label="${OCRI18n.t('content_aria_undo')}" disabled>${OCRI18n.t('content_btn_undo')}</button>
+        <button class="ocr-btn ocr-btn-primary" id="ocr-confirm-btn" aria-label="${OCRI18n.t('content_aria_confirm')}">${OCRI18n.t('content_btn_confirm')}</button>
+        <button class="ocr-btn ocr-btn-secondary" id="ocr-reselect-btn" aria-label="${OCRI18n.t('content_aria_reselect')}">${OCRI18n.t('content_btn_reselect')}</button>
+        <button class="ocr-btn ocr-btn-cancel" id="ocr-cancel-btn" aria-label="${OCRI18n.t('content_aria_cancel')}">${OCRI18n.t('content_btn_cancel_capture')}</button>
       </div>
     `;
 
@@ -541,6 +553,10 @@
     confirmBtn.addEventListener('click', confirmSelection);
     reselectBtn.addEventListener('click', reselectArea);
     cancelBtn.addEventListener('click', cancelCapture);
+
+    // 绑定撤销按钮事件
+    const undoBtn = toolbar.querySelector('#ocr-undo-btn');
+    undoBtn.addEventListener('click', undoSelection);
   }
 
   /**
@@ -587,7 +603,7 @@
     const confirmBtn = toolbar.querySelector('#ocr-confirm-btn');
 
     if (currentRect.width < 10 || currentRect.height < 10) {
-      sizeInfo.innerHTML = `<span class="ocr-size-warning">${Math.round(currentRect.width)} × ${Math.round(currentRect.height)} px - 选区太小</span>`;
+      sizeInfo.innerHTML = `<span class="ocr-size-warning">${Math.round(currentRect.width)} × ${Math.round(currentRect.height)} px - ${OCRI18n.t('content_msg_selection_small_edit')}</span>`;
       confirmBtn.disabled = true;
     } else {
       sizeInfo.textContent = `${Math.round(currentRect.width)} × ${Math.round(currentRect.height)} px`;
@@ -718,9 +734,63 @@
    */
   function onEditModeMouseUp(e) {
     if (isDragging) {
+      // 拖拽结束，记录历史
+      if (currentRect && rectHistory.length > 0) {
+        const lastRect = rectHistory[rectHistory.length - 1];
+        // 只有当位置变化时才记录
+        if (lastRect.left !== currentRect.left || lastRect.top !== currentRect.top ||
+            lastRect.width !== currentRect.width || lastRect.height !== currentRect.height) {
+          rectHistory.push({ ...currentRect });
+        }
+      }
+      // 更新撤销按钮状态
+      updateUndoButtonState();
       isDragging = false;
       dragType = null;
       originalRect = null;
+    }
+  }
+
+  /**
+   * 撤销选区操作
+   * @description 回退到上一个选区状态
+   */
+  function undoSelection() {
+    if (rectHistory.length <= 1) {
+      // 没有可撤销的历史
+      return;
+    }
+
+    // 移除当前状态
+    rectHistory.pop();
+    // 恢复到上一个状态
+    const prevRect = rectHistory[rectHistory.length - 1];
+    currentRect = { ...prevRect };
+
+    // 更新选区框显示
+    if (selectionBox) {
+      selectionBox.style.left = `${currentRect.left}px`;
+      selectionBox.style.top = `${currentRect.top}px`;
+      selectionBox.style.width = `${currentRect.width}px`;
+      selectionBox.style.height = `${currentRect.height}px`;
+    }
+
+    // 更新手柄和工具栏位置
+    updateHandlesPosition();
+    updateToolbarPosition();
+    updateSizeDisplay();
+    // 更新撤销按钮状态
+    updateUndoButtonState();
+  }
+
+  /**
+   * 更新撤销按钮状态
+   */
+  function updateUndoButtonState() {
+    if (!toolbar) return;
+    const undoBtn = toolbar.querySelector('#ocr-undo-btn');
+    if (undoBtn) {
+      undoBtn.disabled = rectHistory.length <= 1;
     }
   }
 
@@ -729,7 +799,7 @@
    */
   async function confirmSelection() {
     if (!currentRect || currentRect.width < 10 || currentRect.height < 10) {
-      showNotification('选区太小，请调整', 'warning');
+      showNotification(OCRI18n.t('content_msg_selection_small_edit'), 'warning');
       return;
     }
 
@@ -759,7 +829,7 @@
 
     // 更新提示
     if (tooltip) {
-      tooltip.textContent = '按住鼠标左键框选需要识别的文字区域（最小10×10像素），按ESC取消';
+      tooltip.textContent = OCRI18n.t('content_tooltip_start');
     }
 
     // 恢复遮罩层光标
@@ -782,7 +852,7 @@
    */
   function cancelCapture() {
     cleanup();
-    showNotification('已取消截图', 'info');
+    showNotification(OCRI18n.t('content_msg_cancelled'), 'info');
   }
 
   /**
@@ -838,7 +908,7 @@
     // 检查选区大小
     if (rect.width < 10 || rect.height < 10) {
       cleanup();
-      showNotification('选区太小，请重新框选', 'warning');
+      showNotification(OCRI18n.t('content_msg_selection_small'), 'warning');
       return;
     }
 
@@ -864,14 +934,18 @@
       // 编辑模式下Enter确认
       e.preventDefault();
       confirmSelection();
+    } else if (e.key === 'z' && isEditMode && (e.ctrlKey || e.metaKey)) {
+      // 编辑模式下 Ctrl/Cmd+Z 撤销
+      e.preventDefault();
+      undoSelection();
     }
   }
 
   // 截取并识别
   async function captureAndRecognize(rect) {
     try {
-      showProgressNotification('正在截图...', false);
-      announceA11y('正在截图');
+      showProgressNotification(OCRI18n.t('content_progress_capturing'), false);
+      announceA11y(OCRI18n.t('content_a11y_capturing'));
 
       // 发送消息给background进行截图（因为content script无法直接调用chrome.tabs.captureVisibleTab）
       const response = await chrome.runtime.sendMessage({
@@ -883,7 +957,7 @@
 
       if (!response || !response.dataUrl) {
         hideProgressNotification();
-        showNotification('截图失败', 'error');
+        showNotification(OCRI18n.t('content_msg_capture_failed'), 'error');
         return;
       }
 
@@ -894,8 +968,8 @@
       if (isCancelled) return;
 
       // 更新为识别阶段，显示取消按钮
-      showProgressNotification('正在识别文字...', true);
-      announceA11y('正在识别文字');
+      showProgressNotification(OCRI18n.t('content_progress_recognizing'), true);
+      announceA11y(OCRI18n.t('content_a11y_recognizing'));
 
       // 发送给background进行OCR识别
       const ocrResponse = await chrome.runtime.sendMessage({
@@ -912,18 +986,18 @@
 
       if (ocrResponse && ocrResponse.success) {
         showResultPopup(ocrResponse.text);
-        showNotification(`识别完成！用时 ${elapsed} 秒`, 'success');
-        announceA11y(`识别完成，用时 ${elapsed} 秒`);
+        showNotification(OCRI18n.t('content_msg_done', [String(elapsed)]), 'success');
+        announceA11y(OCRI18n.t('content_a11y_done', [String(elapsed)]));
       } else {
-        showNotification(ocrResponse?.error || '识别失败', 'error');
-        announceA11y('识别失败');
+        showNotification(ocrResponse?.error || OCRI18n.t('content_msg_recognition_failed'), 'error');
+        announceA11y(OCRI18n.t('content_a11y_failed'));
       }
     } catch (error) {
       hideProgressNotification();
       if (!isCancelled) {
         console.error('截图识别失败:', error);
-        showNotification('识别失败: ' + error.message, 'error');
-        announceA11y('识别失败: ' + error.message);
+        showNotification(OCRI18n.t('content_msg_recognition_failed') + ': ' + error.message, 'error');
+        announceA11y(OCRI18n.t('content_a11y_failed') + ': ' + error.message);
       }
     }
   }
@@ -1093,23 +1167,23 @@
           outline-offset: 2px;
         }
       </style>
-      <button class="close-btn" title="关闭" aria-label="关闭结果弹窗">
+      <button class="close-btn" title="${OCRI18n.t('btn_close')}" aria-label="${OCRI18n.t('content_aria_close')}">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="6" x2="6" y2="18"></line>
           <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
       </button>
       <div class="content">
-        <textarea id="ocr-result-text" placeholder="识别结果..." aria-label="OCR识别结果"></textarea>
+        <textarea id="ocr-result-text" placeholder="${OCRI18n.t('content_result_title')}" aria-label="${OCRI18n.t('content_aria_result')}"></textarea>
         <div class="actions">
-          <button class="btn btn-primary copy-btn" aria-label="复制识别结果">
+          <button class="btn btn-primary copy-btn" aria-label="${OCRI18n.t('content_aria_copy')}">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
-            复制
+            ${OCRI18n.t('content_btn_copy')}
           </button>
-          <button class="btn btn-secondary close-popup-btn" aria-label="关闭弹窗">关闭</button>
+          <button class="btn btn-secondary close-popup-btn" aria-label="${OCRI18n.t('btn_close')}">${OCRI18n.t('btn_close')}</button>
         </div>
       </div>
     `;
@@ -1140,7 +1214,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="20 6 9 17 4 12"></polyline>
           </svg>
-          已复制
+          ${OCRI18n.t('btn_copied')}
         `;
         copyBtn.style.background = '#4caf50';
         setTimeout(() => {
@@ -1149,12 +1223,12 @@
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
-            复制文字
+            ${OCRI18n.t('content_btn_copy_text')}
           `;
           copyBtn.style.background = '';
         }, 2000);
       } catch (err) {
-        console.error('复制失败:', err);
+        console.error(OCRI18n.t('content_msg_recognition_failed') + ':', err);
       }
     });
   }
@@ -1248,9 +1322,9 @@
         <div class="ocr-progress-spinner"></div>
         <div class="ocr-progress-info">
           <div class="ocr-progress-message">${message}</div>
-          <div class="ocr-progress-time">已用时: 0 秒</div>
+          <div class="ocr-progress-time">${OCRI18n.t('content_progress_elapsed')}: 0 ${OCRI18n.t('content_progress_seconds')}</div>
         </div>
-        ${showCancel ? '<button class="ocr-progress-cancel">取消</button>' : ''}
+        ${showCancel ? `<button class="ocr-progress-cancel">${OCRI18n.t('content_progress_cancel')}</button>` : ''}
       </div>
     `;
 
@@ -1263,7 +1337,7 @@
     progressTimer = setInterval(() => {
       if (timeEl) {
         const elapsed = Math.floor((Date.now() - progressStartTime) / 1000);
-        timeEl.textContent = `已用时: ${elapsed} 秒`;
+        timeEl.textContent = `${OCRI18n.t('content_progress_elapsed')}: ${elapsed} ${OCRI18n.t('content_progress_seconds')}`;
       }
     }, 1000);
 
@@ -1274,7 +1348,7 @@
         cancelBtn.addEventListener('click', () => {
           isCancelled = true;
           hideProgressNotification();
-          showNotification('已取消识别', 'warning');
+          showNotification(OCRI18n.t('content_msg_recognition_cancelled'), 'warning');
         });
       }
     }

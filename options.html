@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OCR文字识别助手 - 设置</title>
+  <title data-i18n="app_title">OCR文字识别助手 - 设置</title>
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
@@ -13,8 +13,8 @@
       <div class="header-content">
         <img src="icons/icon48.png" alt="Logo" class="logo">
         <div class="header-text">
-          <h1>OCR文字识别助手</h1>
-          <p>配置API密钥和识别偏好</p>
+          <h1 data-i18n="app_title">OCR文字识别助手</h1>
+          <p data-i18n="options_subtitle">配置API密钥和识别偏好</p>
         </div>
       </div>
     </header>
@@ -23,9 +23,9 @@
     <main class="main">
       <!-- API提供商选择 -->
       <section class="section">
-        <h2>API 提供商</h2>
+        <h2 data-i18n="section_api_provider">API 提供商</h2>
         <div class="form-group">
-          <label for="apiProvider">选择OCR服务提供商</label>
+          <label for="apiProvider" data-i18n="label_select_provider">选择OCR服务提供商</label>
           <select id="apiProvider" class="select">
             <option value="claude">Anthropic Claude (推荐)</option>
             <option value="openai">OpenAI GPT-4 Vision</option>
@@ -35,150 +35,221 @@
             <option value="openai-compatible">通用OpenAI兼容接口</option>
             <option value="custom">自定义API接口</option>
           </select>
-          <p class="help-text">选择您想要使用的文字识别服务</p>
+          <p class="help-text" data-i18n="help_select_provider">选择您想要使用的文字识别服务</p>
         </div>
       </section>
 
       <!-- Claude配置 -->
       <section class="section config-section" id="claudeConfig">
-        <h2>Claude 配置</h2>
+        <h2 data-i18n="section_claude_config">Claude 配置</h2>
         <div class="form-group">
-          <label for="claudeApiKey">API Key</label>
-          <input type="password" id="claudeApiKey" class="input" placeholder="sk-ant-api03-...">
-          <p class="help-text">从 <a href="https://console.anthropic.com/" target="_blank">Anthropic Console</a> 获取API Key</p>
+          <label for="claudeApiKey" data-i18n="label_api_key">API Key</label>
+          <div class="input-wrapper">
+            <input type="password" id="claudeApiKey" class="input" placeholder="sk-ant-api03-...">
+            <span class="field-status" aria-live="polite"></span>
+          </div>
+          <p class="help-text"><span data-i18n="help_claude_key">从</span> <a href="https://console.anthropic.com/" target="_blank">Anthropic Console</a> <span data-i18n="help_get_api_key">获取API Key</span></p>
         </div>
         <div class="form-group">
-          <label for="claudeModel">模型</label>
-          <select id="claudeModel" class="select">
-            <option value="claude-3-opus-20240229">Claude 3 Opus (最佳质量)</option>
-            <option value="claude-3-sonnet-20240229">Claude 3 Sonnet (平衡)</option>
-            <option value="claude-3-haiku-20240307">Claude 3 Haiku (最快)</option>
-          </select>
+          <label for="claudeModel" data-i18n="label_model">模型</label>
+          <div class="input-wrapper">
+            <select id="claudeModel" class="select">
+              <option value="claude-3-opus-20240229">Claude 3 Opus (最佳质量)</option>
+              <option value="claude-3-sonnet-20240229">Claude 3 Sonnet (平衡)</option>
+              <option value="claude-3-haiku-20240307">Claude 3 Haiku (最快)</option>
+            </select>
+            <span class="field-status" aria-live="polite"></span>
+          </div>
         </div>
       </section>
 
       <!-- OpenAI配置 -->
       <section class="section config-section hidden" id="openaiConfig">
-        <h2>OpenAI 配置</h2>
+        <h2 data-i18n="section_openai_config">OpenAI 配置</h2>
         <div class="form-group">
-          <label for="openaiApiKey">API Key</label>
-          <input type="password" id="openaiApiKey" class="input" placeholder="sk-...">
-          <p class="help-text">从 <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a> 获取API Key</p>
+          <label for="openaiApiKey" data-i18n="label_api_key">API Key</label>
+          <div class="input-wrapper">
+            <input type="password" id="openaiApiKey" class="input" placeholder="sk-...">
+            <span class="field-status" aria-live="polite"></span>
+          </div>
+          <p class="help-text"><span data-i18n="help_openai_key">从</span> <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a> <span data-i18n="help_get_api_key">获取API Key</span></p>
         </div>
         <div class="form-group">
-          <label for="openaiModel">模型</label>
-          <select id="openaiModel" class="select">
-            <option value="gpt-4o">GPT-4o (推荐)</option>
-            <option value="gpt-4o-mini">GPT-4o Mini (经济)</option>
-            <option value="gpt-4-turbo">GPT-4 Turbo</option>
-          </select>
+          <label for="openaiModel" data-i18n="label_model">模型</label>
+          <div class="input-wrapper">
+            <select id="openaiModel" class="select">
+              <option value="gpt-4o">GPT-4o (推荐)</option>
+              <option value="gpt-4o-mini">GPT-4o Mini (经济)</option>
+              <option value="gpt-4-turbo">GPT-4 Turbo</option>
+            </select>
+            <span class="field-status" aria-live="polite"></span>
+          </div>
         </div>
       </section>
 
       <!-- 百度OCR配置 -->
       <section class="section config-section hidden" id="baiduConfig">
-        <h2>百度智能云 OCR 配置</h2>
+        <h2 data-i18n="section_baidu_config">百度智能云 OCR 配置</h2>
         <div class="form-group">
-          <label for="baiduApiKey">API Key (Client ID)</label>
-          <input type="text" id="baiduApiKey" class="input" placeholder="">
-          <p class="help-text">从 <a href="https://console.bce.baidu.com/ai/" target="_blank">百度智能云</a> 获取</p>
+          <label for="baiduApiKey" data-i18n="label_api_key_client">API Key (Client ID)</label>
+          <div class="input-wrapper">
+            <input type="text" id="baiduApiKey" class="input" placeholder="">
+            <span class="field-status" aria-live="polite"></span>
+          </div>
+          <p class="help-text"><span data-i18n="help_baidu_key">从</span> <a href="https://console.bce.baidu.com/ai/" target="_blank">百度智能云</a> <span data-i18n="help_get_api_key">获取</span></p>
         </div>
         <div class="form-group">
-          <label for="baiduSecret">Secret Key</label>
-          <input type="password" id="baiduSecret" class="input" placeholder="">
+          <label for="baiduSecret" data-i18n="label_secret_key">Secret Key</label>
+          <div class="input-wrapper">
+            <input type="password" id="baiduSecret" class="input" placeholder="">
+            <span class="field-status" aria-live="polite"></span>
+          </div>
         </div>
       </section>
 
       <!-- 阿里云OCR配置 -->
       <section class="section config-section hidden" id="aliyunConfig">
-        <h2>阿里云 OCR 配置</h2>
+        <h2 data-i18n="section_aliyun_config">阿里云 OCR 配置</h2>
         <div class="form-group">
-          <label for="aliyunApiKey">API Key (DashScope)</label>
-          <input type="password" id="aliyunApiKey" class="input" placeholder="sk-...">
-          <p class="help-text">从 <a href="https://dashscope.console.aliyun.com/apiKey" target="_blank">阿里云DashScope控制台</a> 获取API Key</p>
+          <label for="aliyunApiKey" data-i18n="label_api_key_dashscope">API Key (DashScope)</label>
+          <div class="input-wrapper">
+            <input type="password" id="aliyunApiKey" class="input" placeholder="sk-...">
+            <span class="field-status" aria-live="polite"></span>
+          </div>
+          <p class="help-text"><span data-i18n="help_aliyun_key">从</span> <a href="https://dashscope.console.aliyun.com/apiKey" target="_blank">阿里云DashScope控制台</a> <span data-i18n="help_get_api_key">获取API Key</span></p>
         </div>
         <div class="form-group">
-          <label for="aliyunModel">模型</label>
-          <select id="aliyunModel" class="select">
-            <option value="qwen-vl-max">qwen-vl-max (推荐)</option>
-            <option value="qwen-vl-plus">qwen-vl-plus (经济)</option>
-            <option value="qwen2-vl-72b-instruct">qwen2-vl-72b-instruct</option>
-            <option value="qwen2-vl-7b-instruct">qwen2-vl-7b-instruct</option>
-          </select>
-          <p class="help-text">阿里云DashScope提供的视觉语言模型</p>
+          <label for="aliyunModel" data-i18n="label_model">模型</label>
+          <div class="input-wrapper">
+            <select id="aliyunModel" class="select">
+              <option value="qwen-vl-max">qwen-vl-max (推荐)</option>
+              <option value="qwen-vl-plus">qwen-vl-plus (经济)</option>
+              <option value="qwen2-vl-72b-instruct">qwen2-vl-72b-instruct</option>
+              <option value="qwen2-vl-7b-instruct">qwen2-vl-7b-instruct</option>
+            </select>
+            <span class="field-status" aria-live="polite"></span>
+          </div>
+          <p class="help-text" data-i18n="help_aliyun_models">阿里云DashScope提供的视觉语言模型</p>
         </div>
       </section>
 
       <!-- 智谱AI配置 -->
       <section class="section config-section hidden" id="zhipuConfig">
-        <h2>智谱AI GLM-4V 配置</h2>
+        <h2 data-i18n="section_zhipu_config">智谱AI GLM-4V 配置</h2>
         <div class="form-group">
-          <label for="zhipuApiKey">API Key</label>
-          <input type="password" id="zhipuApiKey" class="input" placeholder="">
-          <p class="help-text">从 <a href="https://open.bigmodel.cn/usercenter/apikeys" target="_blank">智谱AI开放平台</a> 获取API Key</p>
+          <label for="zhipuApiKey" data-i18n="label_api_key">API Key</label>
+          <div class="input-wrapper">
+            <input type="password" id="zhipuApiKey" class="input" placeholder="">
+            <span class="field-status" aria-live="polite"></span>
+          </div>
+          <p class="help-text"><span data-i18n="help_zhipu_key">从</span> <a href="https://open.bigmodel.cn/usercenter/apikeys" target="_blank">智谱AI开放平台</a> <span data-i18n="help_get_api_key">获取API Key</span></p>
         </div>
         <div class="form-group">
-          <label for="zhipuModel">模型</label>
-          <select id="zhipuModel" class="select">
-            <option value="glm-4v">GLM-4V (推荐)</option>
-            <option value="glm-4v-plus">GLM-4V-Plus</option>
-          </select>
+          <label for="zhipuModel" data-i18n="label_model">模型</label>
+          <div class="input-wrapper">
+            <select id="zhipuModel" class="select">
+              <option value="glm-4v">GLM-4V (推荐)</option>
+              <option value="glm-4v-plus">GLM-4V-Plus</option>
+            </select>
+            <span class="field-status" aria-live="polite"></span>
+          </div>
         </div>
       </section>
 
       <!-- 通用OpenAI兼容接口配置 -->
       <section class="section config-section hidden" id="openaiCompatibleConfig">
-        <h2>通用 OpenAI 兼容接口</h2>
+        <h2 data-i18n="section_compatible_config">通用 OpenAI 兼容接口</h2>
         <div class="form-group">
-          <label for="compatibleEndpoint">API 端点</label>
-          <input type="text" id="compatibleEndpoint" class="input" placeholder="https://api.siliconflow.cn/v1/chat/completions">
-          <p class="help-text">支持任何OpenAI格式的API，如硅基流动、DeepSeek、Azure等</p>
+          <label for="compatibleEndpoint" data-i18n="label_endpoint">API 端点</label>
+          <div class="input-wrapper">
+            <input type="text" id="compatibleEndpoint" class="input" placeholder="https://api.siliconflow.cn/v1/chat/completions">
+            <span class="field-status" aria-live="polite"></span>
+          </div>
+          <p class="help-text" data-i18n="help_compatible_endpoint">支持任何OpenAI格式的API，如硅基流动、DeepSeek、Azure等</p>
         </div>
         <div class="form-group">
-          <label for="compatibleApiKey">API Key</label>
-          <input type="password" id="compatibleApiKey" class="input" placeholder="">
+          <label for="compatibleApiKey" data-i18n="label_api_key">API Key</label>
+          <div class="input-wrapper">
+            <input type="password" id="compatibleApiKey" class="input" placeholder="">
+            <span class="field-status" aria-live="polite"></span>
+          </div>
         </div>
         <div class="form-group">
-          <label for="compatibleModel">模型名称</label>
-          <input type="text" id="compatibleModel" class="input" placeholder="例如: Qwen/Qwen2-VL-72B-Instruct">
-          <p class="help-text">根据服务商填写对应的视觉模型名称</p>
+          <label for="compatibleModel" data-i18n="label_model_name">模型名称</label>
+          <div class="input-wrapper">
+            <input type="text" id="compatibleModel" class="input" placeholder="例如: Qwen/Qwen2-VL-72B-Instruct">
+            <span class="field-status" aria-live="polite"></span>
+          </div>
+          <p class="help-text" data-i18n="help_model_by_provider">根据服务商填写对应的视觉模型名称</p>
         </div>
       </section>
 
       <!-- 自定义API配置 -->
       <section class="section config-section hidden" id="customConfig">
-        <h2>自定义 API 配置</h2>
+        <h2 data-i18n="section_custom_config">自定义 API 配置</h2>
         <div class="form-group">
-          <label for="customEndpoint">API 端点</label>
-          <input type="text" id="customEndpoint" class="input" placeholder="https://api.example.com/v1/chat/completions">
-          <p class="help-text">完整的API接口地址</p>
+          <label for="customEndpoint" data-i18n="label_endpoint">API 端点</label>
+          <div class="input-wrapper">
+            <input type="text" id="customEndpoint" class="input" placeholder="https://api.example.com/v1/chat/completions">
+            <span class="field-status" aria-live="polite"></span>
+          </div>
+          <p class="help-text" data-i18n="help_custom_endpoint">完整的API接口地址</p>
         </div>
         <div class="form-group">
-          <label for="customApiKey">API Key</label>
-          <input type="password" id="customApiKey" class="input" placeholder="">
+          <label for="customApiKey" data-i18n="label_api_key">API Key</label>
+          <div class="input-wrapper">
+            <input type="password" id="customApiKey" class="input" placeholder="">
+            <span class="field-status" aria-live="polite"></span>
+          </div>
         </div>
         <div class="form-group">
-          <label for="customModel">模型名称 (可选)</label>
-          <input type="text" id="customModel" class="input" placeholder="例如: gpt-4-vision-preview">
+          <label for="customModel" data-i18n="label_model_name_optional">模型名称 (可选)</label>
+          <div class="input-wrapper">
+            <input type="text" id="customModel" class="input" placeholder="例如: gpt-4-vision-preview">
+            <span class="field-status" aria-live="polite"></span>
+          </div>
         </div>
       </section>
 
       <!-- 高级设置 -->
       <section class="section">
-        <h2>高级设置</h2>
+        <h2 data-i18n="section_advanced">高级设置</h2>
         <div class="form-group">
-          <label for="prompt">自定义识别提示词</label>
-          <textarea id="prompt" class="textarea" rows="3" placeholder="请识别图片中的文字内容，只返回识别到的纯文字...">请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。</textarea>
-          <p class="help-text">告诉AI如何识别和处理图片中的文字</p>
+          <label for="uiLanguage" data-i18n="label_ui_language">界面语言</label>
+          <div class="input-wrapper">
+            <select id="uiLanguage" class="select">
+              <option value="auto" data-i18n="language_auto">自动</option>
+              <option value="zh_CN" data-i18n="language_zh">中文</option>
+              <option value="en" data-i18n="language_en">English</option>
+            </select>
+            <span class="field-status" aria-live="polite"></span>
+          </div>
+          <p class="help-text" data-i18n="help_ui_language">选择插件界面显示语言</p>
         </div>
         <div class="form-group">
-          <label for="language">主要识别语言</label>
+          <label for="theme" data-i18n="label_theme">主题</label>
+          <div class="input-wrapper">
+            <select id="theme" class="select">
+              <option value="light" data-i18n="theme_light">浅色模式</option>
+              <option value="dark" data-i18n="theme_dark">深色模式</option>
+            </select>
+            <span class="field-status" aria-live="polite"></span>
+          </div>
+          <p class="help-text" data-i18n="help_theme">选择界面主题风格</p>
+        </div>
+        <div class="form-group">
+          <label for="prompt" data-i18n="label_prompt">自定义识别提示词</label>
+          <textarea id="prompt" class="textarea" rows="3" data-i18n-placeholder="prompt_placeholder" placeholder="请识别图片中的文字内容，只返回识别到的纯文字...">请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。</textarea>
+          <p class="help-text" data-i18n="help_prompt">告诉AI如何识别和处理图片中的文字</p>
+        </div>
+        <div class="form-group">
+          <label for="language" data-i18n="label_language">主要识别语言</label>
           <select id="language" class="select">
-            <option value="auto">自动检测</option>
-            <option value="zh">中文</option>
-            <option value="en">英文</option>
-            <option value="ja">日文</option>
-            <option value="ko">韩文</option>
+            <option value="auto" data-i18n="language_auto">自动检测</option>
+            <option value="zh" data-i18n="language_zh">中文</option>
+            <option value="en" data-i18n="language_en">英文</option>
+            <option value="ja" data-i18n="language_ja">日文</option>
+            <option value="ko" data-i18n="language_ko">韩文</option>
           </select>
         </div>
       </section>
@@ -190,15 +261,15 @@
             <path d="M9 11l3 3L22 4"/>
             <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
           </svg>
-          测试连接
+          <span data-i18n="btn_test_connection">测试连接</span>
         </button>
       </div>
 
       <!-- 配置导入导出 -->
       <section class="section">
-        <h2>配置管理</h2>
+        <h2 data-i18n="section_config_management">配置管理</h2>
         <div class="form-group">
-          <p class="help-text">导出当前配置到JSON文件，或从文件导入配置。</p>
+          <p class="help-text" data-i18n="help_import_export">导出当前配置到JSON文件，或从文件导入配置。</p>
         </div>
         <div class="actions import-export-actions">
           <button id="exportBtn" class="btn btn-secondary" type="button">
@@ -207,7 +278,7 @@
               <polyline points="7 10 12 15 17 10"/>
               <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            导出配置
+            <span data-i18n="btn_export_config">导出配置</span>
           </button>
           <button id="importBtn" class="btn btn-secondary" type="button">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -215,7 +286,7 @@
               <polyline points="17 8 12 3 7 8"/>
               <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            导入配置
+            <span data-i18n="btn_import_config">导入配置</span>
           </button>
           <input type="file" id="importFileInput" accept=".json" style="display: none;">
         </div>
@@ -264,6 +335,7 @@
     </aside>
   </div>
 
+  <script src="i18n-runtime.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

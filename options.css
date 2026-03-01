@@ -4,10 +4,84 @@
   box-sizing: border-box;
 }
 
+/* 主题变量 */
+:root {
+  --bg: #f5f7fa;
+  --bg-card: #ffffff;
+  --bg-section: #f8f9fa;
+  --text: #333333;
+  --text-secondary: #555555;
+  --text-muted: #888888;
+  --border: #f0f0f0;
+  --border-input: #dddddd;
+  --primary: #667eea;
+  --primary-hover: #764ba2;
+  --input-bg: #ffffff;
+  --input-focus-shadow: rgba(102, 126, 234, 0.1);
+  --input-error: #e74c3c;
+  --input-error-shadow: rgba(231, 76, 60, 0.1);
+  --status-success-bg: #d4edda;
+  --status-success-text: #155724;
+  --status-success-border: #c3e6cb;
+  --status-error-bg: #f8d7da;
+  --status-error-text: #721c24;
+  --status-error-border: #f5c6cb;
+  --status-loading-bg: #d1ecf1;
+  --status-loading-text: #0c5460;
+  --status-loading-border: #bee5eb;
+  --field-success-bg: #d4edda;
+  --field-success-text: #155724;
+  --field-error-bg: #f8d7da;
+  --field-error-text: #721c24;
+  --field-saving-bg: #d1ecf1;
+  --field-saving-text: #0c5460;
+  --kbd-bg: #f0f0f0;
+  --kbd-border: #dddddd;
+  --shadow: rgba(0, 0, 0, 0.08);
+  --shadow-strong: rgba(0, 0, 0, 0.3);
+}
+
+/* 深色模式 */
+[data-theme="dark"] {
+  --bg: #1a1a1a;
+  --bg-card: #2d2d2d;
+  --bg-section: #363636;
+  --text: #e0e0e0;
+  --text-secondary: #b0b0b0;
+  --text-muted: #888888;
+  --border: #404040;
+  --border-input: #505050;
+  --primary: #667eea;
+  --primary-hover: #8b7cf7;
+  --input-bg: #2d2d2d;
+  --input-focus-shadow: rgba(102, 126, 234, 0.2);
+  --input-error: #e74c3c;
+  --input-error-shadow: rgba(231, 76, 60, 0.2);
+  --status-success-bg: #1e4620;
+  --status-success-text: #a8daaa;
+  --status-success-border: #2e5a30;
+  --status-error-bg: #4a1f1f;
+  --status-error-text: #f8d7da;
+  --status-error-border: #6b2c2c;
+  --status-loading-bg: #1e3a4a;
+  --status-loading-text: #a8d8e8;
+  --status-loading-border: #2e5a6a;
+  --field-success-bg: #1e4620;
+  --field-success-text: #a8daaa;
+  --field-error-bg: #4a1f1f;
+  --field-error-text: #f8d7da;
+  --field-saving-bg: #1e3a4a;
+  --field-saving-text: #a8d8e8;
+  --kbd-bg: #404040;
+  --kbd-border: #505050;
+  --shadow: rgba(0, 0, 0, 0.3);
+  --shadow-strong: rgba(0, 0, 0, 0.5);
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background: #f5f7fa;
-  color: #333;
+  background: var(--bg);
+  color: var(--text);
   line-height: 1.6;
 }
 
@@ -23,7 +97,7 @@ body {
 /* 头部 */
 .header {
   grid-column: 1 / -1;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
   color: white;
   padding: 32px;
   border-radius: 16px;
@@ -57,10 +131,10 @@ body {
 
 /* 主内容 */
 .main {
-  background: white;
+  background: var(--bg-card);
   border-radius: 16px;
   padding: 32px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 12px var(--shadow);
 }
 
 .section {
@@ -70,10 +144,10 @@ body {
 .section h2 {
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: var(--text);
   margin-bottom: 20px;
   padding-bottom: 12px;
-  border-bottom: 2px solid #f0f0f0;
+  border-bottom: 2px solid var(--border);
 }
 
 /* 表单元素 */
@@ -85,8 +159,50 @@ body {
   display: block;
   font-size: 14px;
   font-weight: 500;
-  color: #555;
+  color: var(--text-secondary);
   margin-bottom: 8px;
+}
+
+/* 输入包装器（用于字段状态显示） */
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-wrapper .input,
+.input-wrapper .select,
+.input-wrapper .textarea {
+  flex: 1;
+}
+
+/* 字段状态提示 */
+.field-status {
+  font-size: 12px;
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.field-status.success {
+  opacity: 1;
+  color: var(--field-success-text);
+  background: var(--field-success-bg);
+}
+
+.field-status.error {
+  opacity: 1;
+  color: var(--field-error-text);
+  background: var(--field-error-bg);
+}
+
+.field-status.saving {
+  opacity: 1;
+  color: var(--field-saving-text);
+  background: var(--field-saving-bg);
 }
 
 .input,
@@ -94,33 +210,34 @@ body {
 .textarea {
   width: 100%;
   padding: 12px 16px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-input);
   border-radius: 8px;
   font-size: 14px;
   transition: all 0.2s;
-  background: white;
+  background: var(--input-bg);
+  color: var(--text);
 }
 
 .input:focus,
 .select:focus,
 .textarea:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--input-focus-shadow);
 }
 
 /* 输入错误状态 */
 .input.input-error,
 .select.input-error,
 .textarea.input-error {
-  border-color: #e74c3c;
-  box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
+  border-color: var(--input-error);
+  box-shadow: 0 0 0 3px var(--input-error-shadow);
 }
 
 .input.input-error:focus,
 .select.input-error:focus,
 .textarea.input-error:focus {
-  border-color: #e74c3c;
+  border-color: var(--input-error);
   box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.2);
 }
 
@@ -141,12 +258,12 @@ body {
 
 .help-text {
   font-size: 13px;
-  color: #888;
+  color: var(--text-muted);
   margin-top: 6px;
 }
 
 .help-text a {
-  color: #667eea;
+  color: var(--primary);
   text-decoration: none;
 }
 
@@ -156,7 +273,7 @@ body {
 
 /* 配置区块 */
 .config-section {
-  background: #f8f9fa;
+  background: var(--bg-section);
   padding: 24px;
   border-radius: 12px;
   margin-bottom: 24px;
@@ -167,7 +284,7 @@ body {
   display: flex;
   gap: 12px;
   padding-top: 24px;
-  border-top: 2px solid #f0f0f0;
+  border-top: 2px solid var(--border);
 }
 
 .btn {
@@ -185,7 +302,7 @@ body {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
   color: white;
   flex: 1;
 }
@@ -197,12 +314,12 @@ body {
 }
 
 .btn-secondary {
-  background: #f0f0f0;
-  color: #666;
+  background: var(--bg-section);
+  color: var(--text-secondary);
 }
 
 .btn-secondary:hover {
-  background: #e0e0e0;
+  filter: brightness(0.95);
 }
 
 .btn:disabled {
@@ -320,21 +437,21 @@ body {
 }
 
 .status-message.success {
-  background: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+  border: 1px solid var(--status-success-border);
 }
 
 .status-message.error {
-  background: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+  border: 1px solid var(--status-error-border);
 }
 
 .status-message.loading {
-  background: #d1ecf1;
-  color: #0c5460;
-  border: 1px solid #bee5eb;
+  background: var(--status-loading-bg);
+  color: var(--status-loading-text);
+  border: 1px solid var(--status-loading-border);
 }
 
 /* 侧边栏 */
@@ -345,16 +462,16 @@ body {
 }
 
 .info-card {
-  background: white;
+  background: var(--bg-card);
   border-radius: 12px;
   padding: 20px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 12px var(--shadow);
 }
 
 .info-card h3 {
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: var(--text);
   margin-bottom: 12px;
   display: flex;
   align-items: center;
@@ -365,7 +482,7 @@ body {
 .info-card ul {
   padding-left: 20px;
   font-size: 14px;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .info-card li {
@@ -375,8 +492,8 @@ body {
 .info-card kbd {
   display: inline-block;
   padding: 2px 8px;
-  background: #f0f0f0;
-  border: 1px solid #ddd;
+  background: var(--kbd-bg);
+  border: 1px solid var(--kbd-border);
   border-radius: 4px;
   font-family: monospace;
   font-size: 12px;

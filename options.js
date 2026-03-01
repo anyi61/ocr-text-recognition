@@ -3,7 +3,13 @@
  * @description 处理设置页面的配置加载、保存、API测试等功能
  */
 
+// 使用统一的 OCRI18n API（来自 i18n-runtime.js）
+
 document.addEventListener('DOMContentLoaded', async () => {
+  // 初始化 i18n
+  await OCRI18n.init();
+  OCRI18n.applyToDom(document);
+
   // 获取DOM元素
   const apiProvider = document.getElementById('apiProvider');
   const claudeConfig = document.getElementById('claudeConfig');
@@ -47,6 +53,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 高级设置
   const prompt = document.getElementById('prompt');
   const language = document.getElementById('language');
+  const themeSelect = document.getElementById('theme');
+  const uiLanguageSelect = document.getElementById('uiLanguage');
 
   // 按钮
   const testBtn = document.getElementById('testBtn');
@@ -166,6 +174,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (result.language) {
       language.value = result.language;
     }
+    // 主题在单独的 loadTheme 函数中处理
   }
 
   /**
@@ -181,12 +190,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     const validation = validateProviderConfig(provider);
     if (!validation.valid) {
       showFieldErrors(validation.fieldErrors, provider);
+      // 显示字段级错误提示
+      validation.fieldErrors.forEach(field => {
+        const el = getFieldElement(provider, field);
+        if (el) {
+          const messages = {
+            apiKey: OCRI18n.t('err_api_key_empty'),
+            secret: OCRI18n.t('err_secret_empty'),
+            endpoint: OCRI18n.t('err_endpoint_empty'),
+            endpoint_invalid: OCRI18n.t('err_endpoint_invalid'),
+            model: OCRI18n.t('err_model_empty')
+          };
+          setFieldStatus(el, 'error', messages[field] || OCRI18n.t('err_config_incomplete'));
+        }
+      });
       showStatus(validation.message, 'error');
       return false;
     }
 
-    // 清除之前的错误状态
+    // 清除之前的错误状态和字段状态
     showFieldErrors([], provider);
+    // 清除当前provider所有字段的错误状态
+    const providerFields = {
+      'claude': ['apiKey', 'model'],
+      'openai': ['apiKey', 'model'],
+      'baidu': ['apiKey', 'secret'],
+      'aliyun': ['apiKey', 'model'],
+      'zhipu': ['apiKey', 'model'],
+      'openai-compatible': ['endpoint', 'apiKey', 'model'],
+      'custom': ['endpoint', 'apiKey', 'model']
+    };
+    (providerFields[provider] || []).forEach(field => {
+      const el = getFieldElement(provider, field);
+      if (el) clearFieldStatus(el);
+    });
 
     // 构建统一的 apiConfigs 对象，每个API独立存储
     const apiConfigs = {
@@ -227,6 +264,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       apiProvider: provider,
       prompt: prompt.value,
       language: language.value,
+      theme: themeSelect.value,
       apiConfigs: apiConfigs,
       // 以下是为了兼容 background.js 中的旧代码
       apiKey: claudeApiKey.value,
@@ -248,7 +286,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     await chrome.storage.local.set(settings);
-    showStatus('设置已保存', 'success');
+    // 应用主题
+    applyTheme(themeSelect.value);
+    showStatus(OCRI18n.t('msg_saved'), 'success');
     return true;
   }
 
@@ -262,9 +302,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       input.addEventListener('blur', async () => {
         // 当输入框失去焦点时自动保存
         const ok = await saveSettings();
-        // 仅在保存成功时显示自动保存提示
-        if (ok) {
-          showStatus('已自动保存', 'success');
+        // 保存成功时显示字段级提示
+        if (ok && input.closest('.input-wrapper')) {
+          setFieldStatus(input, 'success', OCRI18n.t('msg_field_saved'));
+          // 3秒后自动清除
+          setTimeout(() => clearFieldStatus(input), 3000);
         }
       });
     });
@@ -443,7 +485,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     showFieldErrors([], provider);
 
     testBtn.disabled = true;
-    showStatus('正在测试连接...', 'loading');
+    showStatus(OCRI18n.t('msg_testing'), 'loading');
 
     const config = {
       apiProvider: provider,
@@ -495,12 +537,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
 
       if (response.success) {
-        showStatus('连接成功！API配置正确', 'success');
+        showStatus(OCRI18n.t('msg_test_success'), 'success');
       } else {
-        showStatus('连接失败: ' + response.error, 'error');
+        showStatus(OCRI18n.t('msg_test_failed') + ': ' + response.error, 'error');
       }
     } catch (error) {
-      showStatus('测试失败: ' + error.message, 'error');
+      showStatus(OCRI18n.t('msg_test_failed') + ': ' + error.message, 'error');
     }
 
     testBtn.disabled = false;
@@ -525,6 +567,84 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   /**
+   * 设置字段状态提示
+   * @param {HTMLElement} inputElement - 输入框元素
+   * @param {string} type - 状态类型 (success|error|saving)
+   * @param {string} message - 状态消息
+   */
+  function setFieldStatus(inputElement, type, message) {
+    const wrapper = inputElement.closest('.input-wrapper');
+    if (!wrapper) return;
+
+    const statusEl = wrapper.querySelector('.field-status');
+    if (!statusEl) return;
+
+    // 清除之前的状态
+    statusEl.classList.remove('success', 'error', 'saving');
+
+    // 设置新状态
+    statusEl.textContent = message;
+    statusEl.classList.add(type);
+  }
+
+  /**
+   * 清除字段状态提示
+   * @param {HTMLElement} inputElement - 输入框元素
+   */
+  function clearFieldStatus(inputElement) {
+    const wrapper = inputElement.closest('.input-wrapper');
+    if (!wrapper) return;
+
+    const statusEl = wrapper.querySelector('.field-status');
+    if (!statusEl) return;
+
+    statusEl.classList.remove('success', 'error', 'saving');
+    statusEl.textContent = '';
+  }
+
+  /**
+   * 获取字段对应的输入元素
+   * @param {string} provider - API提供商
+   * @param {string} field - 字段名
+   * @returns {HTMLElement|null}
+   */
+  function getFieldElement(provider, field) {
+    switch (provider) {
+      case 'claude':
+        if (field === 'apiKey') return claudeApiKey;
+        if (field === 'model') return claudeModel;
+        break;
+      case 'openai':
+        if (field === 'apiKey') return openaiApiKey;
+        if (field === 'model') return openaiModel;
+        break;
+      case 'baidu':
+        if (field === 'apiKey') return baiduApiKey;
+        if (field === 'secret') return baiduSecret;
+        break;
+      case 'aliyun':
+        if (field === 'apiKey') return aliyunApiKey;
+        if (field === 'model') return aliyunModel;
+        break;
+      case 'zhipu':
+        if (field === 'apiKey') return zhipuApiKey;
+        if (field === 'model') return zhipuModel;
+        break;
+      case 'openai-compatible':
+        if (field === 'endpoint' || field === 'endpoint_invalid') return compatibleEndpoint;
+        if (field === 'apiKey') return compatibleApiKey;
+        if (field === 'model') return compatibleModel;
+        break;
+      case 'custom':
+        if (field === 'endpoint' || field === 'endpoint_invalid') return customEndpointInput;
+        if (field === 'apiKey') return customApiKeyInput;
+        if (field === 'model') return customModelInput;
+        break;
+    }
+    return null;
+  }
+
+  /**
    * 导出配置到JSON文件
    * @async
    * @returns {Promise<void>}
@@ -532,7 +652,7 @@ document.addEventListener('DOMContentLoaded', async () => {
    */
   async function exportConfig() {
     try {
-      showStatus('正在导出配置...', 'loading');
+      showStatus(OCRI18n.t('msg_exporting'), 'loading');
 
       // 获取当前配置（仅导出配置数据，不包含历史记录）
       const result = await chrome.storage.local.get([
@@ -568,7 +688,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      showStatus('配置已成功导出', 'success');
+      showStatus(OCRI18n.t('msg_export_success'), 'success');
     } catch (error) {
       console.error('导出配置失败:', error);
       showStatus('导出失败: ' + error.message, 'error');
@@ -726,11 +846,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 检查文件类型
     if (!file.name.endsWith('.json') && file.type !== 'application/json') {
-      showStatus('请选择JSON格式的配置文件', 'error');
+      showStatus(OCRI18n.t('err_import_invalid_json'), 'error');
       return;
     }
 
-    showStatus('正在读取配置文件...', 'loading');
+    showStatus(OCRI18n.t('msg_importing'), 'loading');
 
     try {
       // 读取文件内容
@@ -740,14 +860,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         data = JSON.parse(content);
       } catch (parseError) {
-        showStatus('配置文件格式错误，请确保是有效的JSON', 'error');
+        showStatus(OCRI18n.t('err_import_parse'), 'error');
         return;
       }
 
       // 验证配置数据
       const validation = validateImportData(data);
       if (!validation.valid) {
-        showStatus('配置验证失败: ' + validation.error, 'error');
+        showStatus(OCRI18n.t('err_import_parse') + ': ' + validation.error, 'error');
         return;
       }
 
@@ -762,12 +882,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       );
 
       if (!confirmed) {
-        showStatus('已取消导入', 'error');
+        showStatus(OCRI18n.t('msg_import_cancelled'), 'error');
         return;
       }
 
       // 应用配置
-      showStatus('正在应用配置...', 'loading');
+      showStatus(OCRI18n.t('msg_applying_config'), 'loading');
 
       // 构建要保存的配置
       const settingsToSave = {
@@ -815,7 +935,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       // 重新加载页面设置
       await loadSettings();
 
-      showStatus('配置已成功导入！', 'success');
+      showStatus(OCRI18n.t('msg_import_success'), 'success');
     } catch (error) {
       console.error('导入配置失败:', error);
       showStatus('导入失败: ' + error.message, 'error');
@@ -830,6 +950,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     await saveSettings();
   });
 
+  // 主题切换即时生效
+  themeSelect.addEventListener('change', async () => {
+    const theme = themeSelect.value;
+    applyTheme(theme);
+    await chrome.storage.local.set({ theme });
+    setFieldStatus(themeSelect, 'success', OCRI18n.t('msg_field_saved'));
+    setTimeout(() => clearFieldStatus(themeSelect), 3000);
+  });
+
+  // 界面语言切换
+  uiLanguageSelect.addEventListener('change', async () => {
+    const newLang = uiLanguageSelect.value;
+    await OCRI18n.setLanguage(newLang);
+    OCRI18n.applyToDom(document);
+    setFieldStatus(uiLanguageSelect, 'success', OCRI18n.t('msg_field_saved'));
+    setTimeout(() => clearFieldStatus(uiLanguageSelect), 3000);
+  });
+
   testBtn.addEventListener('click', testConnection);
 
   // 导入导出按钮事件
@@ -840,6 +978,36 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 加载设置
   await loadSettings();
 
+  // 加载主题设置
+  await loadTheme();
+
   // 设置自动保存
   setupAutoSave();
 });
+
+/**
+ * 应用主题
+ * @param {string} theme - 主题名称 (light|dark)
+ */
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+}
+
+/**
+ * 加载主题设置
+ * @async
+ */
+async function loadTheme() {
+  const result = await chrome.storage.local.get(['theme', 'uiLanguage']);
+  const theme = result.theme || 'light';
+  const themeSelect = document.getElementById('theme');
+  if (themeSelect) {
+    themeSelect.value = theme;
+  }
+  // 设置 uiLanguage 选择器
+  const uiLanguageSelect = document.getElementById('uiLanguage');
+  if (uiLanguageSelect) {
+    uiLanguageSelect.value = result.uiLanguage || 'auto';
+  }
+  applyTheme(theme);
+}

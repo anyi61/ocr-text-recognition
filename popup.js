@@ -4,11 +4,18 @@
  */
 
 // popup.js - 弹出窗口逻辑
+// 使用统一的 OCRI18n API（来自 i18n-runtime.js）
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // 初始化 i18n
+  await OCRI18n.init();
+  OCRI18n.applyToDom(document);
+
   // 获取DOM元素
   const captureBtn = document.getElementById('captureBtn');
   const settingsBtn = document.getElementById('settingsBtn');
+  const themeBtn = document.getElementById('themeBtn');
+  const languageSelect = document.getElementById('languageSelect');
   const configTip = document.getElementById('configTip');
   const historyArea = document.getElementById('historyArea');
   const historyList = document.getElementById('historyList');
@@ -21,6 +28,43 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 历史记录数据（用于点击查看）
   let historyData = [];
+
+  /**
+   * 应用主题
+   * @param {string} theme - 主题名称 (light|dark)
+   */
+  const applyTheme = (theme) => {
+    document.documentElement.dataset.theme = theme;
+    // 更新图标显示
+    const lightIcon = themeBtn.querySelector('.theme-icon-light');
+    const darkIcon = themeBtn.querySelector('.theme-icon-dark');
+    if (theme === 'dark') {
+      lightIcon.style.display = 'none';
+      darkIcon.style.display = 'block';
+    } else {
+      lightIcon.style.display = 'block';
+      darkIcon.style.display = 'none';
+    }
+  };
+
+  /**
+   * 切换主题
+   */
+  const toggleTheme = async () => {
+    const currentTheme = document.documentElement.dataset.theme || 'light';
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    applyTheme(newTheme);
+    await chrome.storage.local.set({ theme: newTheme });
+  };
+
+  /**
+   * 加载主题设置
+   */
+  const loadTheme = async () => {
+    const result = await chrome.storage.local.get(['theme']);
+    const theme = result.theme || 'light';
+    applyTheme(theme);
+  };
 
   // 检查是否已配置API（支持多API配置）
   const checkConfig = async () => {
@@ -178,7 +222,7 @@ document.addEventListener('DOMContentLoaded', async () => {
    * @returns {Promise<void>}
    */
   const clearHistory = async () => {
-    if (confirm('确定要清空所有历史记录吗？')) {
+    if (confirm(OCRI18n.t('confirm_clear_history'))) {
       await chrome.storage.local.remove(['ocrHistory']);
       historyData = [];
       historyEmptyState.classList.remove('hidden');
@@ -202,8 +246,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   // 初始化
+  // 设置语言选择器当前值
+  languageSelect.value = OCRI18n.getLanguageSetting();
+  await loadTheme();
   await checkConfig();
   await loadHistory();
+
+  // 主题切换按钮事件
+  themeBtn.addEventListener('click', toggleTheme);
+
+  // 语言切换事件
+  languageSelect.addEventListener('change', async (e) => {
+    const newLang = e.target.value;
+    await OCRI18n.setLanguage(newLang);
+    OCRI18n.applyToDom(document);
+  });
 
   // 清空历史按钮事件
   clearHistoryBtn.addEventListener('click', clearHistory);
@@ -215,9 +272,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   previewCopyBtn.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(historyPreviewText.value);
-      previewCopyBtn.textContent = '已复制';
+      previewCopyBtn.textContent = OCRI18n.t('btn_copied');
       setTimeout(() => {
-        previewCopyBtn.textContent = '复制全文';
+        previewCopyBtn.textContent = OCRI18n.t('btn_copy_all');
       }, 1500);
     } catch (err) {
       console.error('复制失败:', err);
@@ -239,7 +296,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 检查配置
     const hasConfig = await checkConfig();
     if (!hasConfig) {
-      alert('请先配置API密钥');
+      alert(OCRI18n.t('msg_config_api_first'));
       return;
     }
 
@@ -248,7 +305,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
       if (!tab) {
-        alert('无法获取当前标签页');
+        alert(OCRI18n.t('msg_no_tab'));
         return;
       }
 
@@ -259,7 +316,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       window.close();
     } catch (error) {
       console.error('启动截图失败:', error);
-      alert('启动截图失败，请刷新页面后重试');
+      alert(OCRI18n.t('msg_capture_failed'));
     }
   });
 });

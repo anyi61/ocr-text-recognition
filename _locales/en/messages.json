@@ -1,0 +1,704 @@
+{
+  "ext_name": {
+    "message": "OCR Text Recognition Assistant",
+    "description": "Extension name"
+  },
+  "ext_description": {
+    "message": "Capture and recognize text from web pages, bypass copy restrictions",
+    "description": "Extension description"
+  },
+  "command_start_capture": {
+    "message": "Start screenshot recognition",
+    "description": "Keyboard shortcut description"
+  },
+
+  "app_title": {
+    "message": "OCR Text Recognition Assistant",
+    "description": "App title in header"
+  },
+  "btn_capture": {
+    "message": "Start Screenshot Recognition",
+    "description": "Capture button text"
+  },
+  "btn_settings": {
+    "message": "Settings",
+    "description": "Settings button"
+  },
+  "btn_theme_toggle": {
+    "message": "Toggle dark/light theme",
+    "description": "Theme toggle button"
+  },
+  "hint_capture": {
+    "message": "Click and drag to select the text area you want to recognize",
+    "description": "Capture hint text"
+  },
+  "tip_config_api": {
+    "message": "Please configure API key first",
+    "description": "API config tip"
+  },
+
+  "history_title": {
+    "message": "Recent Recognition Records",
+    "description": "History section title"
+  },
+  "history_empty_title": {
+    "message": "No recognition records",
+    "description": "Empty history title"
+  },
+  "history_empty_hint": {
+    "message": "Click the button above to start screenshot recognition",
+    "description": "Empty history hint"
+  },
+  "history_view_detail": {
+    "message": "View history record",
+    "description": "View history detail aria label"
+  },
+  "history_copy": {
+    "message": "Copy this history record",
+    "description": "Copy history item"
+  },
+  "history_copied": {
+    "message": "History record copied",
+    "description": "History copied"
+  },
+  "btn_clear_history": {
+    "message": "Clear History",
+    "description": "Clear history button"
+  },
+  "btn_close": {
+    "message": "Close",
+    "description": "Close button"
+  },
+  "btn_close_preview": {
+    "message": "Close preview",
+    "description": "Close preview button"
+  },
+
+  "preview_title": {
+    "message": "Recognition Result",
+    "description": "Preview section title"
+  },
+  "btn_copy_all": {
+    "message": "Copy All",
+    "description": "Copy all button"
+  },
+  "btn_copied": {
+    "message": "Copied",
+    "description": "Copied button state"
+  },
+
+  "footer_supported_apis": {
+    "message": "Supports 7 APIs: Claude / OpenAI / Zhipu AI / Baidu OCR / Aliyun / Compatible / Custom",
+    "description": "Footer text"
+  },
+
+  "theme_light": {
+    "message": "Light Mode",
+    "description": "Light theme option"
+  },
+  "theme_dark": {
+    "message": "Dark Mode",
+    "description": "Dark theme option"
+  },
+
+  "confirm_clear_history": {
+    "message": "Are you sure you want to clear all history records?",
+    "description": "Confirm clear history"
+  },
+
+  "msg_capture_failed": {
+    "message": "Failed to start capture, please refresh the page and try again",
+    "description": "Capture failed message"
+  },
+  "msg_no_tab": {
+    "message": "Cannot get current tab",
+    "description": "No tab error"
+  },
+  "msg_config_api_first": {
+    "message": "Please configure API key first",
+    "description": "Please configure API first"
+  },
+
+  "options_title": {
+    "message": "OCR Text Recognition Assistant - Settings",
+    "description": "Options page title"
+  },
+  "options_header_subtitle": {
+    "message": "Configure API keys and recognition preferences",
+    "description": "Options header subtitle"
+  },
+
+  "section_api_provider": {
+    "message": "API Provider",
+    "description": "API provider section"
+  },
+  "label_select_provider": {
+    "message": "Select OCR Service Provider",
+    "description": "Select provider label"
+  },
+  "help_select_provider": {
+    "message": "Select the text recognition service you want to use",
+    "description": "Select provider help text"
+  },
+
+  "section_claude_config": {
+    "message": "Claude Configuration",
+    "description": "Claude config section"
+  },
+  "section_openai_config": {
+    "message": "OpenAI Configuration",
+    "description": "OpenAI config section"
+  },
+  "section_baidu_config": {
+    "message": "Baidu Cloud OCR Configuration",
+    "description": "Baidu config section"
+  },
+  "section_aliyun_config": {
+    "message": "Aliyun OCR Configuration",
+    "description": "Aliyun config section"
+  },
+  "section_zhipu_config": {
+    "message": "Zhipu AI GLM-4V Configuration",
+    "description": "Zhipu config section"
+  },
+  "section_compatible_config": {
+    "message": "Universal OpenAI Compatible API",
+    "description": "Compatible API section"
+  },
+  "section_custom_config": {
+    "message": "Custom API Configuration",
+    "description": "Custom API section"
+  },
+
+  "label_api_key": {
+    "message": "API Key",
+    "description": "API Key label"
+  },
+  "label_model": {
+    "message": "Model",
+    "description": "Model label"
+  },
+  "label_endpoint": {
+    "message": "API Endpoint",
+    "description": "Endpoint label"
+  },
+  "label_secret_key": {
+    "message": "Secret Key",
+    "description": "Secret Key label"
+  },
+  "label_model_name": {
+    "message": "Model Name",
+    "description": "Model name label"
+  },
+  "label_model_name_optional": {
+    "message": "Model Name (Optional)",
+    "description": "Model name optional label"
+  },
+
+  "help_claude_key": {
+    "message": "Get API Key from Anthropic Console",
+    "description": "Claude key help"
+  },
+  "help_openai_key": {
+    "message": "Get API Key from OpenAI Platform",
+    "description": "OpenAI key help"
+  },
+  "help_baidu_key": {
+    "message": "Get from Baidu Cloud Console",
+    "description": "Baidu key help"
+  },
+  "help_aliyun_key": {
+    "message": "Get API Key from Aliyun DashScope Console",
+    "description": "Aliyun key help"
+  },
+  "help_zhipu_key": {
+    "message": "Get API Key from Zhipu AI Platform",
+    "description": "Zhipu key help"
+  },
+  "help_compatible_endpoint": {
+    "message": "Supports any OpenAI-format API, such as SiliconFlow, DeepSeek, Azure, etc.",
+    "description": "Compatible endpoint help"
+  },
+  "help_custom_endpoint": {
+    "message": "Complete API endpoint URL",
+    "description": "Custom endpoint help"
+  },
+  "help_model_by_provider": {
+    "message": "Enter the vision model name according to your provider",
+    "description": "Model help for compatible API"
+  },
+  "help_aliyun_models": {
+    "message": "Vision language models provided by Aliyun DashScope",
+    "description": "Aliyun models help"
+  },
+
+  "section_advanced": {
+    "message": "Advanced Settings",
+    "description": "Advanced settings section"
+  },
+  "label_theme": {
+    "message": "Theme",
+    "description": "Theme label"
+  },
+  "help_theme": {
+    "message": "Select interface theme style",
+    "description": "Theme help"
+  },
+  "label_prompt": {
+    "message": "Custom Recognition Prompt",
+    "description": "Prompt label"
+  },
+  "help_prompt": {
+    "message": "Tell AI how to recognize and process text in images",
+    "description": "Prompt help"
+  },
+  "label_language": {
+    "message": "Primary Recognition Language",
+    "description": "Language label"
+  },
+  "default_prompt": {
+    "message": "Please recognize the text content in the image, return only the recognized text without any explanation or additional notes.",
+    "description": "Default prompt text"
+  },
+
+  "btn_test_connection": {
+    "message": "Test Connection",
+    "description": "Test connection button"
+  },
+  "btn_export_config": {
+    "message": "Export Config",
+    "description": "Export config button"
+  },
+  "btn_import_config": {
+    "message": "Import Config",
+    "description": "Import config button"
+  },
+
+  "section_config_management": {
+    "message": "Configuration Management",
+    "description": "Config management section"
+  },
+  "help_import_export": {
+    "message": "Export current configuration to a JSON file, or import configuration from a file.",
+    "description": "Import export help"
+  },
+
+  "msg_saved": {
+    "message": "Settings saved",
+    "description": "Settings saved"
+  },
+  "msg_auto_saved": {
+    "message": "Auto saved",
+    "description": "Auto saved"
+  },
+  "msg_field_saved": {
+    "message": "Saved",
+    "description": "Field saved"
+  },
+  "msg_testing": {
+    "message": "Testing connection...",
+    "description": "Testing connection"
+  },
+  "msg_test_success": {
+    "message": "Connection successful! API configuration is correct",
+    "description": "Test success"
+  },
+  "msg_test_failed": {
+    "message": "Connection failed",
+    "description": "Test failed"
+  },
+  "msg_exporting": {
+    "message": "Exporting configuration...",
+    "description": "Exporting config"
+  },
+  "msg_export_success": {
+    "message": "Configuration exported successfully",
+    "description": "Export success"
+  },
+  "msg_importing": {
+    "message": "Reading configuration file...",
+    "description": "Importing config"
+  },
+  "msg_import_success": {
+    "message": "Configuration imported successfully!",
+    "description": "Import success"
+  },
+  "msg_import_cancelled": {
+    "message": "Import cancelled",
+    "description": "Import cancelled"
+  },
+  "msg_applying_config": {
+    "message": "Applying configuration...",
+    "description": "Applying config"
+  },
+
+  "err_config_incomplete": {
+    "message": "Configuration incomplete",
+    "description": "Config incomplete error"
+  },
+  "err_api_key_empty": {
+    "message": "API Key cannot be empty",
+    "description": "API key empty error"
+  },
+  "err_secret_empty": {
+    "message": "Secret Key cannot be empty",
+    "description": "Secret key empty error"
+  },
+  "err_endpoint_empty": {
+    "message": "API Endpoint cannot be empty",
+    "description": "Endpoint empty error"
+  },
+  "err_endpoint_invalid": {
+    "message": "API Endpoint format invalid (must be a valid URL)",
+    "description": "Endpoint invalid error"
+  },
+  "err_model_empty": {
+    "message": "Model name cannot be empty",
+    "description": "Model empty error"
+  },
+  "err_import_invalid_json": {
+    "message": "Please select a JSON configuration file",
+    "description": "Invalid JSON file"
+  },
+  "err_import_parse": {
+    "message": "Configuration file format error, please ensure it is valid JSON",
+    "description": "JSON parse error"
+  },
+
+  "card_usage_title": {
+    "message": "Usage Instructions",
+    "description": "Usage card title"
+  },
+  "card_shortcuts_title": {
+    "message": "Keyboard Shortcuts",
+    "description": "Shortcuts card title"
+  },
+  "card_recommended_api_title": {
+    "message": "Recommended APIs",
+    "description": "Recommended API title"
+  },
+
+  "usage_step1": {
+    "message": "Configure your chosen API provider's key",
+    "description": "Usage step 1"
+  },
+  "usage_step2": {
+    "message": "Click the extension icon to open the popup",
+    "description": "Usage step 2"
+  },
+  "usage_step3": {
+    "message": "Click the 'Start Screenshot Recognition' button",
+    "description": "Usage step 3"
+  },
+  "usage_step4": {
+    "message": "Select the text area you want to recognize on the page",
+    "description": "Usage step 4"
+  },
+  "usage_step5": {
+    "message": "Wait for recognition to complete, then copy the result",
+    "description": "Usage step 5"
+  },
+
+  "shortcut_capture": {
+    "message": "Start screenshot recognition",
+    "description": "Capture shortcut"
+  },
+  "shortcut_cancel": {
+    "message": "Cancel screenshot",
+    "description": "Cancel shortcut"
+  },
+  "shortcut_drag": {
+    "message": "Select area by dragging",
+    "description": "Drag shortcut"
+  },
+  "shortcut_customize_hint": {
+    "message": "Tip: You can customize shortcuts in chrome://extensions/shortcuts",
+    "description": "Customize shortcut hint"
+  },
+
+  "api_claude_opus": {
+    "message": "Highest recognition accuracy",
+    "description": "Claude Opus description"
+  },
+  "api_gpt4o": {
+    "message": "Fast, high accuracy",
+    "description": "GPT-4o description"
+  },
+  "api_glm4v": {
+    "message": "Domestic LLM, great for Chinese",
+    "description": "GLM-4V description"
+  },
+  "api_baidu": {
+    "message": "Great Chinese recognition, cost-effective",
+    "description": "Baidu description"
+  },
+  "api_aliyun": {
+    "message": "Enterprise-grade service, stable and reliable",
+    "description": "Aliyun description"
+  },
+  "api_compatible": {
+    "message": "Flexible support for multiple providers",
+    "description": "Compatible API description"
+  },
+
+  "modal_import_title": {
+    "message": "Import Configuration Confirmation",
+    "description": "Import confirm dialog title"
+  },
+  "modal_import_message": {
+    "message": "About to import configuration file, please confirm:",
+    "description": "Import confirm message"
+  },
+  "modal_import_warning": {
+    "message": "This will overwrite all current configurations. Continue?",
+    "description": "Import warning"
+  },
+  "modal_api_provider": {
+    "message": "API Provider",
+    "description": "API provider label in modal"
+  },
+  "modal_export_date": {
+    "message": "Export Date",
+    "description": "Export date label"
+  },
+  "btn_cancel": {
+    "message": "Cancel",
+    "description": "Cancel button"
+  },
+  "btn_confirm_import": {
+    "message": "Confirm Import",
+    "description": "Confirm import button"
+  },
+
+  "content_tooltip_start": {
+    "message": "Hold left mouse button to select text area (minimum 10×10 pixels), press ESC to cancel",
+    "description": "Initial tooltip"
+  },
+  "content_tooltip_edit": {
+    "message": "Drag to adjust selection, press Enter to confirm, ESC to cancel",
+    "description": "Edit mode tooltip"
+  },
+  "content_tooltip_size_small": {
+    "message": "Selection too small, please expand",
+    "description": "Selection too small"
+  },
+  "content_tooltip_size_ok": {
+    "message": "Release mouse to adjust selection",
+    "description": "Selection size OK"
+  },
+
+  "content_btn_confirm": {
+    "message": "Confirm",
+    "description": "Confirm button"
+  },
+  "content_btn_reselect": {
+    "message": "Reselect",
+    "description": "Reselect button"
+  },
+  "content_btn_cancel_capture": {
+    "message": "Cancel",
+    "description": "Cancel capture button"
+  },
+  "content_btn_undo": {
+    "message": "Undo",
+    "description": "Undo button"
+  },
+
+  "content_aria_confirm": {
+    "message": "Confirm recognition of selected area",
+    "description": "Confirm button aria"
+  },
+  "content_aria_reselect": {
+    "message": "Reselect screenshot area",
+    "description": "Reselect button aria"
+  },
+  "content_aria_cancel": {
+    "message": "Cancel screenshot",
+    "description": "Cancel button aria"
+  },
+  "content_aria_undo": {
+    "message": "Undo last operation",
+    "description": "Undo button aria"
+  },
+  "content_aria_close": {
+    "message": "Close result popup",
+    "description": "Close button aria"
+  },
+  "content_aria_result": {
+    "message": "OCR recognition result",
+    "description": "Result textarea aria"
+  },
+  "content_aria_copy": {
+    "message": "Copy recognition result",
+    "description": "Copy button aria"
+  },
+
+  "content_progress_capturing": {
+    "message": "Capturing screenshot...",
+    "description": "Capturing progress"
+  },
+  "content_progress_recognizing": {
+    "message": "Recognizing text...",
+    "description": "Recognizing progress"
+  },
+  "content_progress_cancel": {
+    "message": "Cancel",
+    "description": "Cancel button in progress"
+  },
+  "content_progress_elapsed": {
+    "message": "Elapsed",
+    "description": "Elapsed time"
+  },
+  "content_progress_seconds": {
+    "message": "seconds",
+    "description": "Seconds"
+  },
+
+  "content_msg_cancelled": {
+    "message": "Screenshot cancelled",
+    "description": "Capture cancelled"
+  },
+  "content_msg_recognition_cancelled": {
+    "message": "Recognition cancelled",
+    "description": "Recognition cancelled"
+  },
+  "content_msg_capture_failed": {
+    "message": "Screenshot failed",
+    "description": "Capture failed"
+  },
+  "content_msg_recognition_failed": {
+    "message": "Recognition failed",
+    "description": "Recognition failed"
+  },
+  "content_msg_done": {
+    "message": "Recognition complete! Time: {0} seconds",
+    "description": "Recognition done with time"
+  },
+  "content_msg_selection_small": {
+    "message": "Selection too small, please reselect",
+    "description": "Selection too small"
+  },
+  "content_msg_selection_small_edit": {
+    "message": "Selection too small, please adjust",
+    "description": "Selection too small in edit mode"
+  },
+
+  "content_result_title": {
+    "message": "Recognition result...",
+    "description": "Result placeholder"
+  },
+  "content_btn_copy": {
+    "message": "Copy",
+    "description": "Copy button"
+  },
+  "content_btn_copy_text": {
+    "message": "Copy Text",
+    "description": "Copy text button"
+  },
+
+  "content_a11y_capturing": {
+    "message": "Capturing screenshot",
+    "description": "A11y capturing"
+  },
+  "content_a11y_recognizing": {
+    "message": "Recognizing text",
+    "description": "A11y recognizing"
+  },
+  "content_a11y_done": {
+    "message": "Recognition complete, time: {0} seconds",
+    "description": "A11y done"
+  },
+  "content_a11y_failed": {
+    "message": "Recognition failed",
+    "description": "A11y failed"
+  },
+
+  "model_claude_opus": {
+    "message": "Claude 3 Opus (Best Quality)",
+    "description": "Claude Opus model"
+  },
+  "model_claude_sonnet": {
+    "message": "Claude 3 Sonnet (Balanced)",
+    "description": "Claude Sonnet model"
+  },
+  "model_claude_haiku": {
+    "message": "Claude 3 Haiku (Fastest)",
+    "description": "Claude Haiku model"
+  },
+  "model_gpt4o": {
+    "message": "GPT-4o (Recommended)",
+    "description": "GPT-4o model"
+  },
+  "model_gpt4o_mini": {
+    "message": "GPT-4o Mini (Economical)",
+    "description": "GPT-4o Mini model"
+  },
+  "model_gpt4_turbo": {
+    "message": "GPT-4 Turbo",
+    "description": "GPT-4 Turbo model"
+  },
+  "model_qwen_max": {
+    "message": "qwen-vl-max (Recommended)",
+    "description": "Qwen max model"
+  },
+  "model_qwen_plus": {
+    "message": "qwen-vl-plus (Economical)",
+    "description": "Qwen plus model"
+  },
+  "model_glm4v": {
+    "message": "GLM-4V (Recommended)",
+    "description": "GLM-4V model"
+  },
+  "model_glm4v_plus": {
+    "message": "GLM-4V-Plus",
+    "description": "GLM-4V Plus model"
+  },
+  "language_auto": {
+    "message": "Auto Detect",
+    "description": "Auto detect language"
+  },
+  "language_zh": {
+    "message": "Chinese",
+    "description": "Chinese"
+  },
+  "language_en": {
+    "message": "English",
+    "description": "English"
+  },
+  "language_ja": {
+    "message": "Japanese",
+    "description": "Japanese"
+  },
+  "language_ko": {
+    "message": "Korean",
+    "description": "Korean"
+  },
+  "options_subtitle": {
+    "message": "Configure API keys and recognition preferences",
+    "description": "Options page subtitle"
+  },
+  "help_get_api_key": {
+    "message": "Get API Key",
+    "description": "Get API key suffix"
+  },
+  "label_api_key_client": {
+    "message": "API Key (Client ID)",
+    "description": "API key client id label"
+  },
+  "label_api_key_dashscope": {
+    "message": "API Key (DashScope)",
+    "description": "DashScope API key label"
+  },
+  "label_ui_language": {
+    "message": "Interface Language",
+    "description": "UI language label"
+  },
+  "help_ui_language": {
+    "message": "Choose plugin interface language",
+    "description": "UI language help"
+  },
+  "prompt_placeholder": {
+    "message": "Please recognize text in the image and return plain text only...",
+    "description": "Prompt placeholder"
+  }
+}
