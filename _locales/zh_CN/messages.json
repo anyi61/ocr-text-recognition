@@ -700,5 +700,41 @@
   "prompt_placeholder": {
     "message": "请识别图片中的文字内容，只返回识别到的纯文字...",
     "description": "Prompt placeholder"
+  },
+  "content_handle_nw": {
+    "message": "左上角调整手柄",
+    "description": "Top-left resize handle"
+  },
+  "content_handle_n": {
+    "message": "上边调整手柄",
+    "description": "Top resize handle"
+  },
+  "content_handle_ne": {
+    "message": "右上角调整手柄",
+    "description": "Top-right resize handle"
+  },
+  "content_handle_e": {
+    "message": "右边调整手柄",
+    "description": "Right resize handle"
+  },
+  "content_handle_se": {
+    "message": "右下角调整手柄",
+    "description": "Bottom-right resize handle"
+  },
+  "content_handle_s": {
+    "message": "下边调整手柄",
+    "description": "Bottom resize handle"
+  },
+  "content_handle_sw": {
+    "message": "左下角调整手柄",
+    "description": "Bottom-left resize handle"
+  },
+  "content_handle_w": {
+    "message": "左边调整手柄",
+    "description": "Left resize handle"
+  },
+  "content_a11y_resized": {
+    "message": "选区已调整为 {0} 像素",
+    "description": "Selection resized announcement"
   }
 }

@@ -59,9 +59,17 @@
   let progressStartTime = null;
   let isCancelled = false;
 
-  // 注入进度通知样式和编辑模式样式
-  const progressStyles = document.createElement('style');
-  progressStyles.textContent = `
+  // Shadow DOM 相关变量
+  let shadowHost = null;      // Shadow DOM 宿主元素
+  let shadowRoot = null;      // Shadow DOM 根节点
+  let styleEl = null;         // shadowRoot 内的样式元素
+
+  /**
+   * 获取所有样式内容
+   * @returns {string} 样式文本
+   */
+  function getAllStyles() {
+    return `
     /* 进度通知样式 */
     #ocr-progress-notification {
       position: fixed;
@@ -133,6 +141,7 @@
       border: 2px solid #fff;
       border-radius: 50%;
       cursor: pointer;
+      pointer-events: auto;
       z-index: ${Z.HANDLE};
       box-shadow: 0 2px 8px rgba(0,0,0,0.3);
       transition: transform 0.15s ease, background 0.15s ease;
@@ -152,6 +161,10 @@
     .ocr-handle:hover {
       transform: scale(1.3);
       background: #764ba2;
+    }
+    .ocr-handle:focus-visible {
+      outline: 2px solid #2563eb;
+      outline-offset: 2px;
     }
     .ocr-handle-nw { cursor: nwse-resize; }
     .ocr-handle-ne { cursor: nesw-resize; }
@@ -177,6 +190,7 @@
       background: #333;
       border-radius: 8px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      pointer-events: auto;
       z-index: ${Z.TOOLBAR};
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       animation: ocr-toolbar-fadeIn 0.2s ease;
@@ -264,19 +278,59 @@
       white-space: nowrap;
       border: 0;
     }
-  `;
-  document.head.appendChild(progressStyles);
+    `;
+  }
+
+  /**
+   * 初始化 Shadow DOM
+   * @description 创建 Shadow DOM 宿主元素并注入样式
+   * @returns {ShadowRoot} Shadow DOM 根节点
+   */
+  function initShadowDOM() {
+    // 如果已经存在，直接返回
+    if (shadowRoot && shadowHost) {
+      return shadowRoot;
+    }
+
+    // 创建宿主元素（全屏容器，但不拦截事件）
+    shadowHost = document.createElement('div');
+    shadowHost.id = 'ocr-root-host';
+    shadowHost.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 1000009;
+    `;
+
+    // 挂载 Shadow DOM
+    shadowRoot = shadowHost.attachShadow({ mode: 'open' });
+
+    // 创建样式元素
+    styleEl = document.createElement('style');
+    styleEl.textContent = getAllStyles();
+    shadowRoot.appendChild(styleEl);
+
+    // 添加到页面
+    document.body.appendChild(shadowHost);
+
+    return shadowRoot;
+  }
 
   // 创建无障碍状态播报区域
   let a11yLiveRegion = null;
   function ensureA11yLiveRegion() {
-    if (!a11yLiveRegion || !document.body.contains(a11yLiveRegion)) {
+    if (!a11yLiveRegion || !shadowRoot || !shadowRoot.contains(a11yLiveRegion)) {
       a11yLiveRegion = document.createElement('div');
       a11yLiveRegion.id = 'ocr-a11y-live';
       a11yLiveRegion.className = 'ocr-sr-only';
       a11yLiveRegion.setAttribute('aria-live', 'polite');
       a11yLiveRegion.setAttribute('aria-atomic', 'true');
-      document.body.appendChild(a11yLiveRegion);
+      if (shadowRoot) {
+        shadowRoot.appendChild(a11yLiveRegion);
+      }
     }
   }
 
@@ -296,6 +350,8 @@
    * @description 创建全屏半透明遮罩和操作提示
    */
   function createOverlay() {
+    const root = initShadowDOM();
+
     overlay = document.createElement('div');
     overlay.id = 'ocr-capture-overlay';
     overlay.style.cssText = `
@@ -307,6 +363,7 @@
       background: rgba(0, 0, 0, 0.3);
       z-index: ${Z.OVERLAY};
       cursor: crosshair;
+      pointer-events: auto;
     `;
 
     // 创建提示文字
@@ -329,8 +386,8 @@
       transition: background 0.2s;
     `;
 
-    document.body.appendChild(overlay);
-    document.body.appendChild(tooltip);
+    root.appendChild(overlay);
+    root.appendChild(tooltip);
   }
 
   /**
@@ -350,7 +407,9 @@
       z-index: ${Z.SELECTION};
       display: none;
     `;
-    document.body.appendChild(selectionBox);
+    if (shadowRoot) {
+      shadowRoot.appendChild(selectionBox);
+    }
   }
 
   /**
@@ -385,8 +444,8 @@
   }
 
   /**
-   * 清理截图相关资源
-   * @description 移除遮罩层、选区框，重置状态
+   * 清理截图相关资源（会话级清理）
+   * @description 移除遮罩层、选区框，重置状态，但不销毁 Shadow DOM
    */
   function cleanup() {
     isCapturing = false;
@@ -406,10 +465,25 @@
     }
     // 清理编辑模式元素
     cleanupEditMode();
+    // 注意：不销毁 shadowHost/shadowRoot，因为后续可能需要显示通知/结果弹窗
+    // Shadow DOM 的销毁放在 fullCleanup() 或 destroyShadowDOM() 中
     document.removeEventListener('mousedown', onMouseDown);
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
     document.removeEventListener('keydown', onKeyDown);
+  }
+
+  /**
+   * 销毁 Shadow DOM（彻底清理）
+   * @description 移除 Shadow DOM 宿主，清理所有子元素和样式
+   */
+  function destroyShadowDOM() {
+    if (shadowHost && document.body.contains(shadowHost)) {
+      shadowHost.remove();
+      shadowHost = null;
+      shadowRoot = null;
+      styleEl = null;
+    }
   }
 
   /**
@@ -481,13 +555,34 @@
    */
   function createHandles() {
     const positions = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+    const ariaLabels = {
+      nw: OCRI18n.t('content_handle_nw'),
+      n: OCRI18n.t('content_handle_n'),
+      ne: OCRI18n.t('content_handle_ne'),
+      e: OCRI18n.t('content_handle_e'),
+      se: OCRI18n.t('content_handle_se'),
+      s: OCRI18n.t('content_handle_s'),
+      sw: OCRI18n.t('content_handle_sw'),
+      w: OCRI18n.t('content_handle_w')
+    };
+    const orientations = {
+      nw: 'undefined', ne: 'undefined', se: 'undefined', sw: 'undefined',
+      n: 'vertical', s: 'vertical', e: 'horizontal', w: 'horizontal'
+    };
 
     positions.forEach(pos => {
       const handle = document.createElement('div');
       handle.className = `ocr-handle ocr-handle-${pos}`;
       handle.dataset.position = pos;
+      handle.tabIndex = 0;
+      handle.setAttribute('role', 'slider');
+      handle.setAttribute('aria-label', ariaLabels[pos]);
+      handle.setAttribute('aria-orientation', orientations[pos]);
       handle.addEventListener('mousedown', onHandleMouseDown);
-      document.body.appendChild(handle);
+      handle.addEventListener('keydown', onHandleKeyDown);
+      if (shadowRoot) {
+        shadowRoot.appendChild(handle);
+      }
       handles.push(handle);
     });
 
@@ -542,7 +637,9 @@
       </div>
     `;
 
-    document.body.appendChild(toolbar);
+    if (shadowRoot) {
+      shadowRoot.appendChild(toolbar);
+    }
     updateToolbarPosition();
 
     // 绑定按钮事件
@@ -627,6 +724,196 @@
 
     document.addEventListener('mousemove', onEditModeMouseMove);
     document.addEventListener('mouseup', onEditModeMouseUp);
+  }
+
+  /**
+   * 手柄键盘事件
+   * @param {KeyboardEvent} e
+   * @description 支持键盘调整选区大小
+   */
+  function onHandleKeyDown(e) {
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const handle = e.target;
+    const handlePos = handle.dataset.position;
+    const step = e.shiftKey ? 10 : 2; // Shift+Arrow 大步进
+
+    // 计算调整方向
+    const direction = {
+      ArrowUp: { dx: 0, dy: -1 },
+      ArrowDown: { dx: 0, dy: 1 },
+      ArrowLeft: { dx: -1, dy: 0 },
+      ArrowRight: { dx: 1, dy: 0 }
+    }[e.key];
+
+    // 根据手柄位置和按键方向计算新选区
+    const newRect = calculateRectByKeyboard(currentRect, handlePos, direction, step);
+    if (!newRect) return;
+
+    // 记录历史
+    rectHistory.push({ ...currentRect });
+    currentRect = newRect;
+
+    // 更新 UI
+    updateSelectionRect();
+    updateHandlesPosition();
+    updateToolbarPosition();
+    updateSizeDisplay();
+    updateUndoButtonState();
+
+    // 播报无障碍提示
+    const sizeInfo = `${Math.round(currentRect.width)} × ${Math.round(currentRect.height)}`;
+    announceA11y(OCRI18n.t('content_a11y_resized', [sizeInfo]));
+  }
+
+  /**
+   * 根据键盘输入计算新选区
+   * @param {Object} rect - 当前选区
+   * @param {string} handlePos - 手柄位置
+   * @param {Object} direction - 移动方向 {dx, dy}
+   * @param {number} step - 步进值
+   * @returns {Object|null} 新选区或 null
+   */
+  function calculateRectByKeyboard(rect, handlePos, direction, step) {
+    const minSize = 10;
+    let newRect = { ...rect };
+
+    // 根据手柄位置决定如何调整
+    // 角落手柄：两个方向都能调整
+    // 边缘手柄：只能调整垂直或水平方向
+    switch (handlePos) {
+      case 'nw':
+        // 左上角：向左/上扩展或收缩
+        if (direction.dx < 0) {
+          newRect.left = Math.max(0, rect.left - step);
+          newRect.width = rect.width + (rect.left - newRect.left);
+        } else if (direction.dx > 0) {
+          newRect.width = Math.max(minSize, rect.width - step);
+          newRect.left = rect.left + rect.width - newRect.width;
+        }
+        if (direction.dy < 0) {
+          newRect.top = Math.max(0, rect.top - step);
+          newRect.height = rect.height + (rect.top - newRect.top);
+        } else if (direction.dy > 0) {
+          newRect.height = Math.max(minSize, rect.height - step);
+          newRect.top = rect.top + rect.height - newRect.height;
+        }
+        break;
+
+      case 'n':
+        // 上边：只能上下调整
+        if (direction.dy < 0) {
+          newRect.top = Math.max(0, rect.top - step);
+          newRect.height = rect.height + (rect.top - newRect.top);
+        } else if (direction.dy > 0) {
+          newRect.height = Math.max(minSize, rect.height - step);
+          newRect.top = rect.top + rect.height - newRect.height;
+        }
+        break;
+
+      case 'ne':
+        // 右上角
+        if (direction.dx > 0) {
+          newRect.width = Math.min(window.innerWidth - rect.left, rect.width + step);
+        } else if (direction.dx < 0) {
+          newRect.width = Math.max(minSize, rect.width - step);
+        }
+        if (direction.dy < 0) {
+          newRect.top = Math.max(0, rect.top - step);
+          newRect.height = rect.height + (rect.top - newRect.top);
+        } else if (direction.dy > 0) {
+          newRect.height = Math.max(minSize, rect.height - step);
+          newRect.top = rect.top + rect.height - newRect.height;
+        }
+        break;
+
+      case 'e':
+        // 右边：只能左右调整
+        if (direction.dx > 0) {
+          newRect.width = Math.min(window.innerWidth - rect.left, rect.width + step);
+        } else if (direction.dx < 0) {
+          newRect.width = Math.max(minSize, rect.width - step);
+        }
+        break;
+
+      case 'se':
+        // 右下角
+        if (direction.dx > 0) {
+          newRect.width = Math.min(window.innerWidth - rect.left, rect.width + step);
+        } else if (direction.dx < 0) {
+          newRect.width = Math.max(minSize, rect.width - step);
+        }
+        if (direction.dy > 0) {
+          newRect.height = Math.min(window.innerHeight - rect.top, rect.height + step);
+        } else if (direction.dy < 0) {
+          newRect.height = Math.max(minSize, rect.height - step);
+        }
+        break;
+
+      case 's':
+        // 下边：只能上下调整
+        if (direction.dy > 0) {
+          newRect.height = Math.min(window.innerHeight - rect.top, rect.height + step);
+        } else if (direction.dy < 0) {
+          newRect.height = Math.max(minSize, rect.height - step);
+        }
+        break;
+
+      case 'sw':
+        // 左下角
+        if (direction.dx < 0) {
+          newRect.left = Math.max(0, rect.left - step);
+          newRect.width = rect.width + (rect.left - newRect.left);
+        } else if (direction.dx > 0) {
+          newRect.width = Math.max(minSize, rect.width - step);
+          newRect.left = rect.left + rect.width - newRect.width;
+        }
+        if (direction.dy > 0) {
+          newRect.height = Math.min(window.innerHeight - rect.top, rect.height + step);
+        } else if (direction.dy < 0) {
+          newRect.height = Math.max(minSize, rect.height - step);
+        }
+        break;
+
+      case 'w':
+        // 左边：只能左右调整
+        if (direction.dx < 0) {
+          newRect.left = Math.max(0, rect.left - step);
+          newRect.width = rect.width + (rect.left - newRect.left);
+        } else if (direction.dx > 0) {
+          newRect.width = Math.max(minSize, rect.width - step);
+          newRect.left = rect.left + rect.width - newRect.width;
+        }
+        break;
+    }
+
+    // 确保选区不超出视口
+    newRect.left = Math.max(0, newRect.left);
+    newRect.top = Math.max(0, newRect.top);
+    newRect.width = Math.min(window.innerWidth - newRect.left, newRect.width);
+    newRect.height = Math.min(window.innerHeight - newRect.top, newRect.height);
+
+    // 确保最小尺寸
+    if (newRect.width < minSize || newRect.height < minSize) {
+      return null;
+    }
+
+    return newRect;
+  }
+
+  /**
+   * 更新选区框显示
+   */
+  function updateSelectionRect() {
+    if (!selectionBox || !currentRect) return;
+
+    selectionBox.style.left = `${currentRect.left}px`;
+    selectionBox.style.top = `${currentRect.top}px`;
+    selectionBox.style.width = `${currentRect.width}px`;
+    selectionBox.style.height = `${currentRect.height}px`;
   }
 
   /**
@@ -863,6 +1150,8 @@
     cleanup();
     cleanupEditMode();
     hideProgressNotification();
+    // 销毁 Shadow DOM（彻底清理）
+    destroyShadowDOM();
     // 移除运行时消息监听器
     chrome.runtime.onMessage.removeListener(messageListener);
     // 标记为未初始化
@@ -1047,8 +1336,13 @@
    * @description 在页面右上角显示识别结果弹窗，包含复制和关闭功能
    */
   function showResultPopup(text) {
-    // 移除已有的结果弹窗
-    const existingPopup = document.getElementById('ocr-result-popup');
+    // 确保 Shadow DOM 已初始化
+    if (!shadowRoot) {
+      initShadowDOM();
+    }
+
+    // 移除已有的结果弹窗（在 Shadow DOM 范围内查找）
+    const existingPopup = shadowRoot.getElementById('ocr-result-popup');
     if (existingPopup) {
       existingPopup.remove();
     }
@@ -1188,7 +1482,9 @@
       </div>
     `;
 
-    document.body.appendChild(popup);
+    if (shadowRoot) {
+      shadowRoot.appendChild(popup);
+    }
 
     // 安全赋值：通过 value 属性设置文本，避免 innerHTML 注入风险
     const textarea = popup.querySelector('#ocr-result-text');
@@ -1240,8 +1536,13 @@
    * @description 在页面顶部显示临时通知，3秒后自动消失
    */
   function showNotification(message, type = 'info') {
-    // 移除已有通知
-    const existing = document.getElementById('ocr-notification');
+    // 确保 Shadow DOM 已初始化
+    if (!shadowRoot) {
+      initShadowDOM();
+    }
+
+    // 移除已有通知（在 Shadow DOM 范围内查找）
+    const existing = shadowRoot.getElementById('ocr-notification');
     if (existing) existing.remove();
 
     const colors = {
@@ -1295,7 +1596,9 @@
     messageSpan.textContent = message;
     notification.appendChild(messageSpan);
 
-    document.body.appendChild(notification);
+    if (shadowRoot) {
+      shadowRoot.appendChild(notification);
+    }
 
     setTimeout(() => {
       notification.style.animation = 'fadeOut 0.3s ease forwards';
@@ -1314,6 +1617,11 @@
     // 移除已有进度通知
     hideProgressNotification();
 
+    // 确保 Shadow DOM 已初始化
+    if (!shadowRoot) {
+      initShadowDOM();
+    }
+
     isCancelled = false;
     const notification = document.createElement('div');
     notification.id = 'ocr-progress-notification';
@@ -1328,7 +1636,9 @@
       </div>
     `;
 
-    document.body.appendChild(notification);
+    if (shadowRoot) {
+      shadowRoot.appendChild(notification);
+    }
     progressNotification = notification;
     progressStartTime = Date.now();
 
