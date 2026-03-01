@@ -613,17 +613,17 @@
     "description": "A11y failed"
   },
 
+  "model_claude_3_5_sonnet": {
+    "message": "Claude 3.5 Sonnet (Recommended)",
+    "description": "Claude 3.5 Sonnet model"
+  },
+  "model_claude_3_5_haiku": {
+    "message": "Claude 3.5 Haiku (Fast & Strong)",
+    "description": "Claude 3.5 Haiku model"
+  },
   "model_claude_opus": {
     "message": "Claude 3 Opus (Best Quality)",
     "description": "Claude Opus model"
-  },
-  "model_claude_sonnet": {
-    "message": "Claude 3 Sonnet (Balanced)",
-    "description": "Claude Sonnet model"
-  },
-  "model_claude_haiku": {
-    "message": "Claude 3 Haiku (Fastest)",
-    "description": "Claude Haiku model"
   },
   "model_gpt4o": {
     "message": "GPT-4o (Recommended)",
@@ -736,5 +736,25 @@
   "content_a11y_resized": {
     "message": "Selection resized to {0} pixels",
     "description": "Selection resized announcement"
+  },
+  "a11y_copy_success": {
+    "message": "Copy successful",
+    "description": "Copy success announcement"
+  },
+  "a11y_copy_failed": {
+    "message": "Copy failed",
+    "description": "Copy failed announcement"
+  },
+  "a11y_history_cleared": {
+    "message": "History records cleared",
+    "description": "History cleared announcement"
+  },
+  "a11y_capture_start_failed": {
+    "message": "Failed to start screenshot",
+    "description": "Capture start failed announcement"
+  },
+  "a11y_config_missing": {
+    "message": "Please configure API key first",
+    "description": "Config missing announcement"
   }
 }

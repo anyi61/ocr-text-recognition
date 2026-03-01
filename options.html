@@ -53,11 +53,12 @@
         <div class="form-group">
           <label for="claudeModel" data-i18n="label_model">模型</label>
           <div class="input-wrapper">
-            <select id="claudeModel" class="select">
-              <option value="claude-3-opus-20240229">Claude 3 Opus (最佳质量)</option>
-              <option value="claude-3-sonnet-20240229">Claude 3 Sonnet (平衡)</option>
-              <option value="claude-3-haiku-20240307">Claude 3 Haiku (最快)</option>
-            </select>
+            <input id="claudeModel" class="input" list="claudeModels" placeholder="例如: claude-3-5-sonnet-latest">
+            <datalist id="claudeModels">
+              <option value="claude-3-5-sonnet-latest" data-i18n="model_claude_3_5_sonnet">Claude 3.5 Sonnet (推荐)</option>
+              <option value="claude-3-5-haiku-latest" data-i18n="model_claude_3_5_haiku">Claude 3.5 Haiku (快且强)</option>
+              <option value="claude-3-opus-latest" data-i18n="model_claude_opus">Claude 3 Opus (最佳质量)</option>
+            </datalist>
             <span class="field-status" aria-live="polite"></span>
           </div>
         </div>
@@ -77,11 +78,13 @@
         <div class="form-group">
           <label for="openaiModel" data-i18n="label_model">模型</label>
           <div class="input-wrapper">
-            <select id="openaiModel" class="select">
-              <option value="gpt-4o">GPT-4o (推荐)</option>
-              <option value="gpt-4o-mini">GPT-4o Mini (经济)</option>
-              <option value="gpt-4-turbo">GPT-4 Turbo</option>
-            </select>
+            <input id="openaiModel" class="input" list="openaiModels" placeholder="例如: gpt-4o">
+            <datalist id="openaiModels">
+              <option value="gpt-4o" data-i18n="model_gpt4o">GPT-4o (推荐)</option>
+              <option value="gpt-4o-mini" data-i18n="model_gpt4o_mini">GPT-4o Mini (经济)</option>
+              <option value="o1-preview">o1-preview</option>
+              <option value="o1-mini">o1-mini</option>
+            </datalist>
             <span class="field-status" aria-live="polite"></span>
           </div>
         </div>
@@ -121,12 +124,13 @@
         <div class="form-group">
           <label for="aliyunModel" data-i18n="label_model">模型</label>
           <div class="input-wrapper">
-            <select id="aliyunModel" class="select">
-              <option value="qwen-vl-max">qwen-vl-max (推荐)</option>
-              <option value="qwen-vl-plus">qwen-vl-plus (经济)</option>
+            <input id="aliyunModel" class="input" list="aliyunModels" placeholder="例如: qwen-vl-max">
+            <datalist id="aliyunModels">
+              <option value="qwen-vl-max" data-i18n="model_qwen_max">qwen-vl-max (推荐)</option>
+              <option value="qwen-vl-plus" data-i18n="model_qwen_plus">qwen-vl-plus (经济)</option>
               <option value="qwen2-vl-72b-instruct">qwen2-vl-72b-instruct</option>
               <option value="qwen2-vl-7b-instruct">qwen2-vl-7b-instruct</option>
-            </select>
+            </datalist>
             <span class="field-status" aria-live="polite"></span>
           </div>
           <p class="help-text" data-i18n="help_aliyun_models">阿里云DashScope提供的视觉语言模型</p>
@@ -147,10 +151,11 @@
         <div class="form-group">
           <label for="zhipuModel" data-i18n="label_model">模型</label>
           <div class="input-wrapper">
-            <select id="zhipuModel" class="select">
-              <option value="glm-4v">GLM-4V (推荐)</option>
-              <option value="glm-4v-plus">GLM-4V-Plus</option>
-            </select>
+            <input id="zhipuModel" class="input" list="zhipuModels" placeholder="例如: glm-4v">
+            <datalist id="zhipuModels">
+              <option value="glm-4v" data-i18n="model_glm4v">GLM-4V (推荐)</option>
+              <option value="glm-4v-plus" data-i18n="model_glm4v_plus">GLM-4V-Plus</option>
+            </datalist>
             <span class="field-status" aria-live="polite"></span>
           </div>
         </div>

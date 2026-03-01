@@ -613,17 +613,17 @@
     "description": "A11y failed"
   },
 
+  "model_claude_3_5_sonnet": {
+    "message": "Claude 3.5 Sonnet (推荐)",
+    "description": "Claude 3.5 Sonnet model"
+  },
+  "model_claude_3_5_haiku": {
+    "message": "Claude 3.5 Haiku (快且强)",
+    "description": "Claude 3.5 Haiku model"
+  },
   "model_claude_opus": {
-    "message": "Claude 3 Opus (最佳质量)",
+    "message": "Claude 3 Opus (最高质量)",
     "description": "Claude Opus model"
-  },
-  "model_claude_sonnet": {
-    "message": "Claude 3 Sonnet (平衡)",
-    "description": "Claude Sonnet model"
-  },
-  "model_claude_haiku": {
-    "message": "Claude 3 Haiku (最快)",
-    "description": "Claude Haiku model"
   },
   "model_gpt4o": {
     "message": "GPT-4o (推荐)",
@@ -736,5 +736,25 @@
   "content_a11y_resized": {
     "message": "选区已调整为 {0} 像素",
     "description": "Selection resized announcement"
+  },
+  "a11y_copy_success": {
+    "message": "复制成功",
+    "description": "Copy success announcement"
+  },
+  "a11y_copy_failed": {
+    "message": "复制失败",
+    "description": "Copy failed announcement"
+  },
+  "a11y_history_cleared": {
+    "message": "历史记录已清空",
+    "description": "History cleared announcement"
+  },
+  "a11y_capture_start_failed": {
+    "message": "启动截图失败",
+    "description": "Capture start failed announcement"
+  },
+  "a11y_config_missing": {
+    "message": "请先配置API密钥",
+    "description": "Config missing announcement"
   }
 }

@@ -25,6 +25,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   const historyPreviewText = document.getElementById('historyPreviewText');
   const closePreviewBtn = document.getElementById('closePreviewBtn');
   const previewCopyBtn = document.getElementById('previewCopyBtn');
+  const a11yLive = document.getElementById('a11y-live');
+
+  /**
+   * 统一的状态播报函数
+   * @param {string} message - 播报文案
+   */
+  const announcePopupStatus = (message) => {
+    if (a11yLive) {
+      a11yLive.textContent = message;
+    }
+  };
 
   // 历史记录数据（用于点击查看）
   let historyData = [];
@@ -191,6 +202,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           const text = history[index].text;
           try {
             await navigator.clipboard.writeText(text);
+            announcePopupStatus(OCRI18n.t('a11y_copy_success'));
             btn.innerHTML = `
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20 6 9 17 4 12"></polyline>
@@ -208,6 +220,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }, 1500);
           } catch (err) {
             console.error('复制失败:', err);
+            announcePopupStatus(OCRI18n.t('a11y_copy_failed'));
           }
         });
       });
@@ -224,6 +237,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const clearHistory = async () => {
     if (confirm(OCRI18n.t('confirm_clear_history'))) {
       await chrome.storage.local.remove(['ocrHistory']);
+      announcePopupStatus(OCRI18n.t('a11y_history_cleared'));
       historyData = [];
       historyEmptyState.classList.remove('hidden');
       historyList.classList.add('hidden');
@@ -272,12 +286,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   previewCopyBtn.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(historyPreviewText.value);
+      announcePopupStatus(OCRI18n.t('a11y_copy_success'));
       previewCopyBtn.textContent = OCRI18n.t('btn_copied');
       setTimeout(() => {
         previewCopyBtn.textContent = OCRI18n.t('btn_copy_all');
       }, 1500);
     } catch (err) {
       console.error('复制失败:', err);
+      announcePopupStatus(OCRI18n.t('a11y_copy_failed'));
     }
   });
 
@@ -296,6 +312,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 检查配置
     const hasConfig = await checkConfig();
     if (!hasConfig) {
+      announcePopupStatus(OCRI18n.t('a11y_config_missing'));
       alert(OCRI18n.t('msg_config_api_first'));
       return;
     }
@@ -316,6 +333,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       window.close();
     } catch (error) {
       console.error('启动截图失败:', error);
+      announcePopupStatus(OCRI18n.t('a11y_capture_start_failed'));
       alert(OCRI18n.t('msg_capture_failed'));
     }
   });

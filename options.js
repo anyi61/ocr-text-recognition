@@ -133,7 +133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Claude 配置
     const claudeConfig = configs.claude || {};
     claudeApiKey.value = claudeConfig.apiKey || result.apiKey || '';
-    claudeModel.value = claudeConfig.model || result.model || 'claude-3-opus-20240229';
+    claudeModel.value = claudeConfig.model || result.model || 'claude-3-5-sonnet-latest';
 
     // OpenAI 配置
     const openaiConfig = configs.openai || {};
@@ -363,6 +363,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!config.apiKey || config.apiKey.trim() === '') {
           fieldErrors.push('apiKey');
         }
+        if (!config.model || config.model.trim() === '') {
+          fieldErrors.push('model');
+        }
         break;
 
       case 'baidu':
@@ -432,9 +435,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       switch (provider) {
         case 'claude':
           if (field === 'apiKey') element = claudeApiKey;
+          if (field === 'model') element = claudeModel;
           break;
         case 'openai':
           if (field === 'apiKey') element = openaiApiKey;
+          if (field === 'model') element = openaiModel;
           break;
         case 'baidu':
           if (field === 'apiKey') element = baiduApiKey;
@@ -442,9 +447,11 @@ document.addEventListener('DOMContentLoaded', async () => {
           break;
         case 'aliyun':
           if (field === 'apiKey') element = aliyunApiKey;
+          if (field === 'model') element = aliyunModel;
           break;
         case 'zhipu':
           if (field === 'apiKey') element = zhipuApiKey;
+          if (field === 'model') element = zhipuModel;
           break;
         case 'openai-compatible':
           if (field === 'endpoint' || field === 'endpoint_invalid') element = compatibleEndpoint;
@@ -510,6 +517,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         break;
       case 'aliyun':
         config.apiKey = aliyunApiKey.value;
+        config.model = aliyunModel.value; // 使用 .model 统一处理
         config.customModel = aliyunModel.value;
         break;
       case 'zhipu':
@@ -900,7 +908,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       // 为了兼容性，也保存旧格式字段
       if (settingsToSave.apiConfigs.claude) {
         settingsToSave.apiKey = settingsToSave.apiConfigs.claude.apiKey || '';
-        settingsToSave.model = settingsToSave.apiConfigs.claude.model || 'claude-3-opus-20240229';
+        settingsToSave.model = settingsToSave.apiConfigs.claude.model || 'claude-3-5-sonnet-latest';
       }
       if (settingsToSave.apiConfigs.openai) {
         settingsToSave.openaiApiKey = settingsToSave.apiConfigs.openai.apiKey || '';

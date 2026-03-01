@@ -1362,6 +1362,7 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       overflow: hidden;
       animation: slideIn 0.3s ease;
+      pointer-events: auto;
     `;
 
     popup.innerHTML = `
@@ -1393,6 +1394,7 @@
           justify-content: center;
           transition: all 0.2s;
           z-index: 10;
+          pointer-events: auto;
         }
         #ocr-result-popup .close-btn:hover {
           background: rgba(0,0,0,0.2);
@@ -1436,6 +1438,7 @@
           align-items: center;
           justify-content: center;
           gap: 6px;
+          pointer-events: auto;
         }
         #ocr-result-popup .btn-primary {
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
