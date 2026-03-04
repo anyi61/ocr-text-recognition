@@ -428,13 +428,25 @@
     "message": "Domestic LLM, great for Chinese",
     "description": "GLM-4V description"
   },
+  "api_baidu_title": {
+    "message": "Baidu OCR",
+    "description": "Baidu OCR title"
+  },
   "api_baidu": {
     "message": "Great Chinese recognition, cost-effective",
     "description": "Baidu description"
   },
+  "api_aliyun_title": {
+    "message": "Aliyun OCR",
+    "description": "Aliyun OCR title"
+  },
   "api_aliyun": {
     "message": "Enterprise-grade service, stable and reliable",
     "description": "Aliyun description"
+  },
+  "api_compatible_title": {
+    "message": "Universal OpenAI API",
+    "description": "Compatible API title"
   },
   "api_compatible": {
     "message": "Flexible support for multiple providers",

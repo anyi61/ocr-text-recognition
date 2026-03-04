@@ -160,17 +160,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         historyItem.className = 'history-item';
         historyItem.setAttribute('tabindex', '0');
         historyItem.setAttribute('role', 'button');
-        historyItem.setAttribute('aria-label', `查看历史记录: ${item.text.substring(0, 30)}...`);
-
-        // 截断显示文本
-        const displayText = item.text.length > 50 ? item.text.substring(0, 50) + '...' : item.text;
+        historyItem.setAttribute('aria-label', `${OCRI18n.t('history_view_detail')}: ${item.text.substring(0, 30)}...`);
 
         historyItem.innerHTML = `
-          <div class="history-item-text" title="${escapeHtml(item.text)}">${escapeHtml(displayText)}</div>
+          <div class="history-item-text" title="${escapeHtml(item.text)}">${escapeHtml(item.text)}</div>
           <div class="history-item-meta">
-            <span>${item.date}</span>
-            <button class="history-copy-btn" data-index="${index}" title="复制" aria-label="复制该条历史记录">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <span class="timestamp">${item.date}</span>
+            <button class="history-copy-btn" data-index="${index}" title="${OCRI18n.t('content_btn_copy')}" aria-label="${OCRI18n.t('history_copy')}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
               </svg>
@@ -179,13 +176,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
 
         // 点击历史项查看详情
-        historyItem.addEventListener('click', () => {
+        historyItem.addEventListener('click', (e) => {
+          // 如果点击的是复制按钮，不触发预览
+          if (e.target.closest('.history-copy-btn')) return;
           showHistoryPreview(history[index].text);
         });
 
         // 键盘支持
         historyItem.addEventListener('keydown', (e) => {
           if (e.key === 'Enter' || e.key === ' ') {
+            if (e.target.classList.contains('history-copy-btn')) return;
             e.preventDefault();
             showHistoryPreview(history[index].text);
           }
@@ -203,20 +203,21 @@ document.addEventListener('DOMContentLoaded', async () => {
           try {
             await navigator.clipboard.writeText(text);
             announcePopupStatus(OCRI18n.t('a11y_copy_success'));
+            // 使用规范中的成功图标
             btn.innerHTML = `
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
             `;
-            btn.setAttribute('aria-label', '已复制该条历史记录');
+            btn.classList.add('copied');
             setTimeout(() => {
               btn.innerHTML = `
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
               `;
-              btn.setAttribute('aria-label', '复制该条历史记录');
+              btn.classList.remove('copied');
             }, 1500);
           } catch (err) {
             console.error('复制失败:', err);

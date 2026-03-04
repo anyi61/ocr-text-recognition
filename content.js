@@ -63,6 +63,44 @@
   let shadowHost = null;      // Shadow DOM 宿主元素
   let shadowRoot = null;      // Shadow DOM 根节点
   let styleEl = null;         // shadowRoot 内的样式元素
+  let themeListenerBound = false;
+
+  /**
+   * 应用主题到 Shadow Host
+   * @param {string} theme - 主题名称 (light|dark)
+   */
+  function applyThemeToShadowHost(theme) {
+    if (!shadowHost) return;
+    const safeTheme = theme === 'dark' ? 'dark' : 'light';
+    shadowHost.setAttribute('data-theme', safeTheme);
+  }
+
+  /**
+   * 从存储同步主题到 Shadow Host
+   */
+  async function syncThemeFromStorage() {
+    try {
+      const result = await chrome.storage.local.get(['theme']);
+      const fallback = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      applyThemeToShadowHost(result.theme || fallback);
+    } catch (error) {
+      const fallback = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      applyThemeToShadowHost(fallback);
+    }
+  }
+
+  /**
+   * 监听主题变更并同步到 Shadow Host
+   */
+  function ensureThemeChangeListener() {
+    if (themeListenerBound) return;
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName === 'local' && changes.theme) {
+        applyThemeToShadowHost(changes.theme.newValue);
+      }
+    });
+    themeListenerBound = true;
+  }
 
   /**
    * 获取所有样式内容
@@ -70,37 +108,72 @@
    */
   function getAllStyles() {
     return `
+    :host {
+      --bg-main: #FFFFFF;
+      --bg-sub: #F5F5F7;
+      --bg-hover: #EAEAEC;
+      --text-primary: #1D1D1F;
+      --text-secondary: #6B6B6E;
+      --text-tertiary: #9E9EA3;
+      --accent: #000000;
+      --accent-inverse: #FFFFFF;
+      --border: rgba(0, 0, 0, 0.08);
+      --divider: rgba(0, 0, 0, 0.06);
+      --radius-xs: 6px;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 14px;
+      --radius-xl: 24px;
+      --duration-fast: 150ms;
+      --duration-normal: 300ms;
+      --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    :host([data-theme="dark"]) {
+      --bg-main: #0A0A0A;
+      --bg-sub: #1C1C1E;
+      --bg-hover: #2C2C2E;
+      --text-primary: #F5F5F7;
+      --text-secondary: #A0A0A5;
+      --text-tertiary: #6C6C70;
+      --accent: #FFFFFF;
+      --accent-inverse: #000000;
+      --border: rgba(255, 255, 255, 0.10);
+      --divider: rgba(255, 255, 255, 0.08);
+    }
+
     /* 进度通知样式 */
     #ocr-progress-notification {
       position: fixed;
-      top: 20px;
+      top: 32px;
       left: 50%;
       transform: translateX(-50%);
-      background: #333;
-      color: #fff;
+      background: var(--bg-sub);
+      color: var(--text-primary);
       padding: 16px 24px;
-      border-radius: 12px;
+      border-radius: var(--radius-md);
       z-index: ${Z.PROGRESS};
-      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      border: 1px solid var(--border);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      animation: ocr-progress-fadeIn 0.3s ease;
+      animation: ocr-progress-fadeIn var(--duration-normal) var(--ease-smooth);
     }
     @keyframes ocr-progress-fadeIn {
-      from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+      from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
       to { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
     .ocr-progress-content {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 16px;
     }
     .ocr-progress-spinner {
       width: 20px;
       height: 20px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: #667eea;
+      border: 2px solid var(--divider);
+      border-top-color: var(--accent);
       border-radius: 50%;
-      animation: ocr-spin 1s linear infinite;
+      animation: ocr-spin 0.8s linear infinite;
     }
     @keyframes ocr-spin {
       to { transform: rotate(360deg); }
@@ -108,45 +181,46 @@
     .ocr-progress-info {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 2px;
     }
     .ocr-progress-message {
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 600;
     }
     .ocr-progress-time {
       font-size: 12px;
-      color: rgba(255,255,255,0.7);
+      color: var(--text-tertiary);
     }
     .ocr-progress-cancel {
-      background: rgba(255,255,255,0.2);
+      background: var(--bg-hover);
       border: none;
-      color: #fff;
-      padding: 6px 12px;
-      border-radius: 6px;
+      color: var(--text-secondary);
+      padding: 6px 14px;
+      border-radius: var(--radius-sm);
       cursor: pointer;
       font-size: 12px;
-      transition: background 0.2s;
+      font-weight: 500;
+      transition: all var(--duration-fast);
     }
     .ocr-progress-cancel:hover {
-      background: rgba(255,255,255,0.3);
+      background: var(--text-tertiary);
+      color: var(--bg-main);
     }
 
     /* 编辑模式样式 */
     .ocr-handle {
       position: fixed;
-      width: 12px;
-      height: 12px;
-      background: #667eea;
-      border: 2px solid #fff;
+      width: 10px;
+      height: 10px;
+      background: var(--accent);
+      border: 2px solid var(--bg-main);
       border-radius: 50%;
       cursor: pointer;
       pointer-events: auto;
       z-index: ${Z.HANDLE};
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      transition: transform 0.15s ease, background 0.15s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      transition: transform var(--duration-fast) var(--ease-smooth);
     }
-    /* 手柄热区扩大到 24px */
     .ocr-handle::before {
       content: '';
       position: absolute;
@@ -159,12 +233,11 @@
       background: transparent;
     }
     .ocr-handle:hover {
-      transform: scale(1.3);
-      background: #764ba2;
+      transform: scale(1.4);
     }
     .ocr-handle:focus-visible {
-      outline: 2px solid #2563eb;
-      outline-offset: 2px;
+      outline: 2px solid var(--accent);
+      outline-offset: 4px;
     }
     .ocr-handle-nw { cursor: nwse-resize; }
     .ocr-handle-ne { cursor: nesw-resize; }
@@ -173,11 +246,11 @@
     .ocr-handle-n, .ocr-handle-s { cursor: ns-resize; }
     .ocr-handle-e, .ocr-handle-w { cursor: ew-resize; }
 
-    /* 选区框双层边框 */
+    /* 选区框样式 */
     #ocr-selection-box {
-      border: 2px solid #667eea;
-      outline: 2px solid rgba(255, 255, 255, 0.8);
-      outline-offset: 0;
+      border: 2px solid var(--accent);
+      box-shadow: 0 0 0 1px var(--bg-main), 0 0 20px rgba(0,0,0,0.1);
+      transition: none !important; /* 禁止选区框动画 */
     }
 
     /* 工具栏样式 */
@@ -185,85 +258,92 @@
       position: fixed;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 16px;
       padding: 10px 16px;
-      background: #333;
-      border-radius: 8px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      background: var(--bg-main);
+      border-radius: var(--radius-md);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      border: 1px solid var(--border);
       pointer-events: auto;
       z-index: ${Z.TOOLBAR};
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      animation: ocr-toolbar-fadeIn 0.2s ease;
+      animation: ocr-toolbar-fadeIn var(--duration-normal) var(--ease-smooth);
+      transition: none !important;
     }
     @keyframes ocr-toolbar-fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; transform: translate(-50%, 10px); }
+      to { opacity: 1; transform: translate(-50%, 0); }
     }
     .ocr-size-info {
-      color: #fff;
+      color: var(--text-secondary);
       font-size: 13px;
-      font-weight: 500;
-      min-width: 100px;
+      font-weight: 600;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      min-width: 80px;
     }
     .ocr-size-warning {
-      color: #ff6b6b;
+      color: #FF3B30;
     }
     .ocr-toolbar-buttons {
       display: flex;
-      gap: 8px;
+      gap: 10px;
     }
     .ocr-btn {
       padding: 8px 16px;
       border: none;
-      border-radius: 6px;
+      border-radius: var(--radius-sm);
       font-size: 13px;
-      font-weight: 500;
+      font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all var(--duration-fast) var(--ease-smooth);
       font-family: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .ocr-btn:disabled {
-      opacity: 0.5;
+      opacity: 0.3;
       cursor: not-allowed;
     }
     .ocr-btn-primary {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
+      background: var(--accent);
+      color: var(--accent-inverse);
     }
     .ocr-btn-primary:hover:not(:disabled) {
-      opacity: 0.9;
       transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .ocr-btn-primary:active:not(:disabled) {
+      transform: scale(0.97);
     }
     .ocr-btn-secondary {
-      background: #555;
-      color: #fff;
+      background: var(--bg-sub);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
     }
-    .ocr-btn-secondary:hover {
-      background: #666;
+    .ocr-btn-secondary:hover:not(:disabled) {
+      background: var(--bg-hover);
     }
     .ocr-btn-cancel {
       background: transparent;
-      color: #aaa;
-      border: 1px solid #555;
+      color: var(--text-tertiary);
+      border: 1px solid var(--divider);
     }
-    .ocr-btn-cancel:hover {
-      background: #444;
-      color: #fff;
+    .ocr-btn-cancel:hover:not(:disabled) {
+      background: var(--bg-sub);
+      color: var(--text-primary);
+      border-color: var(--text-tertiary);
     }
-    /* 统一 focus-visible 样式 */
     .ocr-btn:focus-visible {
-      outline: 2px solid #2563eb;
-      outline-offset: 2px;
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
     }
 
     /* 编辑模式下的选区框 */
     #ocr-selection-box.edit-mode {
       pointer-events: auto;
       cursor: move;
-      border-width: 2px;
-    }
-    #ocr-selection-box.edit-mode:hover {
-      border-color: #764ba2;
+      background: rgba(0, 0, 0, 0.03);
     }
 
     /* 无障碍：屏幕阅读器专用 */
@@ -316,6 +396,10 @@
     // 添加到页面
     document.body.appendChild(shadowHost);
 
+    // 主题同步
+    syncThemeFromStorage();
+    ensureThemeChangeListener();
+
     return shadowRoot;
   }
 
@@ -360,7 +444,7 @@
       left: 0;
       width: 100vw;
       height: 100vh;
-      background: rgba(0, 0, 0, 0.3);
+      background: rgba(0, 0, 0, 0.4);
       z-index: ${Z.OVERLAY};
       cursor: crosshair;
       pointer-events: auto;
@@ -372,18 +456,21 @@
     tooltip.textContent = OCRI18n.t('content_tooltip_start');
     tooltip.style.cssText = `
       position: fixed;
-      top: 20px;
+      top: 32px;
       left: 50%;
       transform: translateX(-50%);
-      background: #333;
-      color: #fff;
-      padding: 10px 20px;
-      border-radius: 6px;
+      background: var(--bg-main);
+      color: var(--text-primary);
+      padding: 12px 24px;
+      border-radius: var(--radius-md);
       font-size: 14px;
+      font-weight: 600;
       z-index: ${Z.TOOLTIP};
       pointer-events: none;
       white-space: nowrap;
-      transition: background 0.2s;
+      transition: all var(--duration-fast) var(--ease-smooth);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      border: 1px solid var(--border);
     `;
 
     root.appendChild(overlay);
@@ -399,10 +486,9 @@
     selectionBox.id = 'ocr-selection-box';
     selectionBox.style.cssText = `
       position: fixed;
-      border: 2px solid #667eea;
-      outline: 2px solid rgba(255, 255, 255, 0.8);
-      outline-offset: 0;
-      background: rgba(102, 126, 234, 0.1);
+      border: 2px solid var(--accent);
+      box-shadow: 0 0 0 1px var(--bg-main);
+      background: rgba(0, 0, 0, 0.05);
       pointer-events: none;
       z-index: ${Z.SELECTION};
       display: none;
@@ -434,12 +520,12 @@
     // 根据选区大小显示不同提示
     if (width < 10 || height < 10) {
       tooltip.textContent = `${Math.round(width)} × ${Math.round(height)} px - ${OCRI18n.t('content_tooltip_size_small')}`;
-      tooltip.style.background = '#e74c3c';
-      selectionBox.style.borderColor = '#e74c3c';
+      tooltip.style.borderColor = '#FF3B30';
+      selectionBox.style.borderColor = '#FF3B30';
     } else {
       tooltip.textContent = `${Math.round(width)} × ${Math.round(height)} px - ${OCRI18n.t('content_tooltip_size_ok')}`;
-      tooltip.style.background = '#333';
-      selectionBox.style.borderColor = '#667eea';
+      tooltip.style.borderColor = 'var(--border)';
+      selectionBox.style.borderColor = 'var(--accent)';
     }
   }
 
@@ -1351,136 +1437,149 @@
     popup.id = 'ocr-result-popup';
     popup.style.cssText = `
       position: fixed;
-      top: 20px;
-      right: 20px;
-      width: 400px;
-      max-height: 500px;
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      top: 32px;
+      right: 32px;
+      width: 420px;
+      max-height: 80vh;
+      background: var(--bg-main);
+      border-radius: var(--radius-xl);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
       z-index: ${Z.RESULT_POPUP};
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       overflow: hidden;
-      animation: slideIn 0.3s ease;
+      animation: ocr-slideIn var(--duration-normal) var(--ease-smooth);
       pointer-events: auto;
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
     `;
 
     popup.innerHTML = `
       <style>
-        @keyframes slideIn {
+        @keyframes ocr-slideIn {
           from { transform: translateX(100%); opacity: 0; }
           to { transform: translateX(0); opacity: 1; }
         }
-        @keyframes slideOut {
+        @keyframes ocr-slideOut {
           from { transform: translateX(0); opacity: 1; }
-          to { transform: translateX(100%); opacity: 1; }
+          to { transform: translateX(100%); opacity: 0; }
         }
         #ocr-result-popup.closing {
-          animation: slideOut 0.3s ease forwards;
+          animation: ocr-slideOut var(--duration-normal) var(--ease-smooth) forwards;
         }
-        #ocr-result-popup .close-btn {
-          position: absolute;
-          top: 8px;
-          right: 8px;
-          width: 28px;
-          height: 28px;
-          background: rgba(0,0,0,0.1);
+        .ocr-result-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 16px 20px;
+          border-bottom: 1px solid var(--divider);
+        }
+        .ocr-result-title {
+          font-size: 15px;
+          font-weight: 700;
+          color: var(--text-primary);
+        }
+        .ocr-close-btn {
+          width: 32px;
+          height: 32px;
+          background: transparent;
           border: none;
-          border-radius: 50%;
-          color: #666;
+          border-radius: var(--radius-sm);
+          color: var(--text-secondary);
           cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: all 0.2s;
-          z-index: 10;
-          pointer-events: auto;
+          transition: all var(--duration-fast);
         }
-        #ocr-result-popup .close-btn:hover {
-          background: rgba(0,0,0,0.2);
-          color: #333;
+        .ocr-close-btn:hover {
+          background: var(--bg-sub);
+          color: var(--text-primary);
         }
-        #ocr-result-popup .content {
-          padding: 16px;
-          padding-top: 20px;
+        .ocr-result-content {
+          padding: 20px;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
         }
-        #ocr-result-popup textarea {
+        .ocr-result-textarea {
           width: 100%;
-          height: 180px;
-          padding: 12px;
-          border: 1px solid #e0e0e0;
-          border-radius: 8px;
+          height: 240px;
+          padding: 14px;
+          background: var(--bg-sub);
+          border: 1px solid transparent;
+          border-radius: var(--radius-lg);
           font-size: 14px;
           line-height: 1.6;
           resize: vertical;
           outline: none;
           font-family: inherit;
           box-sizing: border-box;
+          color: var(--text-primary);
+          transition: border-color var(--duration-normal);
         }
-        #ocr-result-popup textarea:focus {
-          border-color: #667eea;
+        .ocr-result-textarea:focus {
+          border-color: var(--accent);
         }
-        #ocr-result-popup .actions {
+        .ocr-result-actions {
           display: flex;
-          gap: 8px;
-          margin-top: 12px;
+          gap: 12px;
+          margin-top: 20px;
         }
-        #ocr-result-popup .btn {
+        .ocr-result-btn {
           flex: 1;
-          padding: 10px 16px;
+          padding: 12px 16px;
           border: none;
-          border-radius: 8px;
+          border-radius: var(--radius-md);
           font-size: 14px;
-          font-weight: 500;
+          font-weight: 600;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all var(--duration-fast) var(--ease-smooth);
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 6px;
-          pointer-events: auto;
+          gap: 8px;
         }
-        #ocr-result-popup .btn-primary {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
+        .ocr-result-btn-primary {
+          background: var(--accent);
+          color: var(--accent-inverse);
         }
-        #ocr-result-popup .btn-primary:hover {
-          opacity: 0.9;
+        .ocr-result-btn-primary:hover {
           transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
-        #ocr-result-popup .btn-secondary {
-          background: #f0f0f0;
-          color: #666;
+        .ocr-result-btn-secondary {
+          background: var(--bg-hover);
+          color: var(--text-primary);
         }
-        #ocr-result-popup .btn-secondary:hover {
-          background: #e0e0e0;
+        .ocr-result-btn-secondary:hover {
+          filter: brightness(0.95);
         }
-        #ocr-result-popup .btn:focus-visible {
-          outline: 2px solid #2563eb;
-          outline-offset: 2px;
-        }
-        #ocr-result-popup .close-btn:focus-visible {
-          outline: 2px solid #2563eb;
-          outline-offset: 2px;
+        .ocr-result-btn.copied {
+          background: var(--status-success) !important;
+          color: white !important;
         }
       </style>
-      <button class="close-btn" title="${OCRI18n.t('btn_close')}" aria-label="${OCRI18n.t('content_aria_close')}">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </button>
-      <div class="content">
-        <textarea id="ocr-result-text" placeholder="${OCRI18n.t('content_result_title')}" aria-label="${OCRI18n.t('content_aria_result')}"></textarea>
-        <div class="actions">
-          <button class="btn btn-primary copy-btn" aria-label="${OCRI18n.t('content_aria_copy')}">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <div class="ocr-result-header">
+        <span class="ocr-result-title">${OCRI18n.t('preview_title')}</span>
+        <button class="ocr-close-btn" title="${OCRI18n.t('btn_close')}" aria-label="${OCRI18n.t('content_aria_close')}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="ocr-result-content">
+        <textarea class="ocr-result-textarea" id="ocr-result-text" placeholder="${OCRI18n.t('content_result_title')}" aria-label="${OCRI18n.t('content_aria_result')}"></textarea>
+        <div class="ocr-result-actions">
+          <button class="ocr-result-btn ocr-result-btn-primary copy-btn" aria-label="${OCRI18n.t('content_aria_copy')}">
+            <svg class="copy-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
-            ${OCRI18n.t('content_btn_copy')}
+            <span class="btn-text">${OCRI18n.t('content_btn_copy')}</span>
           </button>
-          <button class="btn btn-secondary close-popup-btn" aria-label="${OCRI18n.t('btn_close')}">${OCRI18n.t('btn_close')}</button>
+          <button class="ocr-result-btn ocr-result-btn-secondary close-popup-btn" aria-label="${OCRI18n.t('btn_close')}">${OCRI18n.t('btn_close')}</button>
         </div>
       </div>
     `;
@@ -1489,14 +1588,16 @@
       shadowRoot.appendChild(popup);
     }
 
-    // 安全赋值：通过 value 属性设置文本，避免 innerHTML 注入风险
+    // 安全赋值
     const textarea = popup.querySelector('#ocr-result-text');
     textarea.value = text || '';
 
     // 绑定事件
-    const closeBtn = popup.querySelector('.close-btn');
+    const closeBtn = popup.querySelector('.ocr-close-btn');
     const closePopupBtn = popup.querySelector('.close-popup-btn');
     const copyBtn = popup.querySelector('.copy-btn');
+    const btnText = copyBtn.querySelector('.btn-text');
+    const copyIcon = copyBtn.querySelector('.copy-icon');
 
     const close = () => {
       popup.classList.add('closing');
@@ -1509,25 +1610,20 @@
     copyBtn.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(textarea.value);
-        copyBtn.innerHTML = `
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
-          ${OCRI18n.t('btn_copied')}
-        `;
-        copyBtn.style.background = '#4caf50';
+        copyBtn.classList.add('copied');
+        btnText.textContent = OCRI18n.t('btn_copied');
+        copyIcon.innerHTML = `<polyline points="20 6 9 17 4 12"></polyline>`;
+        
         setTimeout(() => {
-          copyBtn.innerHTML = `
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            ${OCRI18n.t('content_btn_copy_text')}
+          copyBtn.classList.remove('copied');
+          btnText.textContent = OCRI18n.t('content_btn_copy');
+          copyIcon.innerHTML = `
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
           `;
-          copyBtn.style.background = '';
         }, 2000);
       } catch (err) {
-        console.error(OCRI18n.t('content_msg_recognition_failed') + ':', err);
+        console.error('复制失败:', err);
       }
     });
   }
@@ -1544,67 +1640,70 @@
       initShadowDOM();
     }
 
-    // 移除已有通知（在 Shadow DOM 范围内查找）
+    // 移除已有通知
     const existing = shadowRoot.getElementById('ocr-notification');
     if (existing) existing.remove();
-
-    const colors = {
-      info: { bg: '#333', icon: 'ℹ️' },
-      success: { bg: '#4caf50', icon: '✓' },
-      warning: { bg: '#ff9800', icon: '⚠️' },
-      error: { bg: '#f44336', icon: '✗' }
-    };
-
-    const { bg, icon } = colors[type] || colors.info;
 
     const notification = document.createElement('div');
     notification.id = 'ocr-notification';
     notification.style.cssText = `
       position: fixed;
-      top: 60px;
+      top: 32px;
       left: 50%;
       transform: translateX(-50%);
-      background: ${bg};
-      color: white;
-      padding: 12px 20px;
-      border-radius: 8px;
+      background: var(--bg-main);
+      color: var(--text-primary);
+      padding: 12px 24px;
+      border-radius: var(--radius-md);
       font-size: 14px;
+      font-weight: 600;
       z-index: ${Z.NOTIFICATION};
       display: flex;
       align-items: center;
-      gap: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-      animation: fadeIn 0.3s ease;
+      gap: 12px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      border: 1px solid var(--border);
+      animation: ocr-notify-fadeIn var(--duration-normal) var(--ease-smooth);
     `;
 
-    // 使用 DOM API 构建通知内容，避免 innerHTML 注入风险
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes fadeIn {
-        from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-        to { opacity: 1; transform: translateX(-50%) translateY(0); }
-      }
-      @keyframes fadeOut {
-        from { opacity: 1; transform: translateX(-50%) translateY(0); }
-        to { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-      }
+    // 状态色指示器
+    const statusColors = {
+      info: 'var(--text-tertiary)',
+      success: '#34C759',
+      warning: '#FF9500',
+      error: '#FF3B30'
+    };
+    const indicatorColor = statusColors[type] || statusColors.info;
+
+    notification.innerHTML = `
+      <style>
+        @keyframes ocr-notify-fadeIn {
+          from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+          to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        @keyframes ocr-notify-fadeOut {
+          from { opacity: 1; transform: translateX(-50%) translateY(0); }
+          to { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+        }
+        .ocr-notify-indicator {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: ${indicatorColor};
+        }
+      </style>
+      <div class="ocr-notify-indicator"></div>
+      <span class="ocr-notify-msg"></span>
     `;
-    notification.appendChild(style);
 
-    const iconSpan = document.createElement('span');
-    iconSpan.textContent = icon;
-    notification.appendChild(iconSpan);
-
-    const messageSpan = document.createElement('span');
-    messageSpan.textContent = message;
-    notification.appendChild(messageSpan);
+    notification.querySelector('.ocr-notify-msg').textContent = message;
 
     if (shadowRoot) {
       shadowRoot.appendChild(notification);
     }
 
     setTimeout(() => {
-      notification.style.animation = 'fadeOut 0.3s ease forwards';
+      notification.style.animation = 'ocr-notify-fadeOut var(--duration-normal) var(--ease-smooth) forwards';
       setTimeout(() => notification.remove(), 300);
     }, 3000);
   }

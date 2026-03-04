@@ -261,10 +261,10 @@
 
       <!-- 操作按钮 -->
       <div class="actions">
-        <button id="testBtn" class="btn btn-secondary">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M9 11l3 3L22 4"/>
-            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+        <button id="testBtn" class="btn btn-primary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
           </svg>
           <span data-i18n="btn_test_connection">测试连接</span>
         </button>
@@ -278,7 +278,7 @@
         </div>
         <div class="actions import-export-actions">
           <button id="exportBtn" class="btn btn-secondary" type="button">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
               <polyline points="7 10 12 15 17 10"/>
               <line x1="12" y1="15" x2="12" y2="3"/>
@@ -286,7 +286,7 @@
             <span data-i18n="btn_export_config">导出配置</span>
           </button>
           <button id="importBtn" class="btn btn-secondary" type="button">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
               <polyline points="17 8 12 3 7 8"/>
               <line x1="12" y1="3" x2="12" y2="15"/>
@@ -303,40 +303,40 @@
 
     <!-- 使用说明 -->
     <aside class="sidebar">
-      <div class="info-card">
-        <h3>使用说明</h3>
+      <section class="info-card">
+        <h3 data-i18n="card_usage_title">使用说明</h3>
         <ol>
-          <li>配置您选择的API提供商的密钥</li>
-          <li>点击插件图标打开弹出窗口</li>
-          <li>点击「开始截图识别」按钮</li>
-          <li>在页面上框选需要识别的文字区域</li>
-          <li>等待识别完成，复制结果即可</li>
+          <li data-i18n="usage_step1">配置您选择的API提供商的密钥</li>
+          <li data-i18n="usage_step2">点击插件图标打开弹出窗口</li>
+          <li data-i18n="usage_step3">点击「开始截图识别」按钮</li>
+          <li data-i18n="usage_step4">在页面上框选需要识别的文字区域</li>
+          <li data-i18n="usage_step5">等待识别完成，复制结果即可</li>
         </ol>
-      </div>
+      </section>
 
-      <div class="info-card">
-        <h3>快捷键</h3>
+      <section class="info-card">
+        <h3 data-i18n="card_shortcuts_title">快捷键</h3>
         <ul>
-          <li><kbd>Ctrl+Shift+S</kbd> / <kbd>Cmd+Shift+S</kbd> - 开始截图识别</li>
-          <li><kbd>ESC</kbd> - 取消截图</li>
-          <li><kbd>鼠标拖拽</kbd> - 框选区域</li>
+          <li><kbd>Ctrl+Shift+S</kbd> / <kbd>Cmd+Shift+S</kbd> - <span data-i18n="shortcut_capture">开始截图识别</span></li>
+          <li><kbd>ESC</kbd> - <span data-i18n="shortcut_cancel">取消截图</span></li>
+          <li><kbd>鼠标拖拽</kbd> - <span data-i18n="shortcut_drag">框选区域</span></li>
         </ul>
-        <p class="help-text" style="margin-top: 10px; color: #666;">
+        <p class="help-text" data-i18n="shortcut_customize_hint">
           提示：可以在 chrome://extensions/shortcuts 中自定义快捷键
         </p>
-      </div>
+      </section>
 
-      <div class="info-card">
-        <h3>推荐API</h3>
+      <section class="info-card">
+        <h3 data-i18n="card_recommended_api_title">推荐API</h3>
         <ul>
-          <li><strong>Claude 3 Opus</strong> - 识别准确率最高</li>
-          <li><strong>GPT-4o</strong> - 速度快，准确率高</li>
-          <li><strong>GLM-4V</strong> - 国产大模型，中文效果好</li>
-          <li><strong>百度OCR</strong> - 中文识别效果好，性价比高</li>
-          <li><strong>阿里云OCR</strong> - 企业级服务，稳定可靠</li>
-          <li><strong>通用OpenAI接口</strong> - 灵活支持多种服务商</li>
+          <li><strong data-i18n="model_claude_opus">Claude 3 Opus</strong> - <span data-i18n="api_claude_opus">识别准确率最高</span></li>
+          <li><strong data-i18n="model_gpt4o">GPT-4o</strong> - <span data-i18n="api_gpt4o">速度快，准确率高</span></li>
+          <li><strong data-i18n="model_glm4v">GLM-4V</strong> - <span data-i18n="api_glm4v">国产大模型，中文效果好</span></li>
+          <li><strong data-i18n="api_baidu_title">百度OCR</strong> - <span data-i18n="api_baidu">中文识别效果好，性价比高</span></li>
+          <li><strong data-i18n="api_aliyun_title">阿里云OCR</strong> - <span data-i18n="api_aliyun">企业级服务，稳定可靠</span></li>
+          <li><strong data-i18n="api_compatible_title">通用OpenAI接口</strong> - <span data-i18n="api_compatible">灵活支持多种服务商</span></li>
         </ul>
-      </div>
+      </section>
     </aside>
   </div>
 

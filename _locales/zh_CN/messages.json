@@ -428,13 +428,25 @@
     "message": "国产大模型，中文效果好",
     "description": "GLM-4V description"
   },
+  "api_baidu_title": {
+    "message": "百度OCR",
+    "description": "Baidu OCR title"
+  },
   "api_baidu": {
     "message": "中文识别效果好，性价比高",
     "description": "Baidu description"
   },
+  "api_aliyun_title": {
+    "message": "阿里云OCR",
+    "description": "Aliyun OCR title"
+  },
   "api_aliyun": {
     "message": "企业级服务，稳定可靠",
     "description": "Aliyun description"
+  },
+  "api_compatible_title": {
+    "message": "通用OpenAI接口",
+    "description": "Compatible API title"
   },
   "api_compatible": {
     "message": "灵活支持多种服务商",
