@@ -42,3 +42,6 @@ local-docs/
 
 # Local Claude configuration (do not commit)
 .claude/
+
+# Local agent skill (keep local only)
+.agents/skills/bugfix-review/
