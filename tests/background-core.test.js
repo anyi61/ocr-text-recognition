@@ -4,9 +4,9 @@ const assert = require('node:assert/strict');
 const {
   buildRecognitionPrompt,
   getBaiduLanguageType,
+  createCredentialFingerprint,
   createRequestRegistry,
-  isAbortError,
-  saveHistoryRecord
+  isAbortError
 } = require('../background-core.js');
 
 test('buildRecognitionPrompt preserves auto prompt unchanged', () => {
@@ -26,6 +26,13 @@ test('getBaiduLanguageType maps supported UI languages', () => {
     ['auto', 'zh', 'en', 'ja', 'ko'].map(getBaiduLanguageType),
     ['CHN_ENG', 'CHN_ENG', 'ENG', 'JAP', 'KOR']
   );
+});
+
+test('credential cache fingerprints are stable without containing credentials', () => {
+  const fingerprint = createCredentialFingerprint('api-secret', 'client-secret');
+  assert.equal(fingerprint, createCredentialFingerprint('api-secret', 'client-secret'));
+  assert.notEqual(fingerprint, createCredentialFingerprint('other-key', 'client-secret'));
+  assert.doesNotMatch(fingerprint, /api-secret|client-secret/);
 });
 
 test('request registry aborts and removes an active request', () => {
@@ -62,26 +69,4 @@ test('finishing a stale duplicate request cannot remove its replacement', () => 
 test('isAbortError recognizes abort failures', () => {
   assert.equal(isAbortError(new DOMException('cancelled', 'AbortError')), true);
   assert.equal(isAbortError(new Error('network')), false);
-});
-
-test('history persistence rolls back when cancellation happens during storage write', async () => {
-  const controller = new AbortController();
-  const state = { ocrHistory: [] };
-  const storage = {
-    async get() {
-      return structuredClone(state);
-    },
-    async set(value) {
-      Object.assign(state, structuredClone(value));
-      if (state.ocrHistory.length > 0) {
-        controller.abort();
-      }
-    }
-  };
-
-  await assert.rejects(
-    saveHistoryRecord(storage, 'must not persist', controller.signal, 123),
-    (error) => error.name === 'AbortError'
-  );
-  assert.deepEqual(state.ocrHistory, []);
 });

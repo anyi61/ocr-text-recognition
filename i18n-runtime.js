@@ -20,6 +20,10 @@ const OCRI18n = (function() {
   let initialized = false;
   let storageListenerBound = false;
 
+  function normalizeLanguageSetting(setting) {
+    return ['auto', 'zh_CN', 'en'].includes(setting) ? setting : 'auto';
+  }
+
   /**
    * 绑定 storage 监听，支持跨页面语言热更新
    */
@@ -33,7 +37,7 @@ const OCRI18n = (function() {
         return;
       }
 
-      languageSetting = changes.uiLanguage.newValue || 'auto';
+      languageSetting = normalizeLanguageSetting(changes.uiLanguage.newValue);
       resolvedLanguage = resolveLanguage(languageSetting);
 
       loadDictionary(resolvedLanguage).then(() => {
@@ -114,7 +118,7 @@ const OCRI18n = (function() {
     // 从存储中读取语言设置
     try {
       const result = await chrome.storage.local.get(['uiLanguage']);
-      languageSetting = result.uiLanguage || 'auto';
+      languageSetting = normalizeLanguageSetting(result.uiLanguage);
     } catch (error) {
       console.error('Error reading uiLanguage from storage:', error);
       languageSetting = 'auto';
@@ -166,6 +170,13 @@ const OCRI18n = (function() {
    * @param {Element} [root=document] - 根元素
    */
   function applyToDom(root = document) {
+    const ownerDocument = root?.nodeType === 9 ? root : root?.ownerDocument;
+    if (ownerDocument?.documentElement) {
+      ownerDocument.documentElement.lang = resolvedLanguage === 'zh_CN'
+        ? 'zh-CN'
+        : 'en';
+    }
+
     // 处理 data-i18n 属性
     root.querySelectorAll('[data-i18n]').forEach(el => {
       const key = el.dataset.i18n;
@@ -205,15 +216,15 @@ const OCRI18n = (function() {
    * @returns {Promise<void>}
    */
   async function setLanguage(setting) {
-    languageSetting = setting;
-    resolvedLanguage = resolveLanguage(setting);
+    languageSetting = normalizeLanguageSetting(setting);
+    resolvedLanguage = resolveLanguage(languageSetting);
 
     // 确保字典已加载
     await loadDictionary(resolvedLanguage);
 
     // 持久化到存储
     try {
-      await chrome.storage.local.set({ uiLanguage: setting });
+      await chrome.storage.local.set({ uiLanguage: languageSetting });
     } catch (error) {
       console.error('Error saving uiLanguage to storage:', error);
     }

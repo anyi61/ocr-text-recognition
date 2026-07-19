@@ -61,6 +61,34 @@
     "message": "已复制该条历史记录",
     "description": "History copied"
   },
+  "history_search_placeholder": {
+    "message": "搜索文字、服务商或来源",
+    "description": "History search placeholder"
+  },
+  "history_search_empty": {
+    "message": "没有匹配的历史记录",
+    "description": "Empty history search result"
+  },
+  "history_export": {
+    "message": "导出历史记录",
+    "description": "Export history button"
+  },
+  "history_delete": {
+    "message": "删除该条历史记录",
+    "description": "Delete history item"
+  },
+  "history_source": {
+    "message": "来源",
+    "description": "History source label"
+  },
+  "history_provider": {
+    "message": "服务商",
+    "description": "History provider label"
+  },
+  "history_language": {
+    "message": "识别语言",
+    "description": "History language label"
+  },
   "btn_clear_history": {
     "message": "清空历史",
     "description": "Clear history button"
@@ -105,10 +133,34 @@
     "message": "确定要清空所有历史记录吗？",
     "description": "Confirm clear history"
   },
+  "confirm_delete_history": {
+    "message": "确定要删除这条历史记录吗？",
+    "description": "Confirm delete history item"
+  },
+  "msg_history_action_failed": {
+    "message": "历史记录操作失败，请重试",
+    "description": "History action failed"
+  },
+  "a11y_history_deleted": {
+    "message": "历史记录已删除",
+    "description": "History item deleted announcement"
+  },
+  "a11y_history_exported": {
+    "message": "历史记录已导出",
+    "description": "History exported announcement"
+  },
 
   "msg_capture_failed": {
     "message": "启动截图失败，请刷新页面后重试",
     "description": "Capture failed message"
+  },
+  "msg_capture_browser_internal": {
+    "message": "浏览器内部页面不允许扩展截图。请切换到普通网页后重试。",
+    "description": "Capture unavailable on browser internal pages"
+  },
+  "msg_capture_browser_store": {
+    "message": "浏览器扩展商店禁止其他扩展运行。请切换到需要识别的普通网页。",
+    "description": "Capture unavailable on browser extension stores"
   },
   "msg_no_tab": {
     "message": "无法获取当前标签页",
@@ -220,8 +272,60 @@
     "description": "Compatible endpoint help"
   },
   "help_custom_endpoint": {
-    "message": "完整的API接口地址",
+    "message": "完整的 API 接口地址；仅支持 Chat Completions 或 Responses 请求格式。",
     "description": "Custom endpoint help"
+  },
+  "label_request_mode": {
+    "message": "请求格式",
+    "description": "Request format label"
+  },
+  "request_mode_chat_completions": {
+    "message": "Chat Completions",
+    "description": "Chat Completions request mode"
+  },
+  "request_mode_responses": {
+    "message": "Responses",
+    "description": "Responses request mode"
+  },
+  "label_auth_mode": {
+    "message": "认证方式",
+    "description": "Authentication mode label"
+  },
+  "auth_mode_bearer": {
+    "message": "Bearer Token",
+    "description": "Bearer authentication mode"
+  },
+  "auth_mode_api_key": {
+    "message": "api-key Header",
+    "description": "API key header authentication mode"
+  },
+  "auth_mode_custom_header": {
+    "message": "自定义 Header",
+    "description": "Custom header authentication mode"
+  },
+  "auth_mode_none": {
+    "message": "无需认证",
+    "description": "No authentication mode"
+  },
+  "label_header_name": {
+    "message": "Header 名称",
+    "description": "Custom header name label"
+  },
+  "help_header_name": {
+    "message": "不能使用 Host、Origin 或 Content-Length。",
+    "description": "Custom header name restrictions"
+  },
+  "label_response_path": {
+    "message": "响应文本路径（可选）",
+    "description": "Optional response text path label"
+  },
+  "help_response_path": {
+    "message": "留空时使用默认文本字段；使用以点分隔的对象路径。",
+    "description": "Response path help"
+  },
+  "help_custom_contract": {
+    "message": "支持 Chat Completions 或 Responses 请求；可选择 Bearer、api-key、自定义 Header 或无需认证。",
+    "description": "Custom provider contract help"
   },
   "help_model_by_provider": {
     "message": "根据服务商填写对应的视觉模型名称",
@@ -619,6 +723,22 @@
     "message": "复制文字",
     "description": "Copy text button"
   },
+  "content_btn_save_changes": {
+    "message": "保存修改",
+    "description": "Save corrected OCR text"
+  },
+  "content_btn_saved": {
+    "message": "已保存",
+    "description": "Saved corrected OCR text"
+  },
+  "content_msg_changes_saved": {
+    "message": "修改已保存到历史记录",
+    "description": "Corrected OCR text saved"
+  },
+  "content_msg_changes_save_failed": {
+    "message": "保存修改失败，请重试",
+    "description": "Corrected OCR text save failed"
+  },
 
   "content_a11y_capturing": {
     "message": "正在截图",
@@ -800,5 +920,31 @@
   "a11y_config_missing": {
     "message": "请先配置API密钥",
     "description": "Config missing announcement"
-  }
+  },
+  "provider_claude": { "message": "Anthropic Claude（推荐）" },
+  "provider_openai": { "message": "OpenAI GPT-4 Vision" },
+  "provider_zhipu": { "message": "智谱AI GLM-4V" },
+  "provider_baidu": { "message": "百度智能云 OCR" },
+  "provider_aliyun": { "message": "阿里云 OCR" },
+  "provider_openai_compatible": { "message": "通用 OpenAI 兼容接口" },
+  "provider_custom": { "message": "自定义 API 接口" },
+  "history_preview_aria": { "message": "历史记录详情" },
+  "msg_capture_file_access": { "message": "未启用文件网址访问权限。请在扩展详情中开启“允许访问文件网址”后重试。" },
+  "msg_export_failed": { "message": "导出失败：{0}" },
+  "msg_import_failed": { "message": "导入失败：{0}" },
+  "field_api_key": { "message": "API Key" },
+  "field_secret_key": { "message": "Secret Key" },
+  "field_endpoint": { "message": "API 端点" },
+  "field_model_name": { "message": "模型名称" },
+  "field_header_name": { "message": "Header 名称" },
+  "err_config_incomplete_detail": { "message": "配置不完整：{0} 未填写或格式错误" },
+  "err_import_invalid_structure": { "message": "无效的配置文件结构" },
+  "err_import_missing_config": { "message": "配置文件缺少配置数据" },
+  "err_import_invalid_provider": { "message": "无效的 API 提供商：{0}" },
+  "err_import_invalid_api_configs": { "message": "apiConfigs 格式无效" },
+  "err_import_invalid_provider_config": { "message": "apiConfigs.{0} 格式无效" },
+  "err_import_invalid_prompt": { "message": "提示词格式无效" },
+  "err_import_invalid_language": { "message": "识别语言无效" },
+  "err_import_invalid_theme": { "message": "主题无效" },
+  "err_import_invalid_uiLanguage": { "message": "界面语言无效" }
 }

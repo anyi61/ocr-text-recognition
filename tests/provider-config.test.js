@@ -9,7 +9,9 @@ const {
   getEndpointOriginPattern,
   migrateRetiredModel,
   mergeImportedApiConfigs,
-  buildLegacySettings
+  buildLegacySettings,
+  normalizeConfig,
+  isValidHeaderName
 } = require('../provider-config.js');
 
 test('maps the OpenAI-compatible provider to its camelCase storage key', () => {
@@ -25,7 +27,9 @@ test('maps the OpenAI-compatible provider to its camelCase storage key', () => {
     {
       endpoint: 'https://example.com/v1/chat/completions',
       apiKey: 'compatible-secret',
-      model: 'vision-model'
+      model: 'vision-model',
+      authMode: 'bearer',
+      requestMode: 'chat-completions'
     }
   );
 });
@@ -39,26 +43,49 @@ test('requires both Baidu credentials', () => {
   }, 'baidu'), true);
 });
 
-test('requires endpoint, model, and API key for configurable providers', () => {
+test('requires endpoint, model, and API key for OpenAI-compatible providers', () => {
   const complete = {
     endpoint: 'https://example.com/v1/chat/completions',
     apiKey: 'secret',
     model: 'vision-model'
   };
 
-  for (const provider of ['openai-compatible', 'custom']) {
-    const storageKey = getStorageKey(provider);
-    assert.equal(hasRequiredCredentials({ [storageKey]: complete }, provider), true);
-    assert.equal(hasRequiredCredentials({
-      [storageKey]: { ...complete, endpoint: '' }
-    }, provider), false);
-    assert.equal(hasRequiredCredentials({
-      [storageKey]: { ...complete, model: '' }
-    }, provider), false);
-    assert.equal(hasRequiredCredentials({
-      [storageKey]: { ...complete, apiKey: '' }
-    }, provider), false);
-  }
+  assert.equal(hasRequiredCredentials({ openaiCompatible: complete }, 'openai-compatible'), true);
+  assert.equal(hasRequiredCredentials({ openaiCompatible: { ...complete, endpoint: '' } }, 'openai-compatible'), false);
+  assert.equal(hasRequiredCredentials({ openaiCompatible: { ...complete, model: '' } }, 'openai-compatible'), false);
+  assert.equal(hasRequiredCredentials({ openaiCompatible: { ...complete, apiKey: '' } }, 'openai-compatible'), false);
+});
+
+test('custom provider accepts no-auth and no-model configuration', () => {
+  assert.equal(hasRequiredCredentials({
+    custom: {
+      endpoint: 'http://localhost:11434/v1/chat/completions',
+      authMode: 'none',
+      requestMode: 'chat-completions'
+    }
+  }, 'custom'), true);
+});
+
+test('custom-header auth requires a safe header name and API key', () => {
+  const base = {
+    endpoint: 'https://example.test/ocr',
+    authMode: 'custom-header',
+    apiKey: 'secret'
+  };
+  assert.equal(hasRequiredCredentials({ custom: { ...base, headerName: '' } }, 'custom'), false);
+  assert.equal(hasRequiredCredentials({ custom: { ...base, headerName: 'Host' } }, 'custom'), false);
+  assert.equal(hasRequiredCredentials({ custom: { ...base, headerName: 'X-OCR-Key' } }, 'custom'), true);
+  assert.equal(isValidHeaderName('X-OCR-Key'), true);
+  assert.equal(isValidHeaderName('Content-Length'), false);
+  assert.equal(isValidHeaderName('bad header'), false);
+});
+
+test('normalizes legacy configurable provider defaults', () => {
+  assert.deepEqual(normalizeConfig('custom', { endpoint: 'http://localhost:11434' }), {
+    endpoint: 'http://localhost:11434',
+    authMode: 'bearer',
+    requestMode: 'chat-completions'
+  });
 });
 
 test('accepts the legacy Claude API key', () => {

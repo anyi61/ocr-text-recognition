@@ -20,8 +20,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const historyArea = document.getElementById('historyArea');
   const historyList = document.getElementById('historyList');
   const historyEmptyState = document.getElementById('historyEmptyState');
+  const historySearchEmptyState = document.getElementById('historySearchEmptyState');
+  const historySearchWrap = document.getElementById('historySearchWrap');
+  const historySearch = document.getElementById('historySearch');
+  const exportHistoryBtn = document.getElementById('exportHistoryBtn');
   const clearHistoryBtn = document.getElementById('clearHistoryBtn');
   const historyPreview = document.getElementById('historyPreview');
+  const historyPreviewMeta = document.getElementById('historyPreviewMeta');
   const historyPreviewText = document.getElementById('historyPreviewText');
   const closePreviewBtn = document.getElementById('closePreviewBtn');
   const previewCopyBtn = document.getElementById('previewCopyBtn');
@@ -39,6 +44,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 历史记录数据（用于点击查看）
   let historyData = [];
+  let activePreviewId = null;
+
+  const providerLabels = Object.freeze({
+    claude: 'Claude',
+    openai: 'OpenAI',
+    baidu: 'Baidu OCR',
+    aliyun: 'Aliyun',
+    zhipu: 'Zhipu AI',
+    'openai-compatible': 'OpenAI Compatible',
+    custom: 'Custom API'
+  });
 
   /**
    * 应用主题
@@ -128,14 +144,72 @@ document.addEventListener('DOMContentLoaded', async () => {
     );
   };
 
+  const getLanguageLabel = (language) => {
+    const key = ['zh', 'en', 'ja', 'ko'].includes(language)
+      ? `language_${language}`
+      : 'language_auto';
+    return OCRI18n.t(key);
+  };
+
+  const formatHistoryTimestamp = (item) => {
+    const timestamp = Number(item?.timestamp);
+    if (!Number.isFinite(timestamp)) {
+      return String(item?.date || '');
+    }
+    const locale = OCRI18n.getResolvedLanguage() === 'en' ? 'en-US' : 'zh-CN';
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }).format(new Date(timestamp));
+  };
+
+  const getHistorySource = (item) => (
+    String(item?.sourceTitle || item?.sourceUrl || '').trim()
+  );
+
+  const getFilteredHistory = () => {
+    const query = historySearch.value.trim().toLocaleLowerCase();
+    if (!query) return [...historyData];
+
+    return historyData.filter((item) => [
+      item.text,
+      item.provider,
+      item.language,
+      item.sourceTitle,
+      item.sourceUrl
+    ].some((value) => String(value || '').toLocaleLowerCase().includes(query)));
+  };
+
   /**
    * 显示历史详情预览
-   * @param {string} text - 识别结果文本
+   * @param {Object} item - 历史记录
    */
-  const showHistoryPreview = (text) => {
-    historyPreviewText.value = text;
+  const showHistoryPreview = (item) => {
+    activePreviewId = item.id;
+    historyPreviewText.value = item.text || '';
+    historyPreviewMeta.replaceChildren();
+
+    const metadata = [
+      `${OCRI18n.t('history_provider')}: ${providerLabels[item.provider] || item.provider || '-'}`,
+      `${OCRI18n.t('history_language')}: ${getLanguageLabel(item.language)}`,
+      formatHistoryTimestamp(item)
+    ];
+    const source = getHistorySource(item);
+    if (source) {
+      metadata.push(`${OCRI18n.t('history_source')}: ${source}`);
+    }
+    metadata.forEach((value) => {
+      const span = document.createElement('span');
+      span.textContent = value;
+      if (source && value.endsWith(source) && item.sourceUrl) {
+        span.title = item.sourceUrl;
+      }
+      historyPreviewMeta.appendChild(span);
+    });
+
     historyPreview.classList.remove('hidden');
     historyList.classList.add('hidden');
+    historySearchEmptyState.classList.add('hidden');
     historyEmptyState.classList.add('hidden');
   };
 
@@ -143,117 +217,133 @@ document.addEventListener('DOMContentLoaded', async () => {
    * 隐藏历史详情预览
    */
   const hideHistoryPreview = () => {
+    activePreviewId = null;
     historyPreview.classList.add('hidden');
-    // 根据历史记录数量决定显示列表还是空状态
-    if (historyData.length === 0) {
-      historyList.classList.add('hidden');
-      historyEmptyState.classList.remove('hidden');
-    } else {
-      historyList.classList.remove('hidden');
-    }
+    renderHistory();
   };
 
   /**
-   * 加载历史记录
-   * @async
-   * @returns {Promise<void>}
-   * @description 从存储中加载识别历史记录并显示在popup中
+   * 渲染当前历史记录及搜索结果。
    */
-  const loadHistory = async () => {
-    try {
-      const result = await chrome.storage.local.get(['ocrHistory']);
-      const history = result.ocrHistory || [];
-      historyData = history; // 保存数据供点击查看使用
+  function renderHistory() {
+    historyArea.classList.remove('hidden');
+    historyList.replaceChildren();
+    historyPreview.classList.add('hidden');
+    historyEmptyState.classList.toggle('hidden', historyData.length > 0);
+    historySearchWrap.classList.toggle('hidden', historyData.length === 0);
+    clearHistoryBtn.classList.toggle('hidden', historyData.length === 0);
+    exportHistoryBtn.classList.toggle('hidden', historyData.length === 0);
 
-      // 始终显示历史区域
-      historyArea.classList.remove('hidden');
+    if (historyData.length === 0) {
+      historyList.classList.add('hidden');
+      historySearchEmptyState.classList.add('hidden');
+      return;
+    }
 
-      if (history.length === 0) {
-        // 显示空状态，隐藏列表和清空按钮
-        historyEmptyState.classList.remove('hidden');
-        historyList.classList.add('hidden');
-        clearHistoryBtn.classList.add('hidden');
-        return;
-      }
+    const history = getFilteredHistory();
+    historySearchEmptyState.classList.toggle('hidden', history.length > 0);
+    historyList.classList.toggle('hidden', history.length === 0);
 
-      // 有历史记录：隐藏空状态，显示列表和清空按钮
-      historyEmptyState.classList.add('hidden');
-      historyList.classList.remove('hidden');
-      clearHistoryBtn.classList.remove('hidden');
-      historyList.innerHTML = '';
+    history.forEach((item) => {
+      const text = String(item.text || '');
+      const source = getHistorySource(item);
+      const historyItem = document.createElement('div');
+      historyItem.className = 'history-item';
+      historyItem.setAttribute('tabindex', '0');
+      historyItem.setAttribute('role', 'button');
+      historyItem.setAttribute('aria-label', `${OCRI18n.t('history_view_detail')}: ${text.substring(0, 30)}`);
 
-      history.forEach((item, index) => {
-        const historyItem = document.createElement('div');
-        historyItem.className = 'history-item';
-        historyItem.setAttribute('tabindex', '0');
-        historyItem.setAttribute('role', 'button');
-        historyItem.setAttribute('aria-label', `${OCRI18n.t('history_view_detail')}: ${item.text.substring(0, 30)}...`);
-
-        historyItem.innerHTML = `
-          <div class="history-item-text" title="${escapeHtml(item.text)}">${escapeHtml(item.text)}</div>
-          <div class="history-item-meta">
-            <span class="timestamp">${item.date}</span>
-            <button class="history-copy-btn" data-index="${index}" title="${OCRI18n.t('content_btn_copy')}" aria-label="${OCRI18n.t('history_copy')}">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      historyItem.innerHTML = `
+        <div class="history-item-text" title="${escapeHtml(text)}">${escapeHtml(text)}</div>
+        <div class="history-item-meta">
+          <div class="history-item-context">
+            <div class="history-item-tags">
+              <span class="history-tag">${escapeHtml(providerLabels[item.provider] || item.provider || '-')}</span>
+              <span class="history-tag">${escapeHtml(getLanguageLabel(item.language))}</span>
+              <span class="timestamp">${escapeHtml(formatHistoryTimestamp(item))}</span>
+            </div>
+            ${source ? `<span class="history-source" title="${escapeHtml(item.sourceUrl || source)}">${escapeHtml(source)}</span>` : ''}
+          </div>
+          <div class="history-item-actions">
+            <button class="history-copy-btn" type="button" title="${OCRI18n.t('content_btn_copy')}" aria-label="${OCRI18n.t('history_copy')}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
               </svg>
             </button>
-          </div>
-        `;
-
-        // 点击历史项查看详情
-        historyItem.addEventListener('click', (e) => {
-          // 如果点击的是复制按钮，不触发预览
-          if (e.target.closest('.history-copy-btn')) return;
-          showHistoryPreview(history[index].text);
-        });
-
-        // 键盘支持
-        historyItem.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            if (e.target.classList.contains('history-copy-btn')) return;
-            e.preventDefault();
-            showHistoryPreview(history[index].text);
-          }
-        });
-
-        historyList.appendChild(historyItem);
-      });
-
-      // 绑定复制按钮事件
-      document.querySelectorAll('.history-copy-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const index = parseInt(btn.dataset.index);
-          const text = history[index].text;
-          try {
-            await navigator.clipboard.writeText(text);
-            announcePopupStatus(OCRI18n.t('a11y_copy_success'));
-            // 使用规范中的成功图标
-            btn.innerHTML = `
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="20 6 9 17 4 12"></polyline>
+            <button class="history-delete-btn" type="button" title="${OCRI18n.t('history_delete')}" aria-label="${OCRI18n.t('history_delete')}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
               </svg>
-            `;
-            btn.classList.add('copied');
-            setTimeout(() => {
-              btn.innerHTML = `
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-              `;
-              btn.classList.remove('copied');
-            }, 1500);
-          } catch (err) {
-            console.error('复制失败:', err);
-            announcePopupStatus(OCRI18n.t('a11y_copy_failed'));
-          }
-        });
+            </button>
+          </div>
+        </div>
+      `;
+
+      historyItem.addEventListener('click', (event) => {
+        if (event.target.closest('button')) return;
+        showHistoryPreview(item);
       });
+      historyItem.addEventListener('keydown', (event) => {
+        if ((event.key === 'Enter' || event.key === ' ') && !event.target.closest('button')) {
+          event.preventDefault();
+          showHistoryPreview(item);
+        }
+      });
+
+      const copyBtn = historyItem.querySelector('.history-copy-btn');
+      copyBtn.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        try {
+          await navigator.clipboard.writeText(text);
+          announcePopupStatus(OCRI18n.t('a11y_copy_success'));
+          copyBtn.classList.add('copied');
+          setTimeout(() => copyBtn.classList.remove('copied'), 1500);
+        } catch (error) {
+          console.error('复制失败:', error);
+          announcePopupStatus(OCRI18n.t('a11y_copy_failed'));
+        }
+      });
+
+      historyItem.querySelector('.history-delete-btn').addEventListener('click', async (event) => {
+        event.stopPropagation();
+        if (!confirm(OCRI18n.t('confirm_delete_history'))) return;
+
+        try {
+          const response = await chrome.runtime.sendMessage({
+            action: 'deleteHistoryRecord',
+            historyId: item.id
+          });
+          if (!response?.success) {
+            throw new Error(response?.error || OCRI18n.t('msg_history_action_failed'));
+          }
+          historyData = historyData.filter((record) => record.id !== item.id);
+          if (activePreviewId === item.id) activePreviewId = null;
+          announcePopupStatus(OCRI18n.t('a11y_history_deleted'));
+          renderHistory();
+        } catch (error) {
+          console.error('删除历史记录失败:', error);
+          alert(OCRI18n.t('msg_history_action_failed'));
+        }
+      });
+
+      historyList.appendChild(historyItem);
+    });
+  }
+
+  /**
+   * 从存储中加载历史记录。
+   */
+  const loadHistory = async () => {
+    try {
+      const result = await chrome.storage.local.get(['ocrHistory']);
+      historyData = Array.isArray(result.ocrHistory) ? result.ocrHistory : [];
+      renderHistory();
     } catch (error) {
       console.error('加载历史记录失败:', error);
+      historyData = [];
+      renderHistory();
     }
   };
 
@@ -264,15 +354,54 @@ document.addEventListener('DOMContentLoaded', async () => {
    */
   const clearHistory = async () => {
     if (confirm(OCRI18n.t('confirm_clear_history'))) {
-      await chrome.storage.local.remove(['ocrHistory']);
-      announcePopupStatus(OCRI18n.t('a11y_history_cleared'));
-      historyData = [];
-      historyEmptyState.classList.remove('hidden');
-      historyList.classList.add('hidden');
-      clearHistoryBtn.classList.add('hidden');
-      // 隐藏预览（会根据 historyData.length 正确显示空状态）
-      historyPreview.classList.add('hidden');
+      try {
+        const response = await chrome.runtime.sendMessage({ action: 'clearHistory' });
+        if (!response?.success) {
+          throw new Error(response?.error || OCRI18n.t('msg_history_action_failed'));
+        }
+        announcePopupStatus(OCRI18n.t('a11y_history_cleared'));
+        historyData = [];
+        activePreviewId = null;
+        historySearch.value = '';
+        renderHistory();
+      } catch (error) {
+        console.error('清空历史记录失败:', error);
+        alert(OCRI18n.t('msg_history_action_failed'));
+      }
     }
+  };
+
+  /**
+   * 将全部历史记录导出为可移植 JSON 文件。
+   */
+  const exportHistory = () => {
+    if (historyData.length === 0) return;
+
+    const exportData = {
+      version: 1,
+      exportDate: new Date().toISOString(),
+      records: historyData.map((item) => ({
+        id: item.id,
+        text: item.text || '',
+        timestamp: Number(item.timestamp) || null,
+        provider: item.provider || '',
+        language: item.language || 'auto',
+        sourceTitle: item.sourceTitle || '',
+        sourceUrl: item.sourceUrl || ''
+      }))
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: 'application/json'
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `ocr-history-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    announcePopupStatus(OCRI18n.t('a11y_history_exported'));
   };
 
   /**
@@ -302,7 +431,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const newLang = e.target.value;
     await OCRI18n.setLanguage(newLang);
     OCRI18n.applyToDom(document);
+    renderHistory();
   });
+
+  historySearch.addEventListener('input', renderHistory);
+  exportHistoryBtn.addEventListener('click', exportHistory);
 
   // 清空历史按钮事件
   clearHistoryBtn.addEventListener('click', clearHistory);
@@ -362,14 +495,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       // 发送消息；按需注入依赖和内容脚本后重试。
-      await OCRExtensionRuntime.startCaptureInTab(chrome, tab.id);
+      await OCRExtensionRuntime.startCaptureInTab(chrome, tab);
 
       // 关闭popup窗口
       window.close();
     } catch (error) {
       console.error('启动截图失败:', error);
       announcePopupStatus(OCRI18n.t('a11y_capture_start_failed'));
-      alert(OCRI18n.t('msg_capture_failed'));
+      if (error?.code === 'UNSUPPORTED_PAGE') {
+        const key = error.reason === 'browser_store'
+          ? 'msg_capture_browser_store'
+          : error.reason === 'file_access'
+            ? 'msg_capture_file_access'
+            : 'msg_capture_browser_internal';
+        alert(OCRI18n.t(key));
+      } else {
+        alert(OCRI18n.t('msg_capture_failed'));
+      }
     }
   });
 });

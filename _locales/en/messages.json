@@ -61,6 +61,34 @@
     "message": "History record copied",
     "description": "History copied"
   },
+  "history_search_placeholder": {
+    "message": "Search text, provider, or source",
+    "description": "History search placeholder"
+  },
+  "history_search_empty": {
+    "message": "No matching history records",
+    "description": "Empty history search result"
+  },
+  "history_export": {
+    "message": "Export history",
+    "description": "Export history button"
+  },
+  "history_delete": {
+    "message": "Delete this history record",
+    "description": "Delete history item"
+  },
+  "history_source": {
+    "message": "Source",
+    "description": "History source label"
+  },
+  "history_provider": {
+    "message": "Provider",
+    "description": "History provider label"
+  },
+  "history_language": {
+    "message": "Recognition language",
+    "description": "History language label"
+  },
   "btn_clear_history": {
     "message": "Clear History",
     "description": "Clear history button"
@@ -105,10 +133,34 @@
     "message": "Are you sure you want to clear all history records?",
     "description": "Confirm clear history"
   },
+  "confirm_delete_history": {
+    "message": "Are you sure you want to delete this history record?",
+    "description": "Confirm delete history item"
+  },
+  "msg_history_action_failed": {
+    "message": "History action failed. Please try again.",
+    "description": "History action failed"
+  },
+  "a11y_history_deleted": {
+    "message": "History record deleted",
+    "description": "History item deleted announcement"
+  },
+  "a11y_history_exported": {
+    "message": "History records exported",
+    "description": "History exported announcement"
+  },
 
   "msg_capture_failed": {
     "message": "Failed to start capture, please refresh the page and try again",
     "description": "Capture failed message"
+  },
+  "msg_capture_browser_internal": {
+    "message": "Extensions cannot capture browser internal pages. Switch to a regular webpage and try again.",
+    "description": "Capture unavailable on browser internal pages"
+  },
+  "msg_capture_browser_store": {
+    "message": "Browser extension stores block other extensions. Switch to the webpage you want to recognize.",
+    "description": "Capture unavailable on browser extension stores"
   },
   "msg_no_tab": {
     "message": "Cannot get current tab",
@@ -220,8 +272,60 @@
     "description": "Compatible endpoint help"
   },
   "help_custom_endpoint": {
-    "message": "Complete API endpoint URL",
+    "message": "Complete API endpoint URL; supports Chat Completions and Responses request formats.",
     "description": "Custom endpoint help"
+  },
+  "label_request_mode": {
+    "message": "Request format",
+    "description": "Request format label"
+  },
+  "request_mode_chat_completions": {
+    "message": "Chat Completions",
+    "description": "Chat Completions request mode"
+  },
+  "request_mode_responses": {
+    "message": "Responses",
+    "description": "Responses request mode"
+  },
+  "label_auth_mode": {
+    "message": "Authentication",
+    "description": "Authentication mode label"
+  },
+  "auth_mode_bearer": {
+    "message": "Bearer Token",
+    "description": "Bearer authentication mode"
+  },
+  "auth_mode_api_key": {
+    "message": "api-key Header",
+    "description": "API key header authentication mode"
+  },
+  "auth_mode_custom_header": {
+    "message": "Custom Header",
+    "description": "Custom header authentication mode"
+  },
+  "auth_mode_none": {
+    "message": "No authentication",
+    "description": "No authentication mode"
+  },
+  "label_header_name": {
+    "message": "Header name",
+    "description": "Custom header name label"
+  },
+  "help_header_name": {
+    "message": "Host, Origin, and Content-Length cannot be used.",
+    "description": "Custom header name restrictions"
+  },
+  "label_response_path": {
+    "message": "Response text path (optional)",
+    "description": "Optional response text path label"
+  },
+  "help_response_path": {
+    "message": "Leave blank to use the default text field; use a dot-separated object path.",
+    "description": "Response path help"
+  },
+  "help_custom_contract": {
+    "message": "Supports Chat Completions or Responses requests with Bearer, api-key, custom-header, or no authentication.",
+    "description": "Custom provider contract help"
   },
   "help_model_by_provider": {
     "message": "Enter the vision model name according to your provider",
@@ -619,6 +723,22 @@
     "message": "Copy Text",
     "description": "Copy text button"
   },
+  "content_btn_save_changes": {
+    "message": "Save changes",
+    "description": "Save corrected OCR text"
+  },
+  "content_btn_saved": {
+    "message": "Saved",
+    "description": "Saved corrected OCR text"
+  },
+  "content_msg_changes_saved": {
+    "message": "Changes saved to history",
+    "description": "Corrected OCR text saved"
+  },
+  "content_msg_changes_save_failed": {
+    "message": "Could not save changes. Please try again.",
+    "description": "Corrected OCR text save failed"
+  },
 
   "content_a11y_capturing": {
     "message": "Capturing screenshot",
@@ -800,5 +920,31 @@
   "a11y_config_missing": {
     "message": "Please configure API key first",
     "description": "Config missing announcement"
-  }
+  },
+  "provider_claude": { "message": "Anthropic Claude (Recommended)" },
+  "provider_openai": { "message": "OpenAI GPT-4 Vision" },
+  "provider_zhipu": { "message": "Zhipu AI GLM-4V" },
+  "provider_baidu": { "message": "Baidu Cloud OCR" },
+  "provider_aliyun": { "message": "Aliyun OCR" },
+  "provider_openai_compatible": { "message": "OpenAI-Compatible API" },
+  "provider_custom": { "message": "Custom API" },
+  "history_preview_aria": { "message": "History record details" },
+  "msg_capture_file_access": { "message": "File URL access is disabled. Enable Allow access to file URLs in this extension's details, then try again." },
+  "msg_export_failed": { "message": "Export failed: {0}" },
+  "msg_import_failed": { "message": "Import failed: {0}" },
+  "field_api_key": { "message": "API Key" },
+  "field_secret_key": { "message": "Secret Key" },
+  "field_endpoint": { "message": "API endpoint" },
+  "field_model_name": { "message": "Model name" },
+  "field_header_name": { "message": "Header name" },
+  "err_config_incomplete_detail": { "message": "Configuration incomplete: {0} is missing or invalid" },
+  "err_import_invalid_structure": { "message": "Invalid configuration file structure" },
+  "err_import_missing_config": { "message": "Configuration file is missing configuration data" },
+  "err_import_invalid_provider": { "message": "Invalid API provider: {0}" },
+  "err_import_invalid_api_configs": { "message": "Invalid apiConfigs format" },
+  "err_import_invalid_provider_config": { "message": "Invalid apiConfigs.{0} format" },
+  "err_import_invalid_prompt": { "message": "Invalid prompt format" },
+  "err_import_invalid_language": { "message": "Invalid recognition language" },
+  "err_import_invalid_theme": { "message": "Invalid theme" },
+  "err_import_invalid_uiLanguage": { "message": "Invalid interface language" }
 }

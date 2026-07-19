@@ -28,6 +28,17 @@
     return BAIDU_LANGUAGE_TYPES[language] || BAIDU_LANGUAGE_TYPES.auto;
   }
 
+  function createCredentialFingerprint(apiKey, secret = '') {
+    // A cache key only: it keeps credentials out of Map inspection and logs.
+    const input = `${apiKey || ''}\u0000${secret || ''}`;
+    let hash = 0x811c9dc5;
+    for (let index = 0; index < input.length; index += 1) {
+      hash ^= input.charCodeAt(index);
+      hash = Math.imul(hash, 0x01000193);
+    }
+    return `credentials-${(hash >>> 0).toString(16)}`;
+  }
+
   function createRequestRegistry() {
     const controllers = new Map();
 
@@ -76,40 +87,14 @@
     }
   }
 
-  async function saveHistoryRecord(storage, text, signal, now = Date.now()) {
-    throwIfAborted(signal);
-    const result = await storage.get(['ocrHistory']);
-    throwIfAborted(signal);
-
-    const newRecord = {
-      id: now,
-      text,
-      timestamp: now,
-      date: new Date(now).toLocaleString('zh-CN')
-    };
-    const history = [newRecord, ...(result.ocrHistory || [])].slice(0, 10);
-
-    throwIfAborted(signal);
-    await storage.set({ ocrHistory: history });
-
-    if (signal?.aborted) {
-      const latest = await storage.get(['ocrHistory']);
-      const rolledBack = (latest.ocrHistory || []).filter((item) => item.id !== newRecord.id);
-      await storage.set({ ocrHistory: rolledBack });
-      throwIfAborted(signal);
-    }
-
-    return newRecord;
-  }
-
   const api = {
     LANGUAGE_INSTRUCTIONS,
     buildRecognitionPrompt,
     getBaiduLanguageType,
+    createCredentialFingerprint,
     createRequestRegistry,
     isAbortError,
-    throwIfAborted,
-    saveHistoryRecord
+    throwIfAborted
   };
 
   globalScope.OCRBackgroundCore = api;

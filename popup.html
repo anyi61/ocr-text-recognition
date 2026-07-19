@@ -68,12 +68,28 @@
     <section id="historyArea" class="history-area">
       <div class="history-header">
         <h3 data-i18n="history_title">最近识别记录</h3>
-        <button id="clearHistoryBtn" class="icon-btn hidden" data-i18n-title="btn_clear_history" data-i18n-aria="btn_clear_history" title="清空历史" aria-label="清空历史记录">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-          </svg>
-        </button>
+        <div class="history-header-actions">
+          <button id="exportHistoryBtn" class="icon-btn hidden" data-i18n-title="history_export" data-i18n-aria="history_export" title="导出历史" aria-label="导出历史记录">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+          </button>
+          <button id="clearHistoryBtn" class="icon-btn hidden" data-i18n-title="btn_clear_history" data-i18n-aria="btn_clear_history" title="清空历史" aria-label="清空历史记录">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div id="historySearchWrap" class="history-search-wrap hidden">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input id="historySearch" type="search" data-i18n-placeholder="history_search_placeholder" data-i18n-aria="history_search_placeholder" placeholder="搜索历史记录" aria-label="搜索历史记录">
       </div>
       <!-- 空状态提示 -->
       <div id="historyEmptyState" class="history-empty-state">
@@ -84,6 +100,9 @@
         </svg>
         <p data-i18n="history_empty_title">暂无识别记录</p>
         <p class="history-empty-hint" data-i18n="history_empty_hint">点击上方按钮开始截图识别</p>
+      </div>
+      <div id="historySearchEmptyState" class="history-empty-state compact hidden">
+        <p data-i18n="history_search_empty">没有匹配的历史记录</p>
       </div>
       <!-- 历史列表 -->
       <div id="historyList" class="history-list hidden"></div>
@@ -98,7 +117,8 @@
             </svg>
           </button>
         </div>
-        <textarea id="historyPreviewText" readonly aria-label="历史记录详情"></textarea>
+        <div id="historyPreviewMeta" class="history-preview-meta"></div>
+        <textarea id="historyPreviewText" readonly data-i18n-aria="history_preview_aria" aria-label="历史记录详情"></textarea>
         <div class="history-preview-actions">
           <button id="previewCopyBtn" class="btn btn-primary" data-i18n="btn_copy_all">复制全文</button>
         </div>
@@ -109,10 +129,10 @@
     <footer class="footer">
       <span data-i18n="footer_supported_apis">支持 7 种 API：Claude / OpenAI / 智谱AI / 百度OCR / 阿里云 / 通用兼容 / 自定义</span>
       <div class="language-switch">
-        <select id="languageSelect" class="language-select" aria-label="界面语言">
-          <option value="auto">自动</option>
-          <option value="zh_CN">中文</option>
-          <option value="en">English</option>
+        <select id="languageSelect" class="language-select" data-i18n-aria="label_ui_language" aria-label="界面语言">
+          <option value="auto" data-i18n="language_auto">自动</option>
+          <option value="zh_CN" data-i18n="language_zh">中文</option>
+          <option value="en" data-i18n="language_en">English</option>
         </select>
       </div>
     </footer>

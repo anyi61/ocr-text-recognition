@@ -19,7 +19,8 @@ function startMockServer() {
   const state = {
     requests: [],
     abortedCount: 0,
-    completedCount: 0
+    completedCount: 0,
+    transientFailures: 0
   };
   const waiters = new Set();
   const timers = new Set();
@@ -57,9 +58,20 @@ function startMockServer() {
 
       state.requests.push({
         authorization: request.headers.authorization,
+        path: `${url.pathname}${url.search}`,
         body: parsedBody
       });
       notifyWaiters();
+
+      if (url.searchParams.get('transient') === '503' && state.transientFailures === 0) {
+        state.transientFailures += 1;
+        response.writeHead(503, {
+          'content-type': 'application/json',
+          'retry-after': '0'
+        });
+        response.end(JSON.stringify({ error: { message: 'temporarily busy' } }));
+        return;
+      }
 
       let closedBeforeResponse = false;
       response.on('close', () => {
@@ -78,7 +90,13 @@ function startMockServer() {
         if (closedBeforeResponse || response.destroyed) return;
         response.writeHead(200, { 'content-type': 'application/json' });
         response.end(JSON.stringify({
-          choices: [{ message: { content: 'MOCK OCR RESULT 12345' } }]
+          choices: [{
+            message: {
+              content: url.searchParams.get('empty') === '1'
+                ? '   '
+                : 'MOCK OCR RESULT 12345'
+            }
+          }]
         }), () => {
           state.completedCount += 1;
           notifyWaiters();

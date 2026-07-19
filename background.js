@@ -3,9 +3,17 @@
  * @description 处理截图、OCR识别请求、API调用和历史记录管理
  */
 
-importScripts('provider-config.js', 'extension-runtime.js', 'background-core.js');
+importScripts(
+  'provider-config.js',
+  'extension-runtime.js',
+  'background-core.js',
+  'request-runtime.js',
+  'history-store.js'
+);
 
 const ocrRequestRegistry = OCRBackgroundCore.createRequestRegistry();
+const baiduTokenCache = new Map();
+const historyStore = OCRHistoryStore.create(chrome.storage.local, { limit: 50 });
 
 /**
  * API配置对象
@@ -59,12 +67,12 @@ chrome.runtime.onInstalled.addListener(() => {
 // 处理消息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'captureVisibleTab') {
-    handleCapture(sendResponse);
+    handleCapture(sendResponse, sender);
     return true; // 保持消息通道开启
   }
 
   if (request.action === 'performOCR') {
-    handleOCR(request.imageData, request.requestId, sendResponse);
+    handleOCR(request.imageData, request.requestId, sendResponse, sender);
     return true;
   }
 
@@ -78,6 +86,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     testAPIConnection(request.config, sendResponse);
     return true;
   }
+
+  if (request.action === 'updateHistoryRecord') {
+    historyStore.updateText(request.historyId, request.text)
+      .then((updated) => sendResponse({ success: updated }))
+      .catch((error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  if (request.action === 'deleteHistoryRecord') {
+    historyStore.delete(request.historyId)
+      .then((deleted) => sendResponse({ success: deleted }))
+      .catch((error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  if (request.action === 'clearHistory') {
+    historyStore.clear()
+      .then(() => sendResponse({ success: true }))
+      .catch((error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
 });
 
 /**
@@ -86,9 +115,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
  * @param {Function} sendResponse - Chrome消息回调函数
  * @returns {Promise<void>}
  */
-async function handleCapture(sendResponse) {
+async function handleCapture(sendResponse, sender) {
   try {
-    const dataUrl = await chrome.tabs.captureVisibleTab({
+    if (!sender.tab || !Number.isInteger(sender.tab.windowId)) {
+      throw new Error('截图请求必须来自有效的网页标签页');
+    }
+    const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab.windowId, {
       format: 'png',
       quality: 100
     });
@@ -108,7 +140,7 @@ async function handleCapture(sendResponse) {
  * @returns {Promise<void>}
  * @description 根据配置调用对应的API进行OCR识别，并保存历史记录
  */
-async function handleOCR(imageData, requestId, sendResponse) {
+async function handleOCR(imageData, requestId, sendResponse, sender) {
   const effectiveRequestId = requestId || `legacy-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const controller = ocrRequestRegistry.start(effectiveRequestId);
   const { signal } = controller;
@@ -177,6 +209,10 @@ async function handleOCR(imageData, requestId, sendResponse) {
         config.customEndpoint = custom.endpoint || result.customEndpoint;
         config.customModel = custom.model || result.customModel;
         config.model = config.customModel;
+        config.requestMode = custom.requestMode;
+        config.authMode = custom.authMode;
+        config.headerName = custom.headerName || '';
+        config.responsePath = custom.responsePath || '';
         break;
       }
     }
@@ -184,7 +220,7 @@ async function handleOCR(imageData, requestId, sendResponse) {
     config.apiProvider = provider;
     config.model = OCRProviderConfig.migrateRetiredModel(provider, config.model);
 
-    if (!config.apiKey) {
+    if (!OCRProviderConfig.hasRequiredCredentials(configs, provider, result)) {
       sendResponse({ success: false, error: '未配置API密钥' });
       return;
     }
@@ -223,11 +259,21 @@ async function handleOCR(imageData, requestId, sendResponse) {
       throw new DOMException('OCR request cancelled', 'AbortError');
     }
 
-    // 保存到历史记录
-    await saveToHistory(ocrResult, signal);
+    // 保存到串行历史存储，保留识别上下文供检索和修订。
+    const historyRecord = await historyStore.append({
+      text: ocrResult,
+      provider: config.apiProvider,
+      language: config.language || 'auto',
+      sourceUrl: sender?.tab?.url || '',
+      sourceTitle: sender?.tab?.title || ''
+    }, signal);
     OCRBackgroundCore.throwIfAborted(signal);
 
-    sendResponse({ success: true, text: ocrResult });
+    sendResponse({
+      success: true,
+      text: ocrResult,
+      historyId: historyRecord.id
+    });
   } catch (error) {
     if (OCRBackgroundCore.isAbortError(error) || signal.aborted) {
       sendResponse({ success: false, cancelled: true, error: '识别已取消' });
@@ -237,59 +283,6 @@ async function handleOCR(imageData, requestId, sendResponse) {
     sendResponse({ success: false, error: error.message });
   } finally {
     ocrRequestRegistry.finish(effectiveRequestId, controller);
-  }
-}
-
-/**
- * 保存识别结果到历史记录（最近10条）
- * @async
- * @param {string} text - 识别结果文本
- * @returns {Promise<void>}
- */
-async function saveToHistory(text, signal) {
-  try {
-    await OCRBackgroundCore.saveHistoryRecord(chrome.storage.local, text, signal);
-  } catch (error) {
-    if (OCRBackgroundCore.isAbortError(error)) {
-      throw error;
-    }
-    console.error('保存历史记录失败:', error);
-  }
-}
-
-/**
- * 辅助函数：安全地解析错误响应
- * @async
- * @param {Response} response - fetch返回的Response对象
- * @returns {Promise<string>} 错误信息字符串
- * @description 检查Content-Type后决定解析为JSON还是纯文本
- */
-async function parseErrorResponse(response) {
-  try {
-    const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      const data = await response.json();
-      return data.error?.message || data.error?.code || JSON.stringify(data);
-    }
-    const text = await response.text();
-    return text || `HTTP ${response.status}`;
-  } catch (e) {
-    return `HTTP ${response.status}`;
-  }
-}
-
-/**
- * 辅助函数：安全地解析 JSON 响应
- * @async
- * @param {Response} response - fetch返回的Response对象
- * @returns {Promise<Object>} 解析后的JSON对象
- * @throws {Error} 当响应不是有效JSON时抛出
- */
-async function safeJsonParse(response) {
-  try {
-    return await response.json();
-  } catch (e) {
-    throw new Error('服务器返回了无效的 JSON 数据');
   }
 }
 
@@ -305,27 +298,23 @@ async function safeJsonParse(response) {
  * @description 统一处理网络错误、响应检查、错误解析和 JSON 解析
  */
 async function apiRequest(endpoint, headers, body, errorPrefix, signal) {
-  let response;
   try {
-    response = await fetch(endpoint, {
+    return await OCRRequestRuntime.fetchJsonWithPolicy(fetch, {
+      url: endpoint,
       method: 'POST',
       headers,
       body: JSON.stringify(body),
       signal
     });
-  } catch (networkError) {
-    if (networkError.name === 'TypeError' || networkError.message?.includes('fetch')) {
+  } catch (error) {
+    if (error?.name === 'AbortError' || error?.code === 'REQUEST_TIMEOUT') {
+      throw error;
+    }
+    if (error?.name === 'TypeError') {
       throw new Error('网络连接失败，请检查网络或代理设置');
     }
-    throw networkError;
+    throw new Error(`${errorPrefix}: ${error.message}`);
   }
-
-  if (!response.ok) {
-    const errorMsg = await parseErrorResponse(response);
-    throw new Error(`${errorPrefix}: ${errorMsg}`);
-  }
-
-  return await safeJsonParse(response);
 }
 
 /**
@@ -396,7 +385,7 @@ async function callClaudeAPI(base64Image, config, signal) {
     signal
   );
 
-  return data.content?.[0]?.text || '';
+  return OCRRequestRuntime.normalizeOcrText(data.content?.[0]?.text);
 }
 
 /**
@@ -422,7 +411,7 @@ async function callOpenAIAPI(base64Image, config, signal) {
     signal
   );
 
-  return data.choices?.[0]?.message?.content || '';
+  return OCRRequestRuntime.normalizeOcrText(data.choices?.[0]?.message?.content);
 }
 
 /**
@@ -435,74 +424,72 @@ async function callOpenAIAPI(base64Image, config, signal) {
  * @description 需要先获取access_token，然后调用OCR接口
  */
 async function callBaiduOCR(base64Image, config, signal) {
-  let tokenResponse;
-  try {
-    // 首先获取access_token
-    tokenResponse = await fetch(
-      `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${config.apiKey}&client_secret=${config.customSecret || ''}`,
-      { method: 'POST', signal }
-    );
-  } catch (networkError) {
-    throw new Error('网络连接失败，无法连接到百度服务器');
-  }
-
-  if (!tokenResponse.ok) {
-    const errorText = await tokenResponse.text();
-    throw new Error(`获取百度access_token失败: ${errorText || tokenResponse.status}`);
-  }
-
-  let tokenData;
-  try {
-    tokenData = await tokenResponse.json();
-  } catch (e) {
-    throw new Error('百度服务器返回了无效的数据格式');
-  }
-
-  if (tokenData.error) {
-    throw new Error(`百度认证失败: ${tokenData.error_description || tokenData.error}`);
-  }
-
-  const accessToken = tokenData.access_token;
-  if (!accessToken) {
-    throw new Error('未能获取百度access_token，请检查API Key和Secret');
-  }
+  const accessToken = await getBaiduAccessToken(config, signal);
 
   // 调用OCR接口
-  let ocrResponse;
   try {
-    ocrResponse = await fetch(
-      `https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic?access_token=${accessToken}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: `image=${encodeURIComponent(base64Image)}&language_type=${encodeURIComponent(OCRBackgroundCore.getBaiduLanguageType(config.language))}`,
-        signal
-      }
-    );
-  } catch (networkError) {
-    throw new Error('网络连接失败，无法发送OCR请求');
-  }
+    const ocrData = await OCRRequestRuntime.fetchJsonWithPolicy(fetch, {
+      url: `https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic?access_token=${encodeURIComponent(accessToken)}`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `image=${encodeURIComponent(base64Image)}&language_type=${encodeURIComponent(OCRBackgroundCore.getBaiduLanguageType(config.language))}`,
+      signal
+    });
 
-  if (!ocrResponse.ok) {
-    const errorText = await ocrResponse.text();
-    throw new Error(`百度OCR请求失败: ${errorText || ocrResponse.status}`);
-  }
+    if (ocrData.error_code) {
+      throw new Error(`百度OCR错误: ${ocrData.error_code}`);
+    }
 
-  let ocrData;
-  try {
-    ocrData = await ocrResponse.json();
-  } catch (e) {
-    throw new Error('百度OCR返回了无效的数据格式');
+    return OCRRequestRuntime.normalizeOcrText(ocrData.words_result?.map((item) => item.words).join('\n'));
+  } catch (error) {
+    if (error?.name === 'AbortError' || error?.code === 'REQUEST_TIMEOUT') throw error;
+    throw new Error(`百度OCR请求失败: ${error.message}`);
   }
+}
 
-  if (ocrData.error_code) {
-    throw new Error(`百度OCR错误: ${ocrData.error_msg || ocrData.error_code}`);
-  }
+function baiduCredentialFingerprint(config) {
+  return OCRBackgroundCore.createCredentialFingerprint(config.apiKey, config.customSecret);
+}
 
-  // 合并识别结果
-  return ocrData.words_result?.map(item => item.words).join('\n') || '';
+function awaitWithAbort(promise, signal) {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(new DOMException('OCR request cancelled', 'AbortError'));
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => signal.addEventListener(
+      'abort',
+      () => reject(new DOMException('OCR request cancelled', 'AbortError')),
+      { once: true }
+    ))
+  ]);
+}
+
+async function getBaiduAccessToken(config, signal) {
+  const cacheKey = baiduCredentialFingerprint(config);
+  const existing = baiduTokenCache.get(cacheKey);
+  if (existing?.token && existing.expiresAt > Date.now()) return awaitWithAbort(Promise.resolve(existing.token), signal);
+  if (existing?.promise) return awaitWithAbort(existing.promise, signal);
+
+  const params = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: config.apiKey,
+    client_secret: config.customSecret || ''
+  });
+  const promise = OCRRequestRuntime.fetchJsonWithPolicy(fetch, {
+    url: `https://aip.baidubce.com/oauth/2.0/token?${params.toString()}`,
+    method: 'POST'
+  }).then((data) => {
+    if (data.error) throw new Error(`百度认证失败: ${data.error}`);
+    if (!data.access_token) throw new Error('未能获取百度access_token，请检查API Key和Secret');
+    const expiresInMs = Math.max(0, Number(data.expires_in || 0) * 1000 - 60_000);
+    baiduTokenCache.set(cacheKey, { token: data.access_token, expiresAt: Date.now() + expiresInMs });
+    return data.access_token;
+  }).catch((error) => {
+    baiduTokenCache.delete(cacheKey);
+    throw error;
+  });
+  baiduTokenCache.set(cacheKey, { promise });
+  return awaitWithAbort(promise, signal);
 }
 
 /**
@@ -528,21 +515,18 @@ async function callCustomAPI(base64Image, config, signal) {
 
   const data = await apiRequest(
     endpoint,
-    {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.apiKey}`
-    },
-    buildOpenAIRequestBody(model, prompt, base64Image),
+    OCRRequestRuntime.buildCustomHeaders(config),
+    OCRRequestRuntime.buildCustomRequestBody({
+      requestMode: config.requestMode,
+      model,
+      prompt,
+      base64Image
+    }),
     '自定义API错误',
     signal
   );
 
-  // 尝试常见的响应格式
-  return data.choices?.[0]?.message?.content
-    || data.content?.[0]?.text
-    || data.result
-    || data.text
-    || JSON.stringify(data);
+  return OCRRequestRuntime.extractCustomText(data, config.responsePath);
 }
 
 /**
@@ -574,7 +558,7 @@ async function callAliyunOCR(base64Image, config, signal) {
     signal
   );
 
-  return data.choices?.[0]?.message?.content || '';
+  return OCRRequestRuntime.normalizeOcrText(data.choices?.[0]?.message?.content);
 }
 
 /**
@@ -618,7 +602,7 @@ async function callZhipuAPI(base64Image, config, signal) {
     signal
   );
 
-  return data.choices?.[0]?.message?.content || '';
+  return OCRRequestRuntime.normalizeOcrText(data.choices?.[0]?.message?.content);
 }
 
 /**
@@ -651,12 +635,11 @@ async function callOpenAICompatibleAPI(base64Image, config, signal) {
   );
 
   // 兼容不同格式的响应
-  return data.choices?.[0]?.message?.content
+  return OCRRequestRuntime.normalizeOcrText(data.choices?.[0]?.message?.content
     || data.choices?.[0]?.delta?.content
     || data.content?.[0]?.text
     || data.result
-    || data.text
-    || JSON.stringify(data);
+    || data.text);
 }
 
 /**
@@ -694,6 +677,10 @@ async function testAPIConnection(config, sendResponse) {
       case 'custom':
         normalizedConfig.customEndpoint = config.customEndpoint;
         normalizedConfig.customModel = config.customModel || config.model;
+        normalizedConfig.requestMode = config.requestMode || 'chat-completions';
+        normalizedConfig.authMode = config.authMode || 'bearer';
+        normalizedConfig.headerName = config.headerName || '';
+        normalizedConfig.responsePath = config.responsePath || '';
         break;
     }
 
@@ -797,14 +784,20 @@ chrome.commands.onCommand.addListener(async (command) => {
         }
       }
 
-      await OCRExtensionRuntime.startCaptureInTab(chrome, tab.id);
+      await OCRExtensionRuntime.startCaptureInTab(chrome, tab);
     } catch (error) {
       console.error('快捷键启动截图失败:', error);
+      const unsupportedMessages = {
+        browser_internal: '浏览器内部页面禁止扩展截图，请切换到普通网页后重试',
+        browser_store: '扩展商店页面禁止脚本注入，请切换到普通网页后重试',
+        file_access: '请在扩展管理页开启“允许访问文件网址”后重试'
+      };
       chrome.notifications.create({
         type: 'basic',
         iconUrl: 'icons/icon128.png',
         title: 'OCR文字识别助手',
-        message: '无法在当前页面使用截图功能，请刷新页面后重试'
+        message: unsupportedMessages[error?.reason]
+          || '当前页面无法启动截图，请切换到普通网页后重试'
       });
     }
   }

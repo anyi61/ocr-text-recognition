@@ -5,6 +5,70 @@
 
 // 使用统一的 OCRI18n API（来自 i18n-runtime.js）
 
+const OptionsRuntime = (() => {
+  function createStatusPresenter(statusMessage, timerApi = globalThis) {
+    let hideTimer = null;
+    return (message, type) => {
+      if (hideTimer !== null) {
+        timerApi.clearTimeout(hideTimer);
+        hideTimer = null;
+      }
+      statusMessage.textContent = message;
+      statusMessage.className = 'status-message ' + type;
+      statusMessage.classList.remove('hidden');
+      if (type !== 'loading') {
+        hideTimer = timerApi.setTimeout(() => {
+          statusMessage.classList.add('hidden');
+          hideTimer = null;
+        }, 5000);
+      }
+    };
+  }
+
+  function buildExportData(result, apiConfigs, exportDate = new Date().toISOString()) {
+    return {
+      version: '1.1.0',
+      exportDate,
+      appName: 'OCR文字识别助手',
+      config: {
+        apiProvider: result.apiProvider || 'claude',
+        apiConfigs,
+        prompt: result.prompt || '',
+        language: result.language || 'auto',
+        theme: result.theme || 'light',
+        uiLanguage: result.uiLanguage || 'auto'
+      }
+    };
+  }
+
+  function applyImportedAppearance(config, existingSettings) {
+    return {
+      // Old exports do not carry these fields, so retain local preferences.
+      theme: config.theme ?? existingSettings.theme ?? 'light',
+      uiLanguage: config.uiLanguage ?? existingSettings.uiLanguage ?? 'auto'
+    };
+  }
+
+  function validateImportPreferences(config) {
+    if (config.theme !== undefined && !['light', 'dark'].includes(config.theme)) {
+      return 'theme';
+    }
+    if (config.uiLanguage !== undefined && !['auto', 'zh_CN', 'en'].includes(config.uiLanguage)) {
+      return 'uiLanguage';
+    }
+    if (config.language !== undefined && !['auto', 'zh', 'en', 'ja', 'ko'].includes(config.language)) {
+      return 'language';
+    }
+    return null;
+  }
+
+  return { createStatusPresenter, buildExportData, applyImportedAppearance, validateImportPreferences };
+})();
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = OptionsRuntime;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   // 初始化 i18n
   await OCRI18n.init();
@@ -49,6 +113,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const customEndpointInput = document.getElementById('customEndpoint');
   const customApiKeyInput = document.getElementById('customApiKey');
   const customModelInput = document.getElementById('customModel');
+  const customRequestMode = document.getElementById('customRequestMode');
+  const customAuthMode = document.getElementById('customAuthMode');
+  const customHeaderName = document.getElementById('customHeaderName');
+  const customHeaderNameGroup = document.getElementById('customHeaderNameGroup');
+  const customResponsePath = document.getElementById('customResponsePath');
 
   // 高级设置
   const prompt = document.getElementById('prompt');
@@ -102,6 +171,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         customConfig.classList.remove('hidden');
         break;
     }
+  }
+
+  function updateCustomAuthControls() {
+    customHeaderNameGroup.classList.toggle(
+      'hidden',
+      customAuthMode.value !== 'custom-header'
+    );
   }
 
   /**
@@ -173,6 +249,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     customEndpointInput.value = customCfg.endpoint || result.customEndpoint || '';
     customApiKeyInput.value = customCfg.apiKey || result.customApiKey || '';
     customModelInput.value = customCfg.model || result.customModel || '';
+    customRequestMode.value = customCfg.requestMode;
+    customAuthMode.value = customCfg.authMode;
+    customHeaderName.value = customCfg.headerName || '';
+    customResponsePath.value = customCfg.responsePath || '';
+    updateCustomAuthControls();
 
     // 高级设置
     if (result.prompt) {
@@ -225,7 +306,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       'aliyun': ['apiKey', 'model'],
       'zhipu': ['apiKey', 'model'],
       'openai-compatible': ['endpoint', 'apiKey', 'model'],
-      'custom': ['endpoint', 'apiKey', 'model']
+      'custom': ['endpoint', 'apiKey', 'model', 'headerName']
     };
     (providerFields[provider] || []).forEach(field => {
       const el = getFieldElement(provider, field);
@@ -262,7 +343,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       custom: {
         endpoint: customEndpointInput.value,
         apiKey: customApiKeyInput.value,
-        model: customModelInput.value
+        model: customModelInput.value,
+        requestMode: customRequestMode.value,
+        authMode: customAuthMode.value,
+        headerName: customHeaderName.value,
+        responsePath: customResponsePath.value
       }
     };
 
@@ -346,7 +431,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         return {
           endpoint: customEndpointInput.value,
           apiKey: customApiKeyInput.value,
-          model: customModelInput.value
+          model: customModelInput.value,
+          requestMode: customRequestMode.value,
+          authMode: customAuthMode.value,
+          headerName: customHeaderName.value,
+          responsePath: customResponsePath.value
         };
       default:
         return {};
@@ -385,22 +474,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         break;
 
       case 'openai-compatible':
-      case 'custom':
         if (!config.endpoint || config.endpoint.trim() === '') {
           fieldErrors.push('endpoint');
-        } else {
-          // 验证URL格式
-          try {
-            new URL(config.endpoint);
-          } catch {
-            fieldErrors.push('endpoint_invalid');
-          }
+        } else if (!OCRProviderConfig.getEndpointOriginPattern(config.endpoint)) {
+          fieldErrors.push('endpoint_invalid');
         }
         if (!config.apiKey || config.apiKey.trim() === '') {
           fieldErrors.push('apiKey');
         }
         if (!config.model || config.model.trim() === '') {
           fieldErrors.push('model');
+        }
+        break;
+
+      case 'custom':
+        if (!config.endpoint || config.endpoint.trim() === '') {
+          fieldErrors.push('endpoint');
+        } else if (!OCRProviderConfig.getEndpointOriginPattern(config.endpoint)) {
+          fieldErrors.push('endpoint_invalid');
+        }
+        if (config.authMode !== 'none' && (!config.apiKey || config.apiKey.trim() === '')) {
+          fieldErrors.push('apiKey');
+        }
+        if (config.authMode === 'custom-header'
+          && !OCRProviderConfig.isValidHeaderName(config.headerName)) {
+          fieldErrors.push('headerName');
         }
         break;
     }
@@ -415,17 +513,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (fieldErrors.length > 0) {
       const messages = {
-        apiKey: 'API Key',
-        secret: 'Secret Key',
-        endpoint: 'API 端点',
-        endpoint_invalid: 'API 端点格式无效（需为有效URL）',
-        model: '模型名称'
+        apiKey: OCRI18n.t('field_api_key'),
+        secret: OCRI18n.t('field_secret_key'),
+        endpoint: OCRI18n.t('field_endpoint'),
+        endpoint_invalid: OCRI18n.t('err_endpoint_invalid'),
+        model: OCRI18n.t('field_model_name'),
+        headerName: OCRI18n.t('field_header_name')
       };
 
       const errorMessages = fieldErrors.map(f => messages[f] || f);
+      const separator = OCRI18n.getResolvedLanguage() === 'en' ? ', ' : '、';
       return {
         valid: false,
-        message: '配置不完整：' + errorMessages.join('、') + ' 未填写或格式错误',
+        message: OCRI18n.t('err_config_incomplete_detail', [errorMessages.join(separator)]),
         fieldErrors: fieldErrors
       };
     }
@@ -489,6 +589,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (field === 'endpoint' || field === 'endpoint_invalid') element = customEndpointInput;
           if (field === 'apiKey') element = customApiKeyInput;
           if (field === 'model') element = customModelInput;
+          if (field === 'headerName') element = customHeaderName;
           break;
       }
       if (element) {
@@ -569,6 +670,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         config.customEndpoint = customEndpointInput.value;
         config.customModel = customModelInput.value;
         config.model = customModelInput.value || config.customModel;
+        config.requestMode = customRequestMode.value;
+        config.authMode = customAuthMode.value;
+        config.headerName = customHeaderName.value;
+        config.responsePath = customResponsePath.value;
         break;
     }
 
@@ -596,17 +701,7 @@ document.addEventListener('DOMContentLoaded', async () => {
    * @param {string} type - 消息类型 (success|error|loading)
    * @description 在页面上方显示状态消息，非loading类型5秒后自动隐藏
    */
-  function showStatus(message, type) {
-    statusMessage.textContent = message;
-    statusMessage.className = 'status-message ' + type;
-    statusMessage.classList.remove('hidden');
-
-    if (type !== 'loading') {
-      setTimeout(() => {
-        statusMessage.classList.add('hidden');
-      }, 5000);
-    }
-  }
+  const showStatus = OptionsRuntime.createStatusPresenter(statusMessage);
 
   /**
    * 设置字段状态提示
@@ -681,6 +776,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (field === 'endpoint' || field === 'endpoint_invalid') return customEndpointInput;
         if (field === 'apiKey') return customApiKeyInput;
         if (field === 'model') return customModelInput;
+        if (field === 'headerName') return customHeaderName;
         break;
     }
     return null;
@@ -698,7 +794,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // 获取当前配置（仅导出配置数据，不包含历史记录）
       const result = await chrome.storage.local.get([
-        'apiProvider', 'apiConfigs', 'prompt', 'language'
+        'apiProvider', 'apiConfigs', 'prompt', 'language', 'theme', 'uiLanguage'
       ]);
 
       const apiConfigs = result.apiConfigs || {};
@@ -707,17 +803,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         : OCRProviderConfig.redactApiConfigs(apiConfigs);
 
       // 构建导出数据结构
-      const exportData = {
-        version: '1.1.0',
-        exportDate: new Date().toISOString(),
-        appName: 'OCR文字识别助手',
-        config: {
-          apiProvider: result.apiProvider || 'claude',
-          apiConfigs: exportedApiConfigs,
-          prompt: result.prompt || '',
-          language: result.language || 'auto'
-        }
-      };
+      const exportData = OptionsRuntime.buildExportData(result, exportedApiConfigs);
 
       // 创建并下载JSON文件
       const jsonString = JSON.stringify(exportData, null, 2);
@@ -738,7 +824,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       showStatus(OCRI18n.t('msg_export_success'), 'success');
     } catch (error) {
       console.error('导出配置失败:', error);
-      showStatus('导出失败: ' + error.message, 'error');
+      showStatus(OCRI18n.t('msg_export_failed', [error.message]), 'error');
     }
   }
 
@@ -751,25 +837,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   function validateImportData(data) {
     // 检查基本结构
     if (!data || typeof data !== 'object') {
-      return { valid: false, error: '无效的配置文件格式', config: null };
+      return { valid: false, error: OCRI18n.t('err_import_invalid_structure'), config: null };
     }
 
     // 检查是否有config字段（新格式）或直接是配置（兼容旧格式）
     let config = data.config || data;
 
     if (!config || typeof config !== 'object') {
-      return { valid: false, error: '配置文件缺少必要的配置数据', config: null };
+      return { valid: false, error: OCRI18n.t('err_import_missing_config'), config: null };
     }
 
     // 验证apiProvider
     const validProviders = ['claude', 'openai', 'baidu', 'aliyun', 'zhipu', 'openai-compatible', 'custom'];
     if (config.apiProvider && !validProviders.includes(config.apiProvider)) {
-      return { valid: false, error: '无效的API提供商类型: ' + config.apiProvider, config: null };
+      return { valid: false, error: OCRI18n.t('err_import_invalid_provider', [config.apiProvider]), config: null };
     }
 
     // 验证apiConfigs结构
     if (config.apiConfigs && typeof config.apiConfigs !== 'object') {
-      return { valid: false, error: 'apiConfigs格式无效', config: null };
+      return { valid: false, error: OCRI18n.t('err_import_invalid_api_configs'), config: null };
     }
 
     // 验证各个API配置的结构
@@ -782,18 +868,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         const apiConfig = config.apiConfigs[key];
         if (typeof apiConfig !== 'object') {
-          return { valid: false, error: `apiConfigs.${key} 格式无效`, config: null };
+          return { valid: false, error: OCRI18n.t('err_import_invalid_provider_config', [key]), config: null };
         }
       }
     }
 
     // 验证prompt和language
     if (config.prompt !== undefined && typeof config.prompt !== 'string') {
-      return { valid: false, error: 'prompt格式无效', config: null };
+      return { valid: false, error: OCRI18n.t('err_import_invalid_prompt'), config: null };
     }
 
     if (config.language !== undefined && typeof config.language !== 'string') {
-      return { valid: false, error: 'language格式无效', config: null };
+      return { valid: false, error: OCRI18n.t('err_import_invalid_language'), config: null };
+    }
+
+    const invalidPreference = OptionsRuntime.validateImportPreferences(config);
+    if (invalidPreference) {
+      return {
+        valid: false,
+        error: OCRI18n.t(`err_import_invalid_${invalidPreference}`),
+        config: null
+      };
     }
 
     return { valid: true, error: null, config: config };
@@ -814,8 +909,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (configInfo) {
         infoHtml = `
           <div class="config-info">
-            <p><strong>API提供商:</strong> ${configInfo.apiProvider || 'claude'}</p>
-            ${configInfo.exportDate ? `<p><strong>导出时间:</strong> ${new Date(configInfo.exportDate).toLocaleString()}</p>` : ''}
+            <p><strong>${OCRI18n.t('modal_api_provider')}:</strong> ${configInfo.apiProvider || 'claude'}</p>
+            ${configInfo.exportDate ? `<p><strong>${OCRI18n.t('modal_export_date')}:</strong> ${new Date(configInfo.exportDate).toLocaleString()}</p>` : ''}
           </div>
         `;
       }
@@ -828,10 +923,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           <h3>${title}</h3>
           <p>${message}</p>
           ${infoHtml}
-          <p class="warning-text">此操作将覆盖当前所有配置，是否继续？</p>
+          <p class="warning-text">${OCRI18n.t('modal_import_warning')}</p>
           <div class="modal-actions">
-            <button class="btn btn-secondary" id="modalCancel">取消</button>
-            <button class="btn btn-primary" id="modalConfirm">确认导入</button>
+            <button class="btn btn-secondary" id="modalCancel">${OCRI18n.t('btn_cancel')}</button>
+            <button class="btn btn-primary" id="modalConfirm">${OCRI18n.t('btn_confirm_import')}</button>
           </div>
         </div>
       `;
@@ -920,8 +1015,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // 显示确认对话框
       const confirmed = await showConfirmDialog(
-        '导入配置确认',
-        '即将导入配置文件，请确认以下信息：',
+        OCRI18n.t('modal_import_title'),
+        OCRI18n.t('modal_import_message'),
         {
           apiProvider: validation.config.apiProvider,
           exportDate: data.exportDate
@@ -942,7 +1037,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         'openaiApiKey', 'openaiModel', 'baiduApiKey',
         'aliyunApiKey', 'aliyunModel', 'zhipuApiKey', 'zhipuModel',
         'compatibleEndpoint', 'compatibleApiKey', 'compatibleModel',
-        'customApiKey'
+        'customApiKey', 'theme', 'uiLanguage'
       ]);
       const importedApiConfigs = validation.config.apiConfigs || {};
       const existingApiConfigs = existingSettings.apiConfigs || {};
@@ -957,7 +1052,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         apiProvider: validation.config.apiProvider || 'claude',
         apiConfigs: mergedApiConfigs,
         prompt: validation.config.prompt || '',
-        language: validation.config.language || 'auto'
+        language: validation.config.language || 'auto',
+        ...OptionsRuntime.applyImportedAppearance(validation.config, existingSettings)
       };
 
       // 为了兼容性，也保存旧格式字段；脱敏导入会保留本机已有凭据。
@@ -971,11 +1067,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // 重新加载页面设置
       await loadSettings();
+      await loadTheme();
+      await OCRI18n.setLanguage(settingsToSave.uiLanguage);
+      OCRI18n.applyToDom(document);
 
       showStatus(OCRI18n.t('msg_import_success'), 'success');
     } catch (error) {
       console.error('导入配置失败:', error);
-      showStatus('导入失败: ' + error.message, 'error');
+      showStatus(OCRI18n.t('msg_import_failed', [error.message]), 'error');
     }
   }
 
@@ -986,6 +1085,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 切换API时尝试保存当前选择（校验不通过则不保存，但仍允许切换）
     await saveSettings();
   });
+
+  customAuthMode.addEventListener('change', updateCustomAuthControls);
 
   // 主题切换即时生效
   themeSelect.addEventListener('change', async () => {

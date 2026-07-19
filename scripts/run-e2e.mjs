@@ -7,7 +7,14 @@ const cli = path.join(root, 'node_modules', '@playwright', 'test', 'cli.js');
 
 const child = spawn(
   process.execPath,
-  [cli, 'test', 'tests/e2e/extension.spec.js', '--workers=1', '--reporter=line'],
+  [
+    cli,
+    'test',
+    'tests/e2e/extension.spec.js',
+    '--workers=1',
+    '--reporter=line',
+    ...process.argv.slice(2)
+  ],
   { cwd: root, stdio: 'inherit' }
 );
 

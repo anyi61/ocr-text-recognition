@@ -109,12 +109,24 @@ test('background and popup preserve dependency injection order', () => {
 
   assert.match(
     background,
-    /importScripts\('provider-config\.js', 'extension-runtime\.js', 'background-core\.js'\)/
+    /importScripts\([\s\S]*'provider-config\.js',[\s\S]*'extension-runtime\.js',[\s\S]*'background-core\.js',[\s\S]*'request-runtime\.js',[\s\S]*'history-store\.js'[\s\S]*\)/
   );
   assert.match(
     extensionRuntime,
     /'i18n-runtime\.js',\s*'capture-utils\.js',\s*'content\.js'/
   );
+});
+
+test('content capture waits for i18n and runtime updates the document language', () => {
+  const content = fs.readFileSync(path.join(ROOT, 'content.js'), 'utf8');
+  const i18nRuntime = fs.readFileSync(path.join(ROOT, 'i18n-runtime.js'), 'utf8');
+
+  assert.match(content, /const i18nReady = OCRI18n\.init\(\)/);
+  assert.match(
+    content,
+    /if \(request\.action === 'startCapture'\)[\s\S]*i18nReady\.then\(\(\) => \{[\s\S]*startCapture\(\)/
+  );
+  assert.match(i18nRuntime, /documentElement\.lang = resolvedLanguage === 'zh_CN'/);
 });
 
 test('every project JavaScript file parses', () => {

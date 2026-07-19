@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   requestEndpointPermission,
   hasEndpointPermission,
+  getUnsupportedPageReason,
   startCaptureInTab
 } = require('../extension-runtime.js');
 
@@ -95,4 +96,55 @@ test('unexpected messaging errors do not inject scripts', async () => {
 
   await assert.rejects(startCaptureInTab(chromeApi, 42), /Tab was closed/);
   assert.equal(injected, false);
+});
+
+test('classifies browser-internal and store pages before injection', () => {
+  assert.equal(getUnsupportedPageReason('chrome://settings/'), 'browser_internal');
+  assert.equal(getUnsupportedPageReason('edge://extensions/'), 'browser_internal');
+  assert.equal(
+    getUnsupportedPageReason('https://chromewebstore.google.com/detail/example/id'),
+    'browser_store'
+  );
+  assert.equal(getUnsupportedPageReason('https://example.com/page'), null);
+});
+
+test('unsupported pages fail before content script messaging', async () => {
+  let messaged = false;
+  const chromeApi = {
+    tabs: {
+      async sendMessage() {
+        messaged = true;
+      }
+    }
+  };
+
+  await assert.rejects(
+    startCaptureInTab(chromeApi, { id: 42, url: 'chrome://settings/' }),
+    (error) => error?.code === 'UNSUPPORTED_PAGE'
+      && error?.reason === 'browser_internal'
+  );
+  assert.equal(messaged, false);
+});
+
+test('file pages fail with an actionable reason when extension file access is disabled', async () => {
+  let messaged = false;
+  const chromeApi = {
+    extension: {
+      isAllowedFileSchemeAccess(callback) {
+        callback(false);
+      }
+    },
+    tabs: {
+      async sendMessage() {
+        messaged = true;
+      }
+    }
+  };
+
+  await assert.rejects(
+    startCaptureInTab(chromeApi, { id: 42, url: 'file:///tmp/example.html' }),
+    (error) => error?.code === 'UNSUPPORTED_PAGE'
+      && error?.reason === 'file_access'
+  );
+  assert.equal(messaged, false);
 });

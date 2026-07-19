@@ -304,6 +304,40 @@ body {
   letter-spacing: 0.05em;
 }
 
+.history-header-actions,
+.history-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.history-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-md);
+  background: var(--bg-sub);
+  color: var(--text-tertiary);
+}
+
+#historySearch {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+#historySearch::placeholder {
+  color: var(--text-tertiary);
+}
+
 .history-list {
   max-height: 240px;
   overflow-y: auto;
@@ -355,13 +389,45 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   font-size: 11px;
   color: var(--text-tertiary);
   font-family: var(--font-mono);
 }
 
+.history-item-context {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.history-item-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.history-tag {
+  max-width: 100%;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: var(--bg-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-source {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .history-copy-btn,
-.history-copy {
+.history-copy,
+.history-delete-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -379,15 +445,22 @@ body {
 /* 渐进披露逻辑 */
 .history-item:hover .history-copy-btn,
 .history-item:hover .history-copy,
+.history-item:hover .history-delete-btn,
 .history-item:focus-within .history-copy-btn,
-.history-item:focus-within .history-copy {
+.history-item:focus-within .history-copy,
+.history-item:focus-within .history-delete-btn {
   opacity: 1;
 }
 
 .history-copy-btn:hover,
-.history-copy:hover {
+.history-copy:hover,
+.history-delete-btn:hover {
   background: var(--bg-main);
   color: var(--text-primary);
+}
+
+.history-delete-btn:hover {
+  color: var(--status-error);
 }
 
 .history-copy-btn.copied,
@@ -421,6 +494,22 @@ body {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.history-preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.history-preview-meta span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 #historyPreviewText {
@@ -523,6 +612,10 @@ body {
   opacity: 0.8;
 }
 
+.history-empty-state.compact {
+  padding: 24px 12px;
+}
+
 /* === 底部 (Footer) === */
 .footer {
   display: flex;
@@ -576,7 +669,8 @@ body {
 /* 触摸设备优化 */
 @media (hover: none) and (pointer: coarse) {
   .history-copy-btn,
-  .history-copy {
+  .history-copy,
+  .history-delete-btn {
     opacity: 1; /* 始终显示 */
     background: var(--bg-main);
     width: 32px;

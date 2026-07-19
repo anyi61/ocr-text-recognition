@@ -25,6 +25,61 @@
     return provider === 'openai-compatible' || provider === 'custom';
   }
 
+  /**
+   * Return a stable reason when Chrome does not allow content-script injection
+   * into the target page.
+   */
+  function getUnsupportedPageReason(url) {
+    if (!url || typeof url !== 'string') return null;
+
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return null;
+    }
+
+    const internalProtocols = new Set([
+      'about:',
+      'brave:',
+      'chrome:',
+      'chrome-extension:',
+      'devtools:',
+      'edge:',
+      'edge-extension:',
+      'opera:',
+      'view-source:',
+      'vivaldi:'
+    ]);
+    if (internalProtocols.has(parsed.protocol)) {
+      return 'browser_internal';
+    }
+
+    const storeHosts = new Set([
+      'chrome.google.com',
+      'chromewebstore.google.com',
+      'microsoftedge.microsoft.com'
+    ]);
+    if (storeHosts.has(parsed.hostname)) {
+      return 'browser_store';
+    }
+
+    return null;
+  }
+
+  function createUnsupportedPageError(reason) {
+    const error = new Error(`Capture is unavailable on this page: ${reason}`);
+    error.code = 'UNSUPPORTED_PAGE';
+    error.reason = reason;
+    return error;
+  }
+
+  async function hasFileSchemeAccess(chromeApi) {
+    const checker = chromeApi.extension?.isAllowedFileSchemeAccess;
+    if (typeof checker !== 'function') return true;
+    return new Promise((resolve) => checker.call(chromeApi.extension, resolve));
+  }
+
   async function requestEndpointPermission(chromeApi, provider, endpoint) {
     if (!usesCustomEndpoint(provider)) return true;
     const originPattern = providerConfig.getEndpointOriginPattern(endpoint);
@@ -41,7 +96,26 @@
       : false;
   }
 
-  async function startCaptureInTab(chromeApi, tabId) {
+  async function startCaptureInTab(chromeApi, tabOrId) {
+    const tabId = typeof tabOrId === 'object' ? tabOrId?.id : tabOrId;
+    const reason = typeof tabOrId === 'object'
+      ? getUnsupportedPageReason(tabOrId?.url)
+      : null;
+
+    if (reason) {
+      throw createUnsupportedPageError(reason);
+    }
+    if (
+      typeof tabOrId === 'object'
+      && String(tabOrId?.url || '').startsWith('file:')
+      && !(await hasFileSchemeAccess(chromeApi))
+    ) {
+      throw createUnsupportedPageError('file_access');
+    }
+    if (!Number.isInteger(tabId)) {
+      throw new TypeError('A valid target tab id is required');
+    }
+
     try {
       await chromeApi.tabs.sendMessage(tabId, { action: 'startCapture' });
     } catch (error) {
@@ -62,6 +136,7 @@
     CONTENT_SCRIPT_FILES,
     requestEndpointPermission,
     hasEndpointPermission,
+    getUnsupportedPageReason,
     startCaptureInTab
   });
 }));

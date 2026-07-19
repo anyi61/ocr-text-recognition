@@ -9,8 +9,9 @@
   }
   window.ocrCaptureInitialized = true;
 
-  // 使用统一的 OCRI18n API（来自 i18n-runtime.js）
-  OCRI18n.init().catch((error) => {
+  // 使用统一的 OCRI18n API（来自 i18n-runtime.js）。首次按需注入后，
+  // startCapture 必须等待字典完成加载，避免把内部翻译键显示给用户。
+  const i18nReady = OCRI18n.init().catch((error) => {
     console.error('i18n init failed in content script:', error);
   });
 
@@ -255,6 +256,7 @@
     /* 选区框样式 */
     #ocr-selection-box {
       border: 2px solid var(--accent);
+      box-sizing: border-box;
       box-shadow: 0 0 0 1px var(--bg-main), 0 0 20px rgba(0,0,0,0.1);
       transition: none !important; /* 禁止选区框动画 */
     }
@@ -495,6 +497,7 @@
       border: 2px solid var(--accent);
       box-shadow: 0 0 0 1px var(--bg-main);
       background: rgba(0, 0, 0, 0.05);
+      box-sizing: border-box;
       pointer-events: none;
       z-index: ${Z.SELECTION};
       display: none;
@@ -543,6 +546,8 @@
     isCapturing = false;
     isEditMode = false;
     isCancelled = false;
+    // 先解除仍挂在选区上的编辑监听，再移除选区元素。
+    cleanupEditMode();
     if (overlay) {
       overlay.remove();
       overlay = null;
@@ -555,8 +560,6 @@
       tooltip.remove();
       tooltip = null;
     }
-    // 清理编辑模式元素
-    cleanupEditMode();
     // 注意：不销毁 shadowHost/shadowRoot，因为后续可能需要显示通知/结果弹窗
     // Shadow DOM 的销毁放在 fullCleanup() 或 destroyShadowDOM() 中
     document.removeEventListener('mousedown', onMouseDown);
@@ -583,6 +586,7 @@
    * @description 移除手柄和工具栏
    */
   function cleanupEditMode() {
+    selectionBox?.removeEventListener('mousedown', onSelectionMouseDown);
     // 清理手柄
     handles.forEach(h => h && h.remove());
     handles = [];
@@ -596,6 +600,9 @@
     // 移除编辑模式事件监听
     document.removeEventListener('mousemove', onEditModeMouseMove);
     document.removeEventListener('mouseup', onEditModeMouseUp);
+    isDragging = false;
+    dragType = null;
+    originalRect = null;
   }
 
   /**
@@ -618,6 +625,8 @@
     // 更新选区框样式
     if (selectionBox) {
       selectionBox.classList.add('edit-mode');
+      selectionBox.style.pointerEvents = 'auto';
+      selectionBox.addEventListener('mousedown', onSelectionMouseDown);
     }
 
     // 创建调整手柄
@@ -845,9 +854,8 @@
     const newRect = calculateRectByKeyboard(currentRect, handlePos, direction, step);
     if (!newRect) return;
 
-    // 记录历史
-    rectHistory.push({ ...currentRect });
     currentRect = newRect;
+    recordCurrentRect();
 
     // 更新 UI
     updateSelectionRect();
@@ -1113,20 +1121,25 @@
    */
   function onEditModeMouseUp(e) {
     if (isDragging) {
-      // 拖拽结束，记录历史
-      if (currentRect && rectHistory.length > 0) {
-        const lastRect = rectHistory[rectHistory.length - 1];
-        // 只有当位置变化时才记录
-        if (lastRect.left !== currentRect.left || lastRect.top !== currentRect.top ||
-            lastRect.width !== currentRect.width || lastRect.height !== currentRect.height) {
-          rectHistory.push({ ...currentRect });
-        }
-      }
+      // 只在一次完整拖拽结束后记录，保证一次撤销回到拖拽前的状态。
+      recordCurrentRect();
       // 更新撤销按钮状态
       updateUndoButtonState();
       isDragging = false;
       dragType = null;
       originalRect = null;
+    }
+  }
+
+  /**
+   * 将当前选区作为一个完整用户操作写入撤销栈。
+   */
+  function recordCurrentRect() {
+    if (!currentRect || rectHistory.length === 0) return;
+    const lastRect = rectHistory[rectHistory.length - 1];
+    if (lastRect.left !== currentRect.left || lastRect.top !== currentRect.top ||
+        lastRect.width !== currentRect.width || lastRect.height !== currentRect.height) {
+      rectHistory.push({ ...currentRect });
     }
   }
 
@@ -1374,7 +1387,7 @@
       hideProgressNotification();
 
       if (ocrResponse && ocrResponse.success) {
-        showResultPopup(ocrResponse.text);
+        showResultPopup(ocrResponse.text, ocrResponse.historyId);
         showNotification(OCRI18n.t('content_msg_done', [String(elapsed)]), 'success');
         announceA11y(OCRI18n.t('content_a11y_done', [String(elapsed)]));
       } else {
@@ -1418,22 +1431,51 @@
           window.innerHeight
         );
 
-        canvas.width = rect.width * scale.x;
-        canvas.height = rect.height * scale.y;
+        const sourceLeft = Math.max(0, Math.min(imageWidth - 1, rect.left * scale.x));
+        const sourceTop = Math.max(0, Math.min(imageHeight - 1, rect.top * scale.y));
+        const sourceWidth = Math.max(0, Math.min(imageWidth - sourceLeft, rect.width * scale.x));
+        const sourceHeight = Math.max(0, Math.min(imageHeight - sourceTop, rect.height * scale.y));
 
-        ctx.drawImage(
-          img,
-          rect.left * scale.x,
-          rect.top * scale.y,
-          rect.width * scale.x,
-          rect.height * scale.y,
-          0,
-          0,
-          rect.width * scale.x,
-          rect.height * scale.y
-        );
+        if (sourceWidth < 15 || sourceHeight < 15) {
+          reject(new Error(OCRI18n.t('content_msg_selection_small_edit')));
+          return;
+        }
 
-        resolve(canvas.toDataURL('image/png'));
+        const limits = { maxEdge: 4096, maxPixels: 12_000_000 };
+        let fitted = OCRCaptureUtils.fitImageWithinLimits(sourceWidth, sourceHeight, limits);
+        const maxBase64Length = 3 * 1024 * 1024;
+
+        for (let attempt = 0; attempt < 12; attempt += 1) {
+          canvas.width = fitted.width;
+          canvas.height = fitted.height;
+          ctx.clearRect(0, 0, fitted.width, fitted.height);
+          ctx.drawImage(
+            img,
+            sourceLeft,
+            sourceTop,
+            sourceWidth,
+            sourceHeight,
+            0,
+            0,
+            fitted.width,
+            fitted.height
+          );
+
+          const normalizedImage = canvas.toDataURL('image/png');
+          const base64Payload = normalizedImage.slice(normalizedImage.indexOf(',') + 1);
+          if (base64Payload.length <= maxBase64Length) {
+            resolve(normalizedImage);
+            return;
+          }
+
+          const nextScale = Math.min(0.9, Math.sqrt(maxBase64Length / base64Payload.length) * 0.95);
+          const nextWidth = Math.floor(fitted.width * nextScale);
+          const nextHeight = Math.floor(fitted.height * nextScale);
+          if (nextWidth < 15 || nextHeight < 15) break;
+          fitted = { width: nextWidth, height: nextHeight };
+        }
+
+        reject(new Error(OCRI18n.t('content_msg_selection_small_edit')));
       };
       img.onerror = reject;
       img.src = dataUrl;
@@ -1443,9 +1485,10 @@
   /**
    * 显示结果弹窗
    * @param {string} text - 识别结果文本
-   * @description 在页面右上角显示识别结果弹窗，包含复制和关闭功能
+   * @param {string|number} historyId - 对应的历史记录 ID
+   * @description 在页面右上角显示识别结果弹窗，支持修订、保存和复制
    */
-  function showResultPopup(text) {
+  function showResultPopup(text, historyId) {
     // 确保 Shadow DOM 已初始化
     if (!shadowRoot) {
       initShadowDOM();
@@ -1547,11 +1590,13 @@
         }
         .ocr-result-actions {
           display: flex;
+          flex-wrap: wrap;
           gap: 12px;
           margin-top: 20px;
         }
         .ocr-result-btn {
           flex: 1;
+          min-width: 110px;
           padding: 12px 16px;
           border: none;
           border-radius: var(--radius-md);
@@ -1563,6 +1608,12 @@
           align-items: center;
           justify-content: center;
           gap: 8px;
+        }
+        .ocr-result-btn:disabled {
+          cursor: not-allowed;
+          opacity: 0.45;
+          transform: none;
+          box-shadow: none;
         }
         .ocr-result-btn-primary {
           background: var(--accent);
@@ -1603,6 +1654,7 @@
             </svg>
             <span class="btn-text">${OCRI18n.t('content_btn_copy')}</span>
           </button>
+          <button class="ocr-result-btn ocr-result-btn-secondary save-changes-btn" type="button" disabled>${OCRI18n.t('content_btn_save_changes')}</button>
           <button class="ocr-result-btn ocr-result-btn-secondary close-popup-btn" aria-label="${OCRI18n.t('btn_close')}">${OCRI18n.t('btn_close')}</button>
         </div>
       </div>
@@ -1620,8 +1672,17 @@
     const closeBtn = popup.querySelector('.ocr-close-btn');
     const closePopupBtn = popup.querySelector('.close-popup-btn');
     const copyBtn = popup.querySelector('.copy-btn');
+    const saveChangesBtn = popup.querySelector('.save-changes-btn');
     const btnText = copyBtn.querySelector('.btn-text');
     const copyIcon = copyBtn.querySelector('.copy-icon');
+    let lastSavedText = textarea.value.trim();
+
+    const updateSaveButtonState = () => {
+      const currentText = textarea.value.trim();
+      saveChangesBtn.disabled = !historyId || !currentText || currentText === lastSavedText;
+    };
+
+    textarea.addEventListener('input', updateSaveButtonState);
 
     const close = () => {
       popup.classList.add('closing');
@@ -1630,6 +1691,40 @@
 
     closeBtn.addEventListener('click', close);
     closePopupBtn.addEventListener('click', close);
+
+    saveChangesBtn.addEventListener('click', async () => {
+      const updatedText = textarea.value.trim();
+      if (!historyId || !updatedText || updatedText === lastSavedText) return;
+
+      saveChangesBtn.disabled = true;
+      try {
+        const response = await chrome.runtime.sendMessage({
+          action: 'updateHistoryRecord',
+          historyId,
+          text: updatedText
+        });
+        if (!response?.success) {
+          throw new Error(response?.error || OCRI18n.t('content_msg_changes_save_failed'));
+        }
+
+        textarea.value = updatedText;
+        lastSavedText = updatedText;
+        saveChangesBtn.textContent = OCRI18n.t('content_btn_saved');
+        showNotification(OCRI18n.t('content_msg_changes_saved'), 'success');
+        announceA11y(OCRI18n.t('content_msg_changes_saved'));
+        setTimeout(() => {
+          if (saveChangesBtn.isConnected) {
+            saveChangesBtn.textContent = OCRI18n.t('content_btn_save_changes');
+            updateSaveButtonState();
+          }
+        }, 1500);
+      } catch (error) {
+        console.error('保存识别结果修改失败:', error);
+        showNotification(OCRI18n.t('content_msg_changes_save_failed'), 'error');
+        announceA11y(OCRI18n.t('content_msg_changes_save_failed'));
+        updateSaveButtonState();
+      }
+    });
 
     copyBtn.addEventListener('click', async () => {
       try {
@@ -1861,8 +1956,12 @@
    */
   function messageListener(request, _sender, sendResponse) {
     if (request.action === 'startCapture') {
-      startCapture();
-      sendResponse({ success: true });
+      i18nReady.then(() => {
+        startCapture();
+        sendResponse({ success: true });
+      }).catch((error) => {
+        sendResponse({ success: false, error: error.message });
+      });
     }
     return true;
   }

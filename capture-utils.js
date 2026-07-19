@@ -57,8 +57,37 @@
     };
   }
 
+  /**
+   * Fit image dimensions within edge and pixel-count limits while preserving
+   * their aspect ratio.
+   *
+   * @param {number} width
+   * @param {number} height
+   * @param {{maxEdge: number, maxPixels: number}} limits
+   * @returns {{width: number, height: number, scale: number}}
+   */
+  function fitImageWithinLimits(width, height, limits) {
+    const values = [width, height, limits?.maxEdge, limits?.maxPixels];
+    if (values.some((value) => !Number.isFinite(value) || value <= 0)) {
+      throw new TypeError('Image dimensions and limits must be positive finite numbers');
+    }
+
+    const edgeScale = limits.maxEdge / Math.max(width, height);
+    const pixelScale = Math.sqrt(limits.maxPixels / (width * height));
+    const scale = Math.min(1, edgeScale, pixelScale);
+    const fittedWidth = Math.max(1, Math.floor(width * scale));
+    const fittedHeight = Math.max(1, Math.floor(height * scale));
+
+    return {
+      width: fittedWidth,
+      height: fittedHeight,
+      scale
+    };
+  }
+
   return {
     createRequestId,
-    computeCropScale
+    computeCropScale,
+    fitImageWithinLimits
   };
 });

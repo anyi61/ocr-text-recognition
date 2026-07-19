@@ -48,10 +48,14 @@
     aliyun: ['apiKey'],
     zhipu: ['apiKey'],
     'openai-compatible': ['endpoint', 'apiKey', 'model'],
-    custom: ['endpoint', 'apiKey', 'model']
+    custom: ['endpoint']
   });
 
-  const SENSITIVE_FIELDS = new Set(['apiKey', 'secret']);
+  const SENSITIVE_FIELDS = new Set(['apiKey', 'secret', 'headerValue']);
+  const CONFIGURABLE_PROVIDERS = new Set(['openai-compatible', 'custom']);
+  const AUTH_MODES = new Set(['bearer', 'api-key', 'custom-header', 'none']);
+  const REQUEST_MODES = new Set(['chat-completions', 'responses']);
+  const FORBIDDEN_HEADER_NAMES = new Set(['host', 'origin', 'content-length']);
   const RETIRED_MODEL_MIGRATIONS = Object.freeze({
     claude: Object.freeze({
       'claude-3-opus-20240229': 'claude-sonnet-5',
@@ -86,7 +90,7 @@
     }
 
     const config = apiConfigs[getStorageKey(provider)];
-    return config && typeof config === 'object' ? config : {};
+    return normalizeConfig(provider, config && typeof config === 'object' ? config : {});
   }
 
   function getLegacyConfig(legacy, provider) {
@@ -102,15 +106,45 @@
     );
   }
 
+  function normalizeConfig(provider, config) {
+    const normalized = { ...(config || {}) };
+    if (CONFIGURABLE_PROVIDERS.has(provider)) {
+      normalized.authMode = AUTH_MODES.has(normalized.authMode)
+        ? normalized.authMode
+        : 'bearer';
+      normalized.requestMode = REQUEST_MODES.has(normalized.requestMode)
+        ? normalized.requestMode
+        : 'chat-completions';
+    }
+    return normalized;
+  }
+
+  function isValidHeaderName(value) {
+    if (typeof value !== 'string' || !/^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/.test(value)) {
+      return false;
+    }
+    return !FORBIDDEN_HEADER_NAMES.has(value.toLowerCase());
+  }
+
   function hasRequiredCredentials(apiConfigs, provider, legacy = {}) {
-    const config = {
+    const config = normalizeConfig(provider, {
       ...getLegacyConfig(legacy, provider),
       ...getProviderConfig(apiConfigs, provider)
-    };
+    });
     const requiredFields = REQUIRED_FIELDS[provider];
 
-    return Array.isArray(requiredFields)
-      && requiredFields.every((field) => isPresent(config[field]));
+    if (!Array.isArray(requiredFields) || !requiredFields.every((field) => isPresent(config[field]))) {
+      return false;
+    }
+    if (CONFIGURABLE_PROVIDERS.has(provider)) {
+      if (config.authMode !== 'none' && !isPresent(config.apiKey)) {
+        return false;
+      }
+      if (config.authMode === 'custom-header' && !isValidHeaderName(config.headerName)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   function redactApiConfigs(apiConfigs) {
@@ -206,6 +240,8 @@
   return Object.freeze({
     getStorageKey,
     getProviderConfig,
+    normalizeConfig,
+    isValidHeaderName,
     hasRequiredCredentials,
     redactApiConfigs,
     getEndpointOriginPattern,
