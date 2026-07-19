@@ -4,6 +4,11 @@
  */
 
 (function() {
+  if (window.ocrCaptureInitialized) {
+    return;
+  }
+  window.ocrCaptureInitialized = true;
+
   // 使用统一的 OCRI18n API（来自 i18n-runtime.js）
   OCRI18n.init().catch((error) => {
     console.error('i18n init failed in content script:', error);
@@ -58,6 +63,7 @@
   let progressTimer = null;
   let progressStartTime = null;
   let isCancelled = false;
+  let activeRequestId = null;
 
   // Shadow DOM 相关变量
   let shadowHost = null;      // Shadow DOM 宿主元素
@@ -1318,6 +1324,9 @@
 
   // 截取并识别
   async function captureAndRecognize(rect) {
+    isCancelled = false;
+    let requestId = null;
+
     try {
       showProgressNotification(OCRI18n.t('content_progress_capturing'), false);
       announceA11y(OCRI18n.t('content_a11y_capturing'));
@@ -1346,14 +1355,19 @@
       showProgressNotification(OCRI18n.t('content_progress_recognizing'), true);
       announceA11y(OCRI18n.t('content_a11y_recognizing'));
 
+      requestId = OCRCaptureUtils.createRequestId();
+      activeRequestId = requestId;
+
       // 发送给background进行OCR识别
       const ocrResponse = await chrome.runtime.sendMessage({
         action: 'performOCR',
+        requestId,
         imageData: croppedImage
       });
 
       // 检查是否被取消
-      if (isCancelled) return;
+      if (isCancelled || activeRequestId !== requestId) return;
+      activeRequestId = null;
 
       // 计算识别用时
       const elapsed = progressStartTime ? Math.floor((Date.now() - progressStartTime) / 1000) : 0;
@@ -1374,6 +1388,10 @@
         showNotification(OCRI18n.t('content_msg_recognition_failed') + ': ' + error.message, 'error');
         announceA11y(OCRI18n.t('content_a11y_failed') + ': ' + error.message);
       }
+    } finally {
+      if (requestId && activeRequestId === requestId) {
+        activeRequestId = null;
+      }
     }
   }
 
@@ -1391,22 +1409,28 @@
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
 
-        // 考虑设备像素比
-        const scale = window.devicePixelRatio || 1;
+        const imageWidth = img.naturalWidth || img.width;
+        const imageHeight = img.naturalHeight || img.height;
+        const scale = OCRCaptureUtils.computeCropScale(
+          imageWidth,
+          imageHeight,
+          window.innerWidth,
+          window.innerHeight
+        );
 
-        canvas.width = rect.width * scale;
-        canvas.height = rect.height * scale;
+        canvas.width = rect.width * scale.x;
+        canvas.height = rect.height * scale.y;
 
         ctx.drawImage(
           img,
-          rect.left * scale,
-          rect.top * scale,
-          rect.width * scale,
-          rect.height * scale,
+          rect.left * scale.x,
+          rect.top * scale.y,
+          rect.width * scale.x,
+          rect.height * scale.y,
           0,
           0,
-          rect.width * scale,
-          rect.height * scale
+          rect.width * scale.x,
+          rect.height * scale.y
         );
 
         resolve(canvas.toDataURL('image/png'));
@@ -1724,7 +1748,6 @@
       initShadowDOM();
     }
 
-    isCancelled = false;
     const notification = document.createElement('div');
     notification.id = 'ocr-progress-notification';
     notification.innerHTML = `
@@ -1758,9 +1781,20 @@
       const cancelBtn = notification.querySelector('.ocr-progress-cancel');
       if (cancelBtn) {
         cancelBtn.addEventListener('click', () => {
+          const requestId = activeRequestId;
           isCancelled = true;
+          activeRequestId = null;
           hideProgressNotification();
           showNotification(OCRI18n.t('content_msg_recognition_cancelled'), 'warning');
+
+          if (requestId) {
+            chrome.runtime.sendMessage({
+              action: 'cancelOCR',
+              requestId
+            }).catch((error) => {
+              console.debug('取消 OCR 请求消息发送失败:', error);
+            });
+          }
         });
       }
     }
@@ -1803,6 +1837,10 @@
    */
   function startCapture() {
     if (isCapturing) return;
+    if (activeRequestId) {
+      showNotification(OCRI18n.t('content_progress_recognizing'), 'warning');
+      return;
+    }
 
     isCapturing = true;
     createOverlay();

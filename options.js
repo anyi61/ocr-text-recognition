@@ -64,6 +64,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const exportBtn = document.getElementById('exportBtn');
   const importBtn = document.getElementById('importBtn');
   const importFileInput = document.getElementById('importFileInput');
+  const includeApiKeys = document.getElementById('includeApiKeys');
 
   /**
    * 根据提供商显示对应的配置区块
@@ -131,38 +132,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     const configs = result.apiConfigs || {};
 
     // Claude 配置
-    const claudeConfig = configs.claude || {};
+    const claudeConfig = OCRProviderConfig.getProviderConfig(configs, 'claude');
     claudeApiKey.value = claudeConfig.apiKey || result.apiKey || '';
-    claudeModel.value = claudeConfig.model || result.model || 'claude-3-5-sonnet-latest';
+    claudeModel.value = OCRProviderConfig.migrateRetiredModel(
+      'claude',
+      claudeConfig.model || result.model || 'claude-sonnet-5'
+    );
 
     // OpenAI 配置
-    const openaiConfig = configs.openai || {};
+    const openaiConfig = OCRProviderConfig.getProviderConfig(configs, 'openai');
     openaiApiKey.value = openaiConfig.apiKey || result.openaiApiKey || '';
-    openaiModel.value = openaiConfig.model || result.openaiModel || 'gpt-4o';
+    openaiModel.value = OCRProviderConfig.migrateRetiredModel(
+      'openai',
+      openaiConfig.model || result.openaiModel || 'gpt-5-mini'
+    );
 
     // 百度配置
-    const baiduConfig = configs.baidu || {};
+    const baiduConfig = OCRProviderConfig.getProviderConfig(configs, 'baidu');
     baiduApiKey.value = baiduConfig.apiKey || result.baiduApiKey || '';
     baiduSecret.value = baiduConfig.secret || result.customSecret || '';
 
     // 阿里云配置
-    const aliyunCfg = configs.aliyun || {};
+    const aliyunCfg = OCRProviderConfig.getProviderConfig(configs, 'aliyun');
     aliyunApiKey.value = aliyunCfg.apiKey || result.aliyunApiKey || '';
     aliyunModel.value = aliyunCfg.model || result.aliyunModel || 'qwen-vl-max';
 
     // 智谱AI配置
-    const zhipuCfg = configs.zhipu || {};
+    const zhipuCfg = OCRProviderConfig.getProviderConfig(configs, 'zhipu');
     zhipuApiKey.value = zhipuCfg.apiKey || result.zhipuApiKey || '';
     zhipuModel.value = zhipuCfg.model || result.zhipuModel || 'glm-4v';
 
     // 通用OpenAI兼容接口配置
-    const compatibleCfg = configs.openaiCompatible || {};
+    const compatibleCfg = OCRProviderConfig.getProviderConfig(configs, 'openai-compatible');
     compatibleEndpoint.value = compatibleCfg.endpoint || result.compatibleEndpoint || '';
     compatibleApiKey.value = compatibleCfg.apiKey || result.compatibleApiKey || '';
     compatibleModel.value = compatibleCfg.model || result.compatibleModel || '';
 
     // 自定义API配置
-    const customCfg = configs.custom || {};
+    const customCfg = OCRProviderConfig.getProviderConfig(configs, 'custom');
     customEndpointInput.value = customCfg.endpoint || result.customEndpoint || '';
     customApiKeyInput.value = customCfg.apiKey || result.customApiKey || '';
     customModelInput.value = customCfg.model || result.customModel || '';
@@ -398,6 +405,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         break;
     }
 
+    const configKey = OCRProviderConfig.getStorageKey(provider);
+    if (
+      fieldErrors.length === 0
+      && !OCRProviderConfig.hasRequiredCredentials({ [configKey]: config }, provider)
+    ) {
+      fieldErrors.push('apiKey');
+    }
+
     if (fieldErrors.length > 0) {
       const messages = {
         apiKey: 'API Key',
@@ -416,6 +431,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     return { valid: true, message: '', fieldErrors: [] };
+  }
+
+  async function requestEndpointPermission(provider, config) {
+    if (provider !== 'openai-compatible' && provider !== 'custom') {
+      return true;
+    }
+
+    return OCRExtensionRuntime.requestEndpointPermission(
+      chrome,
+      provider,
+      config.endpoint
+    );
   }
 
   /**
@@ -491,6 +518,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 清除之前的错误状态
     showFieldErrors([], provider);
 
+    const providerConfig = getProviderConfig(provider);
+    const permissionGranted = await requestEndpointPermission(provider, providerConfig);
+    if (!permissionGranted) {
+      showStatus(OCRI18n.t('msg_endpoint_permission_denied'), 'error');
+      return;
+    }
+
     testBtn.disabled = true;
     showStatus(OCRI18n.t('msg_testing'), 'loading');
 
@@ -509,7 +543,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         break;
       case 'openai':
         config.apiKey = openaiApiKey.value;
-        config.model = openaiModel.value || 'gpt-4o';
+        config.model = openaiModel.value || 'gpt-5-mini';
         break;
       case 'baidu':
         config.apiKey = baiduApiKey.value;
@@ -656,7 +690,7 @@ document.addEventListener('DOMContentLoaded', async () => {
    * 导出配置到JSON文件
    * @async
    * @returns {Promise<void>}
-   * @description 将当前配置导出为JSON文件下载，不包含敏感的历史记录数据
+   * @description 将当前配置导出为JSON文件下载；默认移除所有API凭据
    */
   async function exportConfig() {
     try {
@@ -667,14 +701,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         'apiProvider', 'apiConfigs', 'prompt', 'language'
       ]);
 
+      const apiConfigs = result.apiConfigs || {};
+      const exportedApiConfigs = includeApiKeys.checked
+        ? apiConfigs
+        : OCRProviderConfig.redactApiConfigs(apiConfigs);
+
       // 构建导出数据结构
       const exportData = {
-        version: '1.0.0',
+        version: '1.1.0',
         exportDate: new Date().toISOString(),
         appName: 'OCR文字识别助手',
         config: {
           apiProvider: result.apiProvider || 'claude',
-          apiConfigs: result.apiConfigs || {},
+          apiConfigs: exportedApiConfigs,
           prompt: result.prompt || '',
           language: result.language || 'auto'
         }
@@ -897,45 +936,35 @@ document.addEventListener('DOMContentLoaded', async () => {
       // 应用配置
       showStatus(OCRI18n.t('msg_applying_config'), 'loading');
 
-      // 构建要保存的配置
+      const existingSettings = await chrome.storage.local.get([
+        'apiConfigs',
+        'apiKey', 'model', 'customEndpoint', 'customSecret', 'customModel',
+        'openaiApiKey', 'openaiModel', 'baiduApiKey',
+        'aliyunApiKey', 'aliyunModel', 'zhipuApiKey', 'zhipuModel',
+        'compatibleEndpoint', 'compatibleApiKey', 'compatibleModel',
+        'customApiKey'
+      ]);
+      const importedApiConfigs = validation.config.apiConfigs || {};
+      const existingApiConfigs = existingSettings.apiConfigs || {};
+      const mergedApiConfigs = OCRProviderConfig.mergeImportedApiConfigs(
+        existingApiConfigs,
+        importedApiConfigs
+      );
+
+      // 构建要保存的配置。缺少凭据字段的脱敏导出会保留本机已有密钥；
+      // 旧版明文导出仍会覆盖对应字段。
       const settingsToSave = {
         apiProvider: validation.config.apiProvider || 'claude',
-        apiConfigs: validation.config.apiConfigs || {},
+        apiConfigs: mergedApiConfigs,
         prompt: validation.config.prompt || '',
         language: validation.config.language || 'auto'
       };
 
-      // 为了兼容性，也保存旧格式字段
-      if (settingsToSave.apiConfigs.claude) {
-        settingsToSave.apiKey = settingsToSave.apiConfigs.claude.apiKey || '';
-        settingsToSave.model = settingsToSave.apiConfigs.claude.model || 'claude-3-5-sonnet-latest';
-      }
-      if (settingsToSave.apiConfigs.openai) {
-        settingsToSave.openaiApiKey = settingsToSave.apiConfigs.openai.apiKey || '';
-        settingsToSave.openaiModel = settingsToSave.apiConfigs.openai.model || 'gpt-4o';
-      }
-      if (settingsToSave.apiConfigs.baidu) {
-        settingsToSave.baiduApiKey = settingsToSave.apiConfigs.baidu.apiKey || '';
-        settingsToSave.customSecret = settingsToSave.apiConfigs.baidu.secret || '';
-      }
-      if (settingsToSave.apiConfigs.aliyun) {
-        settingsToSave.aliyunApiKey = settingsToSave.apiConfigs.aliyun.apiKey || '';
-        settingsToSave.aliyunModel = settingsToSave.apiConfigs.aliyun.model || 'qwen-vl-max';
-      }
-      if (settingsToSave.apiConfigs.zhipu) {
-        settingsToSave.zhipuApiKey = settingsToSave.apiConfigs.zhipu.apiKey || '';
-        settingsToSave.zhipuModel = settingsToSave.apiConfigs.zhipu.model || 'glm-4v';
-      }
-      if (settingsToSave.apiConfigs.openaiCompatible) {
-        settingsToSave.compatibleEndpoint = settingsToSave.apiConfigs.openaiCompatible.endpoint || '';
-        settingsToSave.compatibleApiKey = settingsToSave.apiConfigs.openaiCompatible.apiKey || '';
-        settingsToSave.compatibleModel = settingsToSave.apiConfigs.openaiCompatible.model || '';
-      }
-      if (settingsToSave.apiConfigs.custom) {
-        settingsToSave.customEndpoint = settingsToSave.apiConfigs.custom.endpoint || '';
-        settingsToSave.customApiKey = settingsToSave.apiConfigs.custom.apiKey || '';
-        settingsToSave.customModel = settingsToSave.apiConfigs.custom.model || '';
-      }
+      // 为了兼容性，也保存旧格式字段；脱敏导入会保留本机已有凭据。
+      Object.assign(
+        settingsToSave,
+        OCRProviderConfig.buildLegacySettings(settingsToSave.apiConfigs, existingSettings)
+      );
 
       // 保存到chrome.storage
       await chrome.storage.local.set(settingsToSave);

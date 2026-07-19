@@ -3,6 +3,10 @@
  * @description 处理截图、OCR识别请求、API调用和历史记录管理
  */
 
+importScripts('provider-config.js', 'extension-runtime.js', 'background-core.js');
+
+const ocrRequestRegistry = OCRBackgroundCore.createRequestRegistry();
+
 /**
  * API配置对象
  * @typedef {Object} APIConfig
@@ -44,7 +48,7 @@ chrome.runtime.onInstalled.addListener(() => {
     if (!result.apiProvider) {
       chrome.storage.local.set({
         apiProvider: 'claude',
-        model: 'claude-3-opus-20240229',
+        model: 'claude-sonnet-5',
         language: 'auto',
         prompt: '请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。'
       });
@@ -60,7 +64,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'performOCR') {
-    handleOCR(request.imageData, sendResponse);
+    handleOCR(request.imageData, request.requestId, sendResponse);
+    return true;
+  }
+
+  if (request.action === 'cancelOCR') {
+    const cancelled = ocrRequestRegistry.cancel(request.requestId);
+    sendResponse({ success: true, cancelled });
     return true;
   }
 
@@ -93,11 +103,16 @@ async function handleCapture(sendResponse) {
  * 处理OCR识别请求
  * @async
  * @param {string} imageData - Base64编码的图片数据
+ * @param {string} requestId - 本次OCR请求ID
  * @param {Function} sendResponse - Chrome消息回调函数
  * @returns {Promise<void>}
  * @description 根据配置调用对应的API进行OCR识别，并保存历史记录
  */
-async function handleOCR(imageData, sendResponse) {
+async function handleOCR(imageData, requestId, sendResponse) {
+  const effectiveRequestId = requestId || `legacy-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const controller = ocrRequestRegistry.start(effectiveRequestId);
+  const { signal } = controller;
+
   try {
     // 获取配置 - 优先从新的 apiConfigs 结构读取
     const result = await chrome.storage.local.get([
@@ -118,38 +133,38 @@ async function handleOCR(imageData, sendResponse) {
 
     switch (provider) {
       case 'claude': {
-        const claude = configs.claude || {};
+        const claude = OCRProviderConfig.getProviderConfig(configs, provider);
         config.apiKey = claude.apiKey || result.apiKey;
-        config.model = claude.model || result.model || 'claude-3-opus-20240229';
+        config.model = claude.model || result.model || 'claude-sonnet-5';
         break;
       }
       case 'openai': {
-        const openai = configs.openai || {};
+        const openai = OCRProviderConfig.getProviderConfig(configs, provider);
         config.apiKey = openai.apiKey || result.openaiApiKey;
-        config.model = openai.model || result.openaiModel || 'gpt-4o';
+        config.model = openai.model || result.openaiModel || 'gpt-5-mini';
         break;
       }
       case 'baidu': {
-        const baidu = configs.baidu || {};
+        const baidu = OCRProviderConfig.getProviderConfig(configs, provider);
         config.apiKey = baidu.apiKey || result.baiduApiKey;
         config.customSecret = baidu.secret || result.customSecret;
         break;
       }
       case 'aliyun': {
-        const aliyun = configs.aliyun || {};
+        const aliyun = OCRProviderConfig.getProviderConfig(configs, provider);
         config.apiKey = aliyun.apiKey || result.aliyunApiKey;
         config.customModel = aliyun.model || result.aliyunModel || 'qwen-vl-max';
         config.model = config.customModel;
         break;
       }
       case 'zhipu': {
-        const zhipu = configs.zhipu || {};
+        const zhipu = OCRProviderConfig.getProviderConfig(configs, provider);
         config.apiKey = zhipu.apiKey || result.zhipuApiKey;
         config.model = zhipu.model || result.zhipuModel || 'glm-4v';
         break;
       }
       case 'openai-compatible': {
-        const compatible = configs.openaiCompatible || {};
+        const compatible = OCRProviderConfig.getProviderConfig(configs, provider);
         config.apiKey = compatible.apiKey || result.compatibleApiKey;
         config.customEndpoint = compatible.endpoint || result.compatibleEndpoint;
         config.customModel = compatible.model || result.compatibleModel;
@@ -157,7 +172,7 @@ async function handleOCR(imageData, sendResponse) {
         break;
       }
       case 'custom': {
-        const custom = configs.custom || {};
+        const custom = OCRProviderConfig.getProviderConfig(configs, provider);
         config.apiKey = custom.apiKey || result.customApiKey;
         config.customEndpoint = custom.endpoint || result.customEndpoint;
         config.customModel = custom.model || result.customModel;
@@ -167,6 +182,7 @@ async function handleOCR(imageData, sendResponse) {
     }
 
     config.apiProvider = provider;
+    config.model = OCRProviderConfig.migrateRetiredModel(provider, config.model);
 
     if (!config.apiKey) {
       sendResponse({ success: false, error: '未配置API密钥' });
@@ -179,37 +195,48 @@ async function handleOCR(imageData, sendResponse) {
     let ocrResult;
     switch (config.apiProvider) {
       case 'claude':
-        ocrResult = await callClaudeAPI(base64Image, config);
+        ocrResult = await callClaudeAPI(base64Image, config, signal);
         break;
       case 'openai':
-        ocrResult = await callOpenAIAPI(base64Image, config);
+        ocrResult = await callOpenAIAPI(base64Image, config, signal);
         break;
       case 'baidu':
-        ocrResult = await callBaiduOCR(base64Image, config);
+        ocrResult = await callBaiduOCR(base64Image, config, signal);
         break;
       case 'custom':
-        ocrResult = await callCustomAPI(base64Image, config);
+        ocrResult = await callCustomAPI(base64Image, config, signal);
         break;
       case 'aliyun':
-        ocrResult = await callAliyunOCR(base64Image, config);
+        ocrResult = await callAliyunOCR(base64Image, config, signal);
         break;
       case 'zhipu':
-        ocrResult = await callZhipuAPI(base64Image, config);
+        ocrResult = await callZhipuAPI(base64Image, config, signal);
         break;
       case 'openai-compatible':
-        ocrResult = await callOpenAICompatibleAPI(base64Image, config);
+        ocrResult = await callOpenAICompatibleAPI(base64Image, config, signal);
         break;
       default:
         throw new Error('未知的API提供商');
     }
 
+    if (signal.aborted) {
+      throw new DOMException('OCR request cancelled', 'AbortError');
+    }
+
     // 保存到历史记录
-    await saveToHistory(ocrResult);
+    await saveToHistory(ocrResult, signal);
+    OCRBackgroundCore.throwIfAborted(signal);
 
     sendResponse({ success: true, text: ocrResult });
   } catch (error) {
+    if (OCRBackgroundCore.isAbortError(error) || signal.aborted) {
+      sendResponse({ success: false, cancelled: true, error: '识别已取消' });
+      return;
+    }
     console.error('OCR识别失败:', error);
     sendResponse({ success: false, error: error.message });
+  } finally {
+    ocrRequestRegistry.finish(effectiveRequestId, controller);
   }
 }
 
@@ -219,28 +246,13 @@ async function handleOCR(imageData, sendResponse) {
  * @param {string} text - 识别结果文本
  * @returns {Promise<void>}
  */
-async function saveToHistory(text) {
+async function saveToHistory(text, signal) {
   try {
-    const result = await chrome.storage.local.get(['ocrHistory']);
-    let history = result.ocrHistory || [];
-
-    // 添加新记录到开头
-    const newRecord = {
-      id: Date.now(),
-      text: text,
-      timestamp: Date.now(),
-      date: new Date().toLocaleString('zh-CN')
-    };
-
-    history.unshift(newRecord);
-
-    // 只保留最近10条
-    if (history.length > 10) {
-      history = history.slice(0, 10);
-    }
-
-    await chrome.storage.local.set({ ocrHistory: history });
+    await OCRBackgroundCore.saveHistoryRecord(chrome.storage.local, text, signal);
   } catch (error) {
+    if (OCRBackgroundCore.isAbortError(error)) {
+      throw error;
+    }
     console.error('保存历史记录失败:', error);
   }
 }
@@ -292,13 +304,14 @@ async function safeJsonParse(response) {
  * @throws {Error} 网络错误或API错误时抛出
  * @description 统一处理网络错误、响应检查、错误解析和 JSON 解析
  */
-async function apiRequest(endpoint, headers, body, errorPrefix) {
+async function apiRequest(endpoint, headers, body, errorPrefix, signal) {
   let response;
   try {
     response = await fetch(endpoint, {
       method: 'POST',
       headers,
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal
     });
   } catch (networkError) {
     if (networkError.name === 'TypeError' || networkError.message?.includes('fetch')) {
@@ -322,10 +335,9 @@ async function apiRequest(endpoint, headers, body, errorPrefix) {
  * @param {string} base64Image - base64 编码的图片
  * @returns {Object} OpenAI兼容格式的请求体
  */
-function buildOpenAIRequestBody(model, prompt, base64Image) {
-  return {
+function buildOpenAIRequestBody(model, prompt, base64Image, preferMaxCompletionTokens = false) {
+  const body = {
     model,
-    max_tokens: 4096,
     messages: [{
       role: 'user',
       content: [
@@ -339,6 +351,14 @@ function buildOpenAIRequestBody(model, prompt, base64Image) {
       ]
     }]
   };
+
+  if (preferMaxCompletionTokens && /^(gpt-5|o[1-9])/.test(model)) {
+    body.max_completion_tokens = 4096;
+  } else {
+    body.max_tokens = 4096;
+  }
+
+  return body;
 }
 
 /**
@@ -349,9 +369,9 @@ function buildOpenAIRequestBody(model, prompt, base64Image) {
  * @returns {Promise<string>} 识别结果文本
  * @throws {Error} API调用失败时抛出
  */
-async function callClaudeAPI(base64Image, config) {
-  const model = config.model || 'claude-3-opus-20240229';
-  const prompt = config.prompt || '请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。';
+async function callClaudeAPI(base64Image, config, signal) {
+  const model = config.model || 'claude-sonnet-5';
+  const prompt = OCRBackgroundCore.buildRecognitionPrompt(config.prompt, config.language);
 
   const body = buildOpenAIRequestBody(model, prompt, base64Image);
   // Claude 使用不同的图片格式
@@ -372,7 +392,8 @@ async function callClaudeAPI(base64Image, config) {
       'anthropic-version': '2023-06-01'
     },
     body,
-    'Claude API错误'
+    'Claude API错误',
+    signal
   );
 
   return data.content?.[0]?.text || '';
@@ -386,9 +407,9 @@ async function callClaudeAPI(base64Image, config) {
  * @returns {Promise<string>} 识别结果文本
  * @throws {Error} API调用失败时抛出
  */
-async function callOpenAIAPI(base64Image, config) {
-  const model = config.model || 'gpt-4o';
-  const prompt = config.prompt || '请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。';
+async function callOpenAIAPI(base64Image, config, signal) {
+  const model = config.model || 'gpt-5-mini';
+  const prompt = OCRBackgroundCore.buildRecognitionPrompt(config.prompt, config.language);
 
   const data = await apiRequest(
     'https://api.openai.com/v1/chat/completions',
@@ -396,8 +417,9 @@ async function callOpenAIAPI(base64Image, config) {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${config.apiKey}`
     },
-    buildOpenAIRequestBody(model, prompt, base64Image),
-    'OpenAI API错误'
+    buildOpenAIRequestBody(model, prompt, base64Image, true),
+    'OpenAI API错误',
+    signal
   );
 
   return data.choices?.[0]?.message?.content || '';
@@ -412,13 +434,13 @@ async function callOpenAIAPI(base64Image, config) {
  * @throws {Error} API调用失败时抛出
  * @description 需要先获取access_token，然后调用OCR接口
  */
-async function callBaiduOCR(base64Image, config) {
+async function callBaiduOCR(base64Image, config, signal) {
   let tokenResponse;
   try {
     // 首先获取access_token
     tokenResponse = await fetch(
       `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${config.apiKey}&client_secret=${config.customSecret || ''}`,
-      { method: 'POST' }
+      { method: 'POST', signal }
     );
   } catch (networkError) {
     throw new Error('网络连接失败，无法连接到百度服务器');
@@ -455,7 +477,8 @@ async function callBaiduOCR(base64Image, config) {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         },
-        body: `image=${encodeURIComponent(base64Image)}`
+        body: `image=${encodeURIComponent(base64Image)}&language_type=${encodeURIComponent(OCRBackgroundCore.getBaiduLanguageType(config.language))}`,
+        signal
       }
     );
   } catch (networkError) {
@@ -491,10 +514,13 @@ async function callBaiduOCR(base64Image, config) {
  * @throws {Error} API调用失败时抛出
  * @description 支持任何OpenAI格式API，自动适配多种响应格式
  */
-async function callCustomAPI(base64Image, config) {
+async function callCustomAPI(base64Image, config, signal) {
   const endpoint = config.customEndpoint;
   const model = config.customModel || '';
-  const prompt = config.prompt || '请识别图片中的文字内容';
+  const prompt = OCRBackgroundCore.buildRecognitionPrompt(
+    config.prompt || '请识别图片中的文字内容',
+    config.language
+  );
 
   if (!endpoint) {
     throw new Error('未配置自定义API端点');
@@ -507,7 +533,8 @@ async function callCustomAPI(base64Image, config) {
       'Authorization': `Bearer ${config.apiKey}`
     },
     buildOpenAIRequestBody(model, prompt, base64Image),
-    '自定义API错误'
+    '自定义API错误',
+    signal
   );
 
   // 尝试常见的响应格式
@@ -526,7 +553,7 @@ async function callCustomAPI(base64Image, config) {
  * @returns {Promise<string>} 识别结果文本
  * @throws {Error} API调用失败时抛出
  */
-async function callAliyunOCR(base64Image, config) {
+async function callAliyunOCR(base64Image, config, signal) {
   const apiKey = config.apiKey;
 
   if (!apiKey) {
@@ -534,7 +561,7 @@ async function callAliyunOCR(base64Image, config) {
   }
 
   const model = config.customModel || 'qwen-vl-max';
-  const prompt = config.prompt || '请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。';
+  const prompt = OCRBackgroundCore.buildRecognitionPrompt(config.prompt, config.language);
 
   const data = await apiRequest(
     'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
@@ -543,7 +570,8 @@ async function callAliyunOCR(base64Image, config) {
       'Authorization': `Bearer ${apiKey}`
     },
     buildOpenAIRequestBody(model, prompt, base64Image),
-    '阿里云OCR错误'
+    '阿里云OCR错误',
+    signal
   );
 
   return data.choices?.[0]?.message?.content || '';
@@ -558,9 +586,9 @@ async function callAliyunOCR(base64Image, config) {
  * @throws {Error} API调用失败时抛出
  * @description 智谱API不支持max_tokens参数，需要特殊处理
  */
-async function callZhipuAPI(base64Image, config) {
+async function callZhipuAPI(base64Image, config, signal) {
   const model = config.model || 'glm-4v';
-  const prompt = config.prompt || '请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。';
+  const prompt = OCRBackgroundCore.buildRecognitionPrompt(config.prompt, config.language);
 
   // 智谱API不支持 max_tokens 参数，需要手动构建请求体
   const body = {
@@ -586,7 +614,8 @@ async function callZhipuAPI(base64Image, config) {
       'Authorization': `Bearer ${config.apiKey}`
     },
     body,
-    '智谱AI错误'
+    '智谱AI错误',
+    signal
   );
 
   return data.choices?.[0]?.message?.content || '';
@@ -601,10 +630,10 @@ async function callZhipuAPI(base64Image, config) {
  * @throws {Error} API调用失败时抛出
  * @description 兼容多种响应格式，支持硅基流动、DeepSeek等服务商
  */
-async function callOpenAICompatibleAPI(base64Image, config) {
+async function callOpenAICompatibleAPI(base64Image, config, signal) {
   const endpoint = config.customEndpoint || 'https://api.openai.com/v1/chat/completions';
-  const model = config.customModel || 'gpt-4o';
-  const prompt = config.prompt || '请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。';
+  const model = config.customModel || 'gpt-5-mini';
+  const prompt = OCRBackgroundCore.buildRecognitionPrompt(config.prompt, config.language);
 
   if (!endpoint) {
     throw new Error('未配置API端点');
@@ -617,7 +646,8 @@ async function callOpenAICompatibleAPI(base64Image, config) {
       'Authorization': `Bearer ${config.apiKey}`
     },
     buildOpenAIRequestBody(model, prompt, base64Image),
-    'API错误'
+    'API错误',
+    signal
   );
 
   // 兼容不同格式的响应
@@ -652,7 +682,7 @@ async function testAPIConnection(config, sendResponse) {
         normalizedConfig.customModel = config.customModel || config.model || 'qwen-vl-max';
         break;
       case 'openai':
-        normalizedConfig.model = config.model || 'gpt-4o';
+        normalizedConfig.model = config.model || 'gpt-5-mini';
         break;
       case 'zhipu':
         normalizedConfig.model = config.model || 'glm-4v';
@@ -717,16 +747,22 @@ chrome.commands.onCommand.addListener(async (command) => {
       }
 
       // 检查是否已配置API
-      const result = await chrome.storage.local.get(['apiProvider', 'apiConfigs', 'apiKey']);
+      const result = await chrome.storage.local.get([
+        'apiProvider', 'apiConfigs',
+        'apiKey', 'model',
+        'openaiApiKey', 'openaiModel',
+        'baiduApiKey', 'customSecret',
+        'aliyunApiKey', 'aliyunModel',
+        'zhipuApiKey', 'zhipuModel',
+        'compatibleEndpoint', 'compatibleApiKey', 'compatibleModel',
+        'customEndpoint', 'customApiKey', 'customModel'
+      ]);
       const provider = result.apiProvider || 'claude';
-      const configs = result.apiConfigs || {};
-
-      let hasApiKey = false;
-      if (configs[provider] && configs[provider].apiKey) {
-        hasApiKey = true;
-      } else if (provider === 'claude' && result.apiKey) {
-        hasApiKey = true;
-      }
+      const hasApiKey = OCRProviderConfig.hasRequiredCredentials(
+        result.apiConfigs,
+        provider,
+        result
+      );
 
       if (!hasApiKey) {
         // 显示通知提示用户配置API
@@ -739,30 +775,37 @@ chrome.commands.onCommand.addListener(async (command) => {
         return;
       }
 
-      // 向内容脚本发送消息，启动截图模式
-      await chrome.tabs.sendMessage(tab.id, { action: 'startCapture' });
+      if (provider === 'openai-compatible' || provider === 'custom') {
+        const config = OCRProviderConfig.getProviderConfig(result.apiConfigs, provider);
+        const legacyEndpoint = provider === 'openai-compatible'
+          ? result.compatibleEndpoint
+          : result.customEndpoint;
+        const hasEndpointPermission = await OCRExtensionRuntime.hasEndpointPermission(
+          chrome,
+          provider,
+          config.endpoint || legacyEndpoint
+        );
+
+        if (!hasEndpointPermission) {
+          chrome.notifications.create({
+            type: 'basic',
+            iconUrl: 'icons/icon128.png',
+            title: 'OCR文字识别助手',
+            message: '请先在插件弹窗中授权访问自定义 API 域名'
+          });
+          return;
+        }
+      }
+
+      await OCRExtensionRuntime.startCaptureInTab(chrome, tab.id);
     } catch (error) {
       console.error('快捷键启动截图失败:', error);
-      // 可能是内容脚本未加载，尝试注入
-      try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (tab) {
-          await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            files: ['content.js']
-          });
-          // 再次尝试启动截图
-          await chrome.tabs.sendMessage(tab.id, { action: 'startCapture' });
-        }
-      } catch (injectError) {
-        console.error('注入内容脚本失败:', injectError);
-        chrome.notifications.create({
-          type: 'basic',
-          iconUrl: 'icons/icon128.png',
-          title: 'OCR文字识别助手',
-          message: '无法在当前页面使用截图功能，请刷新页面后重试'
-        });
-      }
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: 'icons/icon128.png',
+        title: 'OCR文字识别助手',
+        message: '无法在当前页面使用截图功能，请刷新页面后重试'
+      });
     }
   }
 });

@@ -279,8 +279,20 @@
     "description": "Config management section"
   },
   "help_import_export": {
-    "message": "导出当前配置到JSON文件，或从文件导入配置。",
+    "message": "默认导出不包含 API Key，并继续支持导入旧版明文配置。",
     "description": "Import export help"
+  },
+  "label_include_api_keys": {
+    "message": "在导出文件中包含 API Key",
+    "description": "Include secrets export checkbox"
+  },
+  "warning_include_api_keys": {
+    "message": "勾选后导出文件将包含明文密钥，请只在可信设备上使用并妥善保管。",
+    "description": "Plaintext credential export warning"
+  },
+  "msg_endpoint_permission_denied": {
+    "message": "未授予访问所配置 API 端点的权限。",
+    "description": "Optional endpoint permission denied"
   },
 
   "msg_saved": {
@@ -637,6 +649,18 @@
     "message": "Claude 3 Opus (最高质量)",
     "description": "Claude Opus model"
   },
+  "model_claude_sonnet_5": {
+    "message": "Claude Sonnet 5（推荐）",
+    "description": "当前均衡型 Claude 视觉模型"
+  },
+  "model_claude_haiku_4_5": {
+    "message": "Claude Haiku 4.5（经济）",
+    "description": "当前经济型 Claude 视觉模型"
+  },
+  "model_claude_opus_4_8": {
+    "message": "Claude Opus 4.8（高质量）",
+    "description": "当前高质量 Claude 视觉模型"
+  },
   "model_gpt4o": {
     "message": "GPT-4o (推荐)",
     "description": "GPT-4o model"
@@ -644,6 +668,14 @@
   "model_gpt4o_mini": {
     "message": "GPT-4o Mini (经济)",
     "description": "GPT-4o Mini model"
+  },
+  "model_gpt5_mini": {
+    "message": "GPT-5 mini（推荐）",
+    "description": "当前经济型 OpenAI 视觉模型"
+  },
+  "model_gpt54_mini": {
+    "message": "GPT-5.4 mini（高质量）",
+    "description": "当前高质量 OpenAI 视觉模型"
   },
   "model_gpt4_turbo": {
     "message": "GPT-4 Turbo",

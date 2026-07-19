@@ -79,19 +79,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 检查是否已配置API（支持多API配置）
   const checkConfig = async () => {
-    const result = await chrome.storage.local.get(['apiProvider', 'apiConfigs', 'apiKey']);
+    const result = await chrome.storage.local.get([
+      'apiProvider', 'apiConfigs', 'apiKey',
+      'compatibleEndpoint', 'compatibleApiKey', 'compatibleModel',
+      'customEndpoint', 'customApiKey', 'customModel'
+    ]);
     const provider = result.apiProvider || 'claude';
 
-    // 优先从新的 apiConfigs 结构检查，兼容旧配置
-    let hasApiKey = false;
-    const configs = result.apiConfigs || {};
-
-    if (configs[provider] && configs[provider].apiKey) {
-      hasApiKey = true;
-    } else if (provider === 'claude' && result.apiKey) {
-      // 兼容旧版本配置
-      hasApiKey = true;
-    }
+    // 共享映射会处理 openai-compatible 的存储键及旧版 Claude 配置。
+    const hasApiKey = OCRProviderConfig.hasRequiredCredentials(
+      result.apiConfigs,
+      provider,
+      result
+    );
 
     if (!hasApiKey) {
       configTip.classList.remove('hidden');
@@ -99,6 +99,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     configTip.classList.add('hidden');
     return true;
+  };
+
+  /**
+   * Requests access to a user-configured API origin when the selected provider
+   * is not covered by the extension's fixed host permissions.
+   */
+  const requestEndpointPermission = async () => {
+    const result = await chrome.storage.local.get([
+      'apiProvider', 'apiConfigs',
+      'compatibleEndpoint', 'compatibleApiKey', 'compatibleModel',
+      'customEndpoint', 'customApiKey', 'customModel'
+    ]);
+    const provider = result.apiProvider || 'claude';
+
+    if (provider !== 'openai-compatible' && provider !== 'custom') {
+      return true;
+    }
+
+    const modernConfig = OCRProviderConfig.getProviderConfig(result.apiConfigs, provider);
+    const legacyEndpoint = provider === 'openai-compatible'
+      ? result.compatibleEndpoint
+      : result.customEndpoint;
+    return OCRExtensionRuntime.requestEndpointPermission(
+      chrome,
+      provider,
+      modernConfig.endpoint || legacyEndpoint
+    );
   };
 
   /**
@@ -319,6 +346,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
+      const permissionGranted = await requestEndpointPermission();
+      if (!permissionGranted) {
+        announcePopupStatus(OCRI18n.t('msg_endpoint_permission_denied'));
+        alert(OCRI18n.t('msg_endpoint_permission_denied'));
+        return;
+      }
+
       // 获取当前活动标签页
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
@@ -327,8 +361,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
 
-      // 发送消息给content script启动截图模式
-      await chrome.tabs.sendMessage(tab.id, { action: 'startCapture' });
+      // 发送消息；按需注入依赖和内容脚本后重试。
+      await OCRExtensionRuntime.startCaptureInTab(chrome, tab.id);
 
       // 关闭popup窗口
       window.close();

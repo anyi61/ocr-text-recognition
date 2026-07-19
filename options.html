@@ -53,11 +53,11 @@
         <div class="form-group">
           <label for="claudeModel" data-i18n="label_model">模型</label>
           <div class="input-wrapper">
-            <input id="claudeModel" class="input" list="claudeModels" placeholder="例如: claude-3-5-sonnet-latest">
+            <input id="claudeModel" class="input" list="claudeModels" placeholder="例如: claude-sonnet-5">
             <datalist id="claudeModels">
-              <option value="claude-3-5-sonnet-latest" data-i18n="model_claude_3_5_sonnet">Claude 3.5 Sonnet (推荐)</option>
-              <option value="claude-3-5-haiku-latest" data-i18n="model_claude_3_5_haiku">Claude 3.5 Haiku (快且强)</option>
-              <option value="claude-3-opus-latest" data-i18n="model_claude_opus">Claude 3 Opus (最佳质量)</option>
+              <option value="claude-sonnet-5" data-i18n="model_claude_sonnet_5">Claude Sonnet 5 (推荐)</option>
+              <option value="claude-haiku-4-5-20251001" data-i18n="model_claude_haiku_4_5">Claude Haiku 4.5 (经济)</option>
+              <option value="claude-opus-4-8" data-i18n="model_claude_opus_4_8">Claude Opus 4.8 (高质量)</option>
             </datalist>
             <span class="field-status" aria-live="polite"></span>
           </div>
@@ -78,12 +78,10 @@
         <div class="form-group">
           <label for="openaiModel" data-i18n="label_model">模型</label>
           <div class="input-wrapper">
-            <input id="openaiModel" class="input" list="openaiModels" placeholder="例如: gpt-4o">
+            <input id="openaiModel" class="input" list="openaiModels" placeholder="例如: gpt-5-mini">
             <datalist id="openaiModels">
-              <option value="gpt-4o" data-i18n="model_gpt4o">GPT-4o (推荐)</option>
-              <option value="gpt-4o-mini" data-i18n="model_gpt4o_mini">GPT-4o Mini (经济)</option>
-              <option value="o1-preview">o1-preview</option>
-              <option value="o1-mini">o1-mini</option>
+              <option value="gpt-5-mini" data-i18n="model_gpt5_mini">GPT-5 mini (推荐)</option>
+              <option value="gpt-5.4-mini" data-i18n="model_gpt54_mini">GPT-5.4 mini (高质量)</option>
             </datalist>
             <span class="field-status" aria-live="polite"></span>
           </div>
@@ -276,6 +274,15 @@
         <div class="form-group">
           <p class="help-text" data-i18n="help_import_export">导出当前配置到JSON文件，或从文件导入配置。</p>
         </div>
+        <div class="form-group">
+          <label for="includeApiKeys">
+            <input id="includeApiKeys" type="checkbox">
+            <span data-i18n="label_include_api_keys">在导出文件中包含 API Key</span>
+          </label>
+          <p class="warning-text" data-i18n="warning_include_api_keys">
+            导出文件将包含明文密钥，请只在可信设备上使用并妥善保管。
+          </p>
+        </div>
         <div class="actions import-export-actions">
           <button id="exportBtn" class="btn btn-secondary" type="button">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -329,8 +336,8 @@
       <section class="info-card">
         <h3 data-i18n="card_recommended_api_title">推荐API</h3>
         <ul>
-          <li><strong data-i18n="model_claude_opus">Claude 3 Opus</strong> - <span data-i18n="api_claude_opus">识别准确率最高</span></li>
-          <li><strong data-i18n="model_gpt4o">GPT-4o</strong> - <span data-i18n="api_gpt4o">速度快，准确率高</span></li>
+          <li><strong data-i18n="model_claude_sonnet_5">Claude Sonnet 5</strong> - <span data-i18n="api_claude_opus">识别准确率高</span></li>
+          <li><strong data-i18n="model_gpt5_mini">GPT-5 mini</strong> - <span data-i18n="api_gpt4o">速度快，性价比高</span></li>
           <li><strong data-i18n="model_glm4v">GLM-4V</strong> - <span data-i18n="api_glm4v">国产大模型，中文效果好</span></li>
           <li><strong data-i18n="api_baidu_title">百度OCR</strong> - <span data-i18n="api_baidu">中文识别效果好，性价比高</span></li>
           <li><strong data-i18n="api_aliyun_title">阿里云OCR</strong> - <span data-i18n="api_aliyun">企业级服务，稳定可靠</span></li>
@@ -341,6 +348,8 @@
   </div>
 
   <script src="i18n-runtime.js"></script>
+  <script src="provider-config.js"></script>
+  <script src="extension-runtime.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

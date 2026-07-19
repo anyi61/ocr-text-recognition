@@ -279,8 +279,20 @@
     "description": "Config management section"
   },
   "help_import_export": {
-    "message": "Export current configuration to a JSON file, or import configuration from a file.",
+    "message": "Exports omit API keys by default. Existing plaintext exports remain importable.",
     "description": "Import export help"
+  },
+  "label_include_api_keys": {
+    "message": "Include API keys in the exported file",
+    "description": "Include secrets export checkbox"
+  },
+  "warning_include_api_keys": {
+    "message": "When selected, the export contains plaintext credentials. Use it only on trusted devices and store it securely.",
+    "description": "Plaintext credential export warning"
+  },
+  "msg_endpoint_permission_denied": {
+    "message": "Access to the configured API endpoint was not granted.",
+    "description": "Optional endpoint permission denied"
   },
 
   "msg_saved": {
@@ -637,6 +649,18 @@
     "message": "Claude 3 Opus (Best Quality)",
     "description": "Claude Opus model"
   },
+  "model_claude_sonnet_5": {
+    "message": "Claude Sonnet 5 (Recommended)",
+    "description": "Current balanced Claude vision model"
+  },
+  "model_claude_haiku_4_5": {
+    "message": "Claude Haiku 4.5 (Economical)",
+    "description": "Current economical Claude vision model"
+  },
+  "model_claude_opus_4_8": {
+    "message": "Claude Opus 4.8 (High quality)",
+    "description": "Current high quality Claude vision model"
+  },
   "model_gpt4o": {
     "message": "GPT-4o (Recommended)",
     "description": "GPT-4o model"
@@ -644,6 +668,14 @@
   "model_gpt4o_mini": {
     "message": "GPT-4o Mini (Economical)",
     "description": "GPT-4o Mini model"
+  },
+  "model_gpt5_mini": {
+    "message": "GPT-5 mini (Recommended)",
+    "description": "Current economical OpenAI vision model"
+  },
+  "model_gpt54_mini": {
+    "message": "GPT-5.4 mini (High quality)",
+    "description": "Current high quality OpenAI vision model"
   },
   "model_gpt4_turbo": {
     "message": "GPT-4 Turbo",

@@ -20,6 +20,8 @@ node_modules/
 # Build outputs
 dist/
 build/
+test-results/
+playwright-report/
 
 # Temporary files
 tmp/
@@ -42,6 +44,10 @@ local-docs/
 
 # Local Claude configuration (do not commit)
 .claude/
+
+# Local code intelligence indexes
+.codegraph/
+.cursor/rules/codegraph.mdc
 
 # Local agent skill (keep local only)
 .agents/skills/bugfix-review/

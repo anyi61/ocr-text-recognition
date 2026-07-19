@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "__MSG_ext_name__",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "__MSG_ext_description__",
   "default_locale": "zh_CN",
   "permissions": [
@@ -21,7 +21,15 @@
     }
   },
   "host_permissions": [
-    "<all_urls>"
+    "https://api.anthropic.com/*",
+    "https://api.openai.com/*",
+    "https://aip.baidubce.com/*",
+    "https://dashscope.aliyuncs.com/*",
+    "https://open.bigmodel.cn/*"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -35,13 +43,6 @@
   "background": {
     "service_worker": "background.js"
   },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["i18n-runtime.js", "content.js"],
-      "run_at": "document_idle"
-    }
-  ],
   "options_page": "options.html",
   "icons": {
     "16": "icons/icon16.png",
@@ -51,7 +52,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["icons/*", "_locales/*"],
+      "resources": ["_locales/*"],
       "matches": ["<all_urls>"]
     }
   ]
