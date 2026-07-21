@@ -49,9 +49,9 @@ Chrome、Edge 内部页面、扩展页面、Chrome Web Store 以及未开启文�
 - `storage` 用于在本机 Chrome 配置中保存 API 配置、主题和最近历史。
 - `notifications` 用于快捷键无法使用时显示原因。
 - Anthropic、OpenAI、百度、阿里云和智谱的官方 API 域名在 manifest 中明确列出。
-- 自定义或 OpenAI 兼容接口按配置的域名单独请求权限，不会默认获得所有网站的网络权限。
+- 自定义或 OpenAI 兼容接口按配置的域名单独请求权限；远程地址强制使用 HTTPS，HTTP 仅允许 `localhost` 和 `127.0.0.1` 本机服务。
 
-API Key 保存在 `chrome.storage.local`，没有上传到本项目自己的服务器。截图内容会发送到当前选择的第三方服务商，适用其隐私和数据保留政策；请勿识别不应交给该服务商处理的敏感页面。凭据不会写入识别历史、运行日志或默认配置导出；历史也不保存截图 Base64。
+API Key 保存在 `chrome.storage.local`，并限制为扩展可信页面与后台访问，没有上传到本项目自己的服务器。截图内容会发送到当前选择的第三方服务商，适用其隐私和数据保留政策；请勿识别不应交给该服务商处理的敏感页面。凭据不会写入识别历史、运行日志或默认配置导出；历史也不保存截图 Base64，来源 URL 只保留站点 origin。
 
 配置导出默认移除 API Key 和 Secret。只有主动勾选“在导出文件中包含 API Key”时才会导出明文凭据；此类文件应只存放在可信设备上。
 
@@ -61,12 +61,15 @@ API Key 保存在 `chrome.storage.local`，没有上传到本项目自己的服�
 
 ```bash
 npm install
+npx playwright install chromium
 npm run check
-npm run test:e2e
+npm run package
 ```
 
-- `npm run check`：运行 provider 映射、语言提示、取消竞态、截图缩放、manifest、语言包和 JavaScript 语法测试。
+- `npm run check`：依次运行全部单元/静态测试和 Playwright 端到端测试。
+- `npm run lint`：检查未定义变量、不可达代码、重复分支和恒定表达式等 JavaScript 错误。
 - `npm run test:e2e`：启动 Playwright Chromium 和本地 Mock OCR 服务，加载扩展后验证截图、裁剪、OCR、结果、历史记录与真实请求中止。
+- `npm run package`：校验 `package.json`、manifest 与配置导出版本一致，并在 `dist/` 生成只包含生产文件的商店 ZIP。
 - 端到端测试不需要任何真实 API Key，也不会请求第三方 OCR 服务。
 
 ## 核心文件

@@ -946,5 +946,17 @@
   "err_import_invalid_prompt": { "message": "Invalid prompt format" },
   "err_import_invalid_language": { "message": "Invalid recognition language" },
   "err_import_invalid_theme": { "message": "Invalid theme" },
-  "err_import_invalid_uiLanguage": { "message": "Invalid interface language" }
+  "err_import_invalid_uiLanguage": { "message": "Invalid interface language" },
+  "error_missing_api_key": { "message": "Configure the selected API before starting recognition." },
+  "error_capture_tab_changed": { "message": "The active tab changed. Select the area again." },
+  "error_request_timeout": { "message": "The request timed out. Check your network and try again." },
+  "error_empty_ocr_result": { "message": "No text was recognized. Adjust the selection and try again." },
+  "error_invalid_ocr_result": { "message": "The provider returned an unsupported response format." },
+  "error_ocr_result_truncated": { "message": "The recognition result was truncated. Reduce the selected area and try again." },
+  "error_history_save_failed": { "message": "Text was recognized, but the history record could not be saved." },
+  "error_network": { "message": "The network request failed. Check your connection or proxy." },
+  "error_unknown_provider": { "message": "The selected API provider is unsupported." },
+  "notification_config_required": { "message": "Configure an API before using the screenshot shortcut." },
+  "notification_endpoint_permission_required": { "message": "Authorize the custom API domain in the extension popup first." },
+  "notification_capture_unavailable": { "message": "Screenshot capture is unavailable on this page. Switch to a regular webpage and try again." }
 }

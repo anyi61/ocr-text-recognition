@@ -14,6 +14,12 @@ importScripts(
 const ocrRequestRegistry = OCRBackgroundCore.createRequestRegistry();
 const baiduTokenCache = new Map();
 const historyStore = OCRHistoryStore.create(chrome.storage.local, { limit: 50 });
+const backgroundMessage = (key, fallback) => chrome.i18n?.getMessage(key) || fallback;
+
+if (typeof chrome.storage.local.setAccessLevel === 'function') {
+  chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })
+    .catch((error) => console.error('无法限制本地存储访问范围:', error));
+}
 
 /**
  * API配置对象
@@ -87,6 +93,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.action === 'getContentPreferences') {
+    chrome.storage.local.get(['theme', 'uiLanguage'])
+      .then((preferences) => sendResponse({ success: true, ...preferences }))
+      .catch(() => sendResponse({ success: false }));
+    return true;
+  }
+
   if (request.action === 'updateHistoryRecord') {
     historyStore.updateText(request.historyId, request.text)
       .then((updated) => sendResponse({ success: updated }))
@@ -117,17 +130,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
  */
 async function handleCapture(sendResponse, sender) {
   try {
-    if (!sender.tab || !Number.isInteger(sender.tab.windowId)) {
-      throw new Error('截图请求必须来自有效的网页标签页');
+    if (!sender.tab || !Number.isInteger(sender.tab.id) || !Number.isInteger(sender.tab.windowId)) {
+      throw OCRBackgroundCore.createCodedError('CAPTURE_TAB_CHANGED', 'Invalid capture tab');
+    }
+    const [activeBefore] = await chrome.tabs.query({
+      active: true,
+      windowId: sender.tab.windowId
+    });
+    if (!OCRBackgroundCore.isSameTabIdentity(sender.tab, activeBefore)) {
+      throw OCRBackgroundCore.createCodedError('CAPTURE_TAB_CHANGED', 'Active tab changed');
     }
     const dataUrl = await chrome.tabs.captureVisibleTab(sender.tab.windowId, {
       format: 'png',
       quality: 100
     });
+    const [activeAfter] = await chrome.tabs.query({
+      active: true,
+      windowId: sender.tab.windowId
+    });
+    if (!OCRBackgroundCore.isSameTabIdentity(sender.tab, activeAfter)) {
+      throw OCRBackgroundCore.createCodedError('CAPTURE_TAB_CHANGED', 'Active tab changed');
+    }
     sendResponse({ dataUrl });
   } catch (error) {
     console.error('截图失败:', error);
-    sendResponse({ error: error.message });
+    sendResponse({ error: error.message, errorCode: error.code });
   }
 }
 
@@ -221,7 +248,7 @@ async function handleOCR(imageData, requestId, sendResponse, sender) {
     config.model = OCRProviderConfig.migrateRetiredModel(provider, config.model);
 
     if (!OCRProviderConfig.hasRequiredCredentials(configs, provider, result)) {
-      sendResponse({ success: false, error: '未配置API密钥' });
+      sendResponse({ success: false, errorCode: 'MISSING_API_KEY', error: 'Missing API configuration' });
       return;
     }
 
@@ -252,7 +279,7 @@ async function handleOCR(imageData, requestId, sendResponse, sender) {
         ocrResult = await callOpenAICompatibleAPI(base64Image, config, signal);
         break;
       default:
-        throw new Error('未知的API提供商');
+        throw OCRBackgroundCore.createCodedError('UNKNOWN_PROVIDER', 'Unknown API provider');
     }
 
     if (signal.aborted) {
@@ -260,27 +287,27 @@ async function handleOCR(imageData, requestId, sendResponse, sender) {
     }
 
     // 保存到串行历史存储，保留识别上下文供检索和修订。
-    const historyRecord = await historyStore.append({
+    const historyResult = await OCRBackgroundCore.appendHistoryBestEffort(historyStore, {
       text: ocrResult,
       provider: config.apiProvider,
       language: config.language || 'auto',
-      sourceUrl: sender?.tab?.url || '',
+      sourceUrl: OCRBackgroundCore.sanitizeSourceUrl(sender?.tab?.url),
       sourceTitle: sender?.tab?.title || ''
     }, signal);
-    OCRBackgroundCore.throwIfAborted(signal);
 
     sendResponse({
       success: true,
       text: ocrResult,
-      historyId: historyRecord.id
+      historyId: historyResult.historyId,
+      ...(historyResult.warningCode ? { warningCode: historyResult.warningCode } : {})
     });
   } catch (error) {
     if (OCRBackgroundCore.isAbortError(error) || signal.aborted) {
-      sendResponse({ success: false, cancelled: true, error: '识别已取消' });
+      sendResponse({ success: false, cancelled: true, errorCode: 'OCR_CANCELLED', error: 'OCR cancelled' });
       return;
     }
     console.error('OCR识别失败:', error);
-    sendResponse({ success: false, error: error.message });
+    sendResponse({ success: false, error: error.message, errorCode: error.code });
   } finally {
     ocrRequestRegistry.finish(effectiveRequestId, controller);
   }
@@ -311,9 +338,11 @@ async function apiRequest(endpoint, headers, body, errorPrefix, signal) {
       throw error;
     }
     if (error?.name === 'TypeError') {
-      throw new Error('网络连接失败，请检查网络或代理设置');
+      throw OCRBackgroundCore.createCodedError('NETWORK_ERROR', 'Network request failed');
     }
-    throw new Error(`${errorPrefix}: ${error.message}`);
+    const wrapped = new Error(`${errorPrefix}: ${error.message}`);
+    wrapped.code = error.code || 'API_ERROR';
+    throw wrapped;
   }
 }
 
@@ -385,7 +414,8 @@ async function callClaudeAPI(base64Image, config, signal) {
     signal
   );
 
-  return OCRRequestRuntime.normalizeOcrText(data.content?.[0]?.text);
+  OCRBackgroundCore.assertOcrResponseComplete('claude', data);
+  return OCRRequestRuntime.normalizeOcrText(OCRBackgroundCore.extractClaudeText(data));
 }
 
 /**
@@ -411,6 +441,7 @@ async function callOpenAIAPI(base64Image, config, signal) {
     signal
   );
 
+  OCRBackgroundCore.assertOcrResponseComplete('openai', data);
   return OCRRequestRuntime.normalizeOcrText(data.choices?.[0]?.message?.content);
 }
 
@@ -443,7 +474,9 @@ async function callBaiduOCR(base64Image, config, signal) {
     return OCRRequestRuntime.normalizeOcrText(ocrData.words_result?.map((item) => item.words).join('\n'));
   } catch (error) {
     if (error?.name === 'AbortError' || error?.code === 'REQUEST_TIMEOUT') throw error;
-    throw new Error(`百度OCR请求失败: ${error.message}`);
+    const wrapped = new Error(`百度OCR请求失败: ${error.message}`);
+    wrapped.code = error.code || 'API_ERROR';
+    throw wrapped;
   }
 }
 
@@ -526,6 +559,7 @@ async function callCustomAPI(base64Image, config, signal) {
     signal
   );
 
+  OCRBackgroundCore.assertOcrResponseComplete('custom', data);
   return OCRRequestRuntime.extractCustomText(data, config.responsePath);
 }
 
@@ -558,6 +592,7 @@ async function callAliyunOCR(base64Image, config, signal) {
     signal
   );
 
+  OCRBackgroundCore.assertOcrResponseComplete('aliyun', data);
   return OCRRequestRuntime.normalizeOcrText(data.choices?.[0]?.message?.content);
 }
 
@@ -602,6 +637,7 @@ async function callZhipuAPI(base64Image, config, signal) {
     signal
   );
 
+  OCRBackgroundCore.assertOcrResponseComplete('zhipu', data);
   return OCRRequestRuntime.normalizeOcrText(data.choices?.[0]?.message?.content);
 }
 
@@ -635,6 +671,7 @@ async function callOpenAICompatibleAPI(base64Image, config, signal) {
   );
 
   // 兼容不同格式的响应
+  OCRBackgroundCore.assertOcrResponseComplete('openai-compatible', data);
   return OCRRequestRuntime.normalizeOcrText(data.choices?.[0]?.message?.content
     || data.choices?.[0]?.delta?.content
     || data.content?.[0]?.text
@@ -652,8 +689,8 @@ async function callOpenAICompatibleAPI(base64Image, config, signal) {
  */
 async function testAPIConnection(config, sendResponse) {
   try {
-    // 使用一个50x50像素的测试图片（纯蓝色），满足百度OCR最小尺寸要求（15x15）
-    const testImage = 'iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAAaklEQVR4nM3OQQEAIBCAMCSawQxsCgvcX5Zga59LjyRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkr8Dswfy9AIOoZwhhQAAAABJRU5ErkJggg==';
+    // 320x120 高对比度 PNG，包含清晰的 “OCR TEST” 文本，避免有效配置因空白图被误判。
+    const testImage = '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';
 
     // 标准化配置，确保字段名正确
     const normalizedConfig = { ...config };
@@ -712,7 +749,7 @@ async function testAPIConnection(config, sendResponse) {
 
     sendResponse({ success: true, message: '连接成功' });
   } catch (error) {
-    sendResponse({ success: false, error: error.message });
+    sendResponse({ success: false, error: error.message, errorCode: error.code });
   }
 }
 
@@ -756,8 +793,8 @@ chrome.commands.onCommand.addListener(async (command) => {
         chrome.notifications.create({
           type: 'basic',
           iconUrl: 'icons/icon128.png',
-          title: 'OCR文字识别助手',
-          message: '请先配置API密钥后再使用快捷键截图'
+          title: backgroundMessage('ext_name', 'OCR'),
+          message: backgroundMessage('notification_config_required', 'Configure an API first')
         });
         return;
       }
@@ -777,8 +814,8 @@ chrome.commands.onCommand.addListener(async (command) => {
           chrome.notifications.create({
             type: 'basic',
             iconUrl: 'icons/icon128.png',
-            title: 'OCR文字识别助手',
-            message: '请先在插件弹窗中授权访问自定义 API 域名'
+            title: backgroundMessage('ext_name', 'OCR'),
+            message: backgroundMessage('notification_endpoint_permission_required', 'Authorize the API domain first')
           });
           return;
         }
@@ -788,16 +825,16 @@ chrome.commands.onCommand.addListener(async (command) => {
     } catch (error) {
       console.error('快捷键启动截图失败:', error);
       const unsupportedMessages = {
-        browser_internal: '浏览器内部页面禁止扩展截图，请切换到普通网页后重试',
-        browser_store: '扩展商店页面禁止脚本注入，请切换到普通网页后重试',
-        file_access: '请在扩展管理页开启“允许访问文件网址”后重试'
+        browser_internal: backgroundMessage('msg_capture_browser_internal', 'Capture is unavailable on browser pages'),
+        browser_store: backgroundMessage('msg_capture_browser_store', 'Capture is unavailable in the extension store'),
+        file_access: backgroundMessage('msg_capture_file_access', 'Enable file URL access and try again')
       };
       chrome.notifications.create({
         type: 'basic',
         iconUrl: 'icons/icon128.png',
-        title: 'OCR文字识别助手',
+        title: backgroundMessage('ext_name', 'OCR'),
         message: unsupportedMessages[error?.reason]
-          || '当前页面无法启动截图，请切换到普通网页后重试'
+          || backgroundMessage('notification_capture_unavailable', 'Capture is unavailable on this page')
       });
     }
   }

@@ -62,6 +62,7 @@
       return enqueue(async () => {
         throwIfAborted(signal);
         const history = await readHistory();
+        const previousHistory = history.map((item) => ({ ...item }));
         throwIfAborted(signal);
 
         const timestamp = Number.isFinite(record?.timestamp)
@@ -87,9 +88,7 @@
         await storage.set({ ocrHistory: nextHistory });
 
         if (signal?.aborted) {
-          await storage.set({
-            ocrHistory: nextHistory.filter((item) => item.id !== newRecord.id)
-          });
+          await storage.set({ ocrHistory: previousHistory });
           throwIfAborted(signal);
         }
 

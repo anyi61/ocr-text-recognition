@@ -35,6 +35,16 @@ test('popup exposes searchable, deletable, exportable history controls', () => {
   assert.match(popup, /sourceUrl/);
 });
 
+test('history rendering assigns untrusted text through DOM properties', () => {
+  const popup = read('popup.js');
+
+  assert.doesNotMatch(popup, /title="\$\{escapeHtml\(/);
+  assert.match(popup, /textElement\.textContent = text/);
+  assert.match(popup, /textElement\.title = text/);
+  assert.match(popup, /sourceElement\.textContent = source/);
+  assert.match(popup, /sourceElement\.title = item\.sourceUrl \|\| source/);
+});
+
 test('history timestamps are rendered from timestamp using the active UI locale', () => {
   const popup = read('popup.js');
 

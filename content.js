@@ -65,6 +65,8 @@
   let progressStartTime = null;
   let isCancelled = false;
   let activeRequestId = null;
+  let captureSessionId = null;
+  let isProcessing = false;
 
   // Shadow DOM 相关变量
   let shadowHost = null;      // Shadow DOM 宿主元素
@@ -87,7 +89,7 @@
    */
   async function syncThemeFromStorage() {
     try {
-      const result = await chrome.storage.local.get(['theme']);
+      const result = await chrome.runtime.sendMessage({ action: 'getContentPreferences' });
       const fallback = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       applyThemeToShadowHost(result.theme || fallback);
     } catch (error) {
@@ -100,12 +102,8 @@
    * 监听主题变更并同步到 Shadow Host
    */
   function ensureThemeChangeListener() {
-    if (themeListenerBound) return;
-    chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName === 'local' && changes.theme) {
-        applyThemeToShadowHost(changes.theme.newValue);
-      }
-    });
+    // Content scripts cannot subscribe to private storage. Theme is refreshed
+    // through the background message each time capture starts.
     themeListenerBound = true;
   }
 
@@ -394,7 +392,7 @@
     `;
 
     // 挂载 Shadow DOM
-    shadowRoot = shadowHost.attachShadow({ mode: 'open' });
+    shadowRoot = shadowHost.attachShadow({ mode: 'closed' });
 
     // 创建样式元素
     styleEl = document.createElement('style');
@@ -545,7 +543,6 @@
   function cleanup() {
     isCapturing = false;
     isEditMode = false;
-    isCancelled = false;
     // 先解除仍挂在选区上的编辑监听，再移除选区元素。
     cleanupEditMode();
     if (overlay) {
@@ -814,6 +811,7 @@
    * @param {MouseEvent} e
    */
   function onHandleMouseDown(e) {
+    if (!e?.isTrusted) return;
     e.preventDefault();
     e.stopPropagation();
 
@@ -833,6 +831,7 @@
    * @description 支持键盘调整选区大小
    */
   function onHandleKeyDown(e) {
+    if (!e?.isTrusted) return;
     if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
 
     e.preventDefault();
@@ -1021,6 +1020,7 @@
    * @param {MouseEvent} e
    */
   function onSelectionMouseDown(e) {
+    if (!e?.isTrusted) return;
     if (!isEditMode || isDragging) return;
     e.preventDefault();
     e.stopPropagation();
@@ -1037,71 +1037,19 @@
    * @param {MouseEvent} e
    */
   function onEditModeMouseMove(e) {
+    if (!e?.isTrusted) return;
     if (!isDragging || !originalRect) return;
 
     const deltaX = e.clientX - dragStartX;
     const deltaY = e.clientY - dragStartY;
-    const minSize = 5;
-
-    let newRect = { ...originalRect };
-
-    switch (dragType) {
-      case 'move':
-        // 移动整个选区
-        newRect.left = Math.max(0, Math.min(window.innerWidth - newRect.width, originalRect.left + deltaX));
-        newRect.top = Math.max(0, Math.min(window.innerHeight - newRect.height, originalRect.top + deltaY));
-        break;
-
-      case 'nw':
-        newRect.left = Math.min(originalRect.left + originalRect.width - minSize, originalRect.left + deltaX);
-        newRect.top = Math.min(originalRect.top + originalRect.height - minSize, originalRect.top + deltaY);
-        newRect.width = originalRect.width - (newRect.left - originalRect.left);
-        newRect.height = originalRect.height - (newRect.top - originalRect.top);
-        break;
-
-      case 'n':
-        newRect.top = Math.min(originalRect.top + originalRect.height - minSize, originalRect.top + deltaY);
-        newRect.height = originalRect.height - (newRect.top - originalRect.top);
-        break;
-
-      case 'ne':
-        newRect.top = Math.min(originalRect.top + originalRect.height - minSize, originalRect.top + deltaY);
-        newRect.width = Math.max(minSize, originalRect.width + deltaX);
-        newRect.height = originalRect.height - (newRect.top - originalRect.top);
-        break;
-
-      case 'e':
-        newRect.width = Math.max(minSize, originalRect.width + deltaX);
-        break;
-
-      case 'se':
-        newRect.width = Math.max(minSize, originalRect.width + deltaX);
-        newRect.height = Math.max(minSize, originalRect.height + deltaY);
-        break;
-
-      case 's':
-        newRect.height = Math.max(minSize, originalRect.height + deltaY);
-        break;
-
-      case 'sw':
-        newRect.left = Math.min(originalRect.left + originalRect.width - minSize, originalRect.left + deltaX);
-        newRect.width = originalRect.width - (newRect.left - originalRect.left);
-        newRect.height = Math.max(minSize, originalRect.height + deltaY);
-        break;
-
-      case 'w':
-        newRect.left = Math.min(originalRect.left + originalRect.width - minSize, originalRect.left + deltaX);
-        newRect.width = originalRect.width - (newRect.left - originalRect.left);
-        break;
-    }
-
-    // 确保选区在视口内
-    newRect.left = Math.max(0, newRect.left);
-    newRect.top = Math.max(0, newRect.top);
-    newRect.width = Math.min(window.innerWidth - newRect.left, newRect.width);
-    newRect.height = Math.min(window.innerHeight - newRect.top, newRect.height);
-
-    currentRect = newRect;
+    currentRect = OCRCaptureUtils.resizeSelectionRect(
+      originalRect,
+      dragType,
+      deltaX,
+      deltaY,
+      { width: window.innerWidth, height: window.innerHeight },
+      5
+    );
 
     // 更新选区框显示
     selectionBox.style.left = `${currentRect.left}px`;
@@ -1120,6 +1068,7 @@
    * @param {MouseEvent} e
    */
   function onEditModeMouseUp(e) {
+    if (!e?.isTrusted) return;
     if (isDragging) {
       // 只在一次完整拖拽结束后记录，保证一次撤销回到拖拽前的状态。
       recordCurrentRect();
@@ -1189,7 +1138,8 @@
   /**
    * 确认选区并开始识别
    */
-  async function confirmSelection() {
+  async function confirmSelection(event) {
+    if (!event?.isTrusted || isProcessing || !captureSessionId) return;
     if (!currentRect || currentRect.width < 10 || currentRect.height < 10) {
       showNotification(OCRI18n.t('content_msg_selection_small_edit'), 'warning');
       return;
@@ -1197,16 +1147,20 @@
 
     // 清理UI（保留选区信息）
     const rect = { ...currentRect };
+    const sessionId = captureSessionId;
+    isProcessing = true;
+    currentRect = null;
     cleanup();
 
     // 执行截图
-    await captureAndRecognize(rect);
+    await captureAndRecognize(rect, sessionId);
   }
 
   /**
    * 重新选择区域
    */
-  function reselectArea() {
+  function reselectArea(event) {
+    if (!event?.isTrusted) return;
     cleanupEditMode();
 
     // 重置编辑模式状态
@@ -1242,7 +1196,11 @@
   /**
    * 取消截图
    */
-  function cancelCapture() {
+  function cancelCapture(event) {
+    if (!event?.isTrusted) return;
+    captureSessionId = null;
+    isProcessing = false;
+    isCancelled = true;
     cleanup();
     showNotification(OCRI18n.t('content_msg_cancelled'), 'info');
   }
@@ -1252,6 +1210,14 @@
    * @description 页面卸载时调用，移除所有DOM元素和事件监听器
    */
   function fullCleanup() {
+    const requestId = activeRequestId;
+    captureSessionId = null;
+    isProcessing = false;
+    isCancelled = true;
+    activeRequestId = null;
+    if (requestId) {
+      chrome.runtime.sendMessage({ action: 'cancelOCR', requestId }).catch(() => {});
+    }
     cleanup();
     cleanupEditMode();
     hideProgressNotification();
@@ -1265,6 +1231,7 @@
 
   // 鼠标按下
   function onMouseDown(e) {
+    if (!e?.isTrusted) return;
     if (e.button !== 0) return; // 只处理左键
 
     // 如果正在编辑模式或点击了工具栏/手柄，不处理
@@ -1289,12 +1256,14 @@
 
   // 鼠标移动
   function onMouseMove(e) {
+    if (!e?.isTrusted) return;
     if (!selectionBox) return;
     updateSelectionBox(startX, startY, e.clientX, e.clientY);
   }
 
   // 鼠标释放
-  async function onMouseUp() {
+  async function onMouseUp(e) {
+    if (!e?.isTrusted) return;
     if (!selectionBox) return;
 
     const rect = selectionBox.getBoundingClientRect();
@@ -1317,6 +1286,7 @@
 
   // 键盘事件
   function onKeyDown(e) {
+    if (!e?.isTrusted) return;
     if (e.key === 'Escape') {
       if (isEditMode) {
         // 编辑模式下ESC取消
@@ -1327,7 +1297,7 @@
     } else if (e.key === 'Enter' && isEditMode) {
       // 编辑模式下Enter确认
       e.preventDefault();
-      confirmSelection();
+      confirmSelection(e);
     } else if (e.key === 'z' && isEditMode && (e.ctrlKey || e.metaKey)) {
       // 编辑模式下 Ctrl/Cmd+Z 撤销
       e.preventDefault();
@@ -1336,13 +1306,16 @@
   }
 
   // 截取并识别
-  async function captureAndRecognize(rect) {
-    isCancelled = false;
+  async function captureAndRecognize(rect, sessionId) {
     let requestId = null;
 
     try {
-      showProgressNotification(OCRI18n.t('content_progress_capturing'), false);
       announceA11y(OCRI18n.t('content_a11y_capturing'));
+
+      // cleanup() 刚移除了遮罩、选区和工具栏。等待浏览器提交一帧，
+      // 避免 captureVisibleTab 捕获到已删除但尚未重绘的扩展 UI。
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      if (isCancelled || captureSessionId !== sessionId) return;
 
       // 发送消息给background进行截图（因为content script无法直接调用chrome.tabs.captureVisibleTab）
       const response = await chrome.runtime.sendMessage({
@@ -1350,11 +1323,11 @@
       });
 
       // 检查是否被取消
-      if (isCancelled) return;
+      if (isCancelled || captureSessionId !== sessionId) return;
 
       if (!response || !response.dataUrl) {
         hideProgressNotification();
-        showNotification(OCRI18n.t('content_msg_capture_failed'), 'error');
+        showNotification(OCRI18n.errorMessage(response, 'content_msg_capture_failed'), 'error');
         return;
       }
 
@@ -1362,7 +1335,7 @@
       const croppedImage = await cropImage(response.dataUrl, rect);
 
       // 检查是否被取消
-      if (isCancelled) return;
+      if (isCancelled || captureSessionId !== sessionId) return;
 
       // 更新为识别阶段，显示取消按钮
       showProgressNotification(OCRI18n.t('content_progress_recognizing'), true);
@@ -1379,7 +1352,7 @@
       });
 
       // 检查是否被取消
-      if (isCancelled || activeRequestId !== requestId) return;
+      if (isCancelled || captureSessionId !== sessionId || activeRequestId !== requestId) return;
       activeRequestId = null;
 
       // 计算识别用时
@@ -1388,22 +1361,32 @@
 
       if (ocrResponse && ocrResponse.success) {
         showResultPopup(ocrResponse.text, ocrResponse.historyId);
-        showNotification(OCRI18n.t('content_msg_done', [String(elapsed)]), 'success');
+        showNotification(
+          ocrResponse.warningCode
+            ? OCRI18n.errorMessage({ errorCode: ocrResponse.warningCode })
+            : OCRI18n.t('content_msg_done', [String(elapsed)]),
+          ocrResponse.warningCode ? 'warning' : 'success'
+        );
         announceA11y(OCRI18n.t('content_a11y_done', [String(elapsed)]));
       } else {
-        showNotification(ocrResponse?.error || OCRI18n.t('content_msg_recognition_failed'), 'error');
+        showNotification(OCRI18n.errorMessage(ocrResponse), 'error');
         announceA11y(OCRI18n.t('content_a11y_failed'));
       }
     } catch (error) {
       hideProgressNotification();
       if (!isCancelled) {
         console.error('截图识别失败:', error);
-        showNotification(OCRI18n.t('content_msg_recognition_failed') + ': ' + error.message, 'error');
-        announceA11y(OCRI18n.t('content_a11y_failed') + ': ' + error.message);
+        const message = OCRI18n.errorMessage(error);
+        showNotification(message, 'error');
+        announceA11y(`${OCRI18n.t('content_a11y_failed')}: ${message}`);
       }
     } finally {
       if (requestId && activeRequestId === requestId) {
         activeRequestId = null;
+      }
+      if (captureSessionId === sessionId) {
+        captureSessionId = null;
+        isProcessing = false;
       }
     }
   }
@@ -1875,9 +1858,12 @@
     if (showCancel) {
       const cancelBtn = notification.querySelector('.ocr-progress-cancel');
       if (cancelBtn) {
-        cancelBtn.addEventListener('click', () => {
+        cancelBtn.addEventListener('click', (event) => {
+          if (!event?.isTrusted) return;
           const requestId = activeRequestId;
           isCancelled = true;
+          captureSessionId = null;
+          isProcessing = false;
           activeRequestId = null;
           hideProgressNotification();
           showNotification(OCRI18n.t('content_msg_recognition_cancelled'), 'warning');
@@ -1932,11 +1918,14 @@
    */
   function startCapture() {
     if (isCapturing) return;
-    if (activeRequestId) {
+    if (isProcessing || activeRequestId) {
       showNotification(OCRI18n.t('content_progress_recognizing'), 'warning');
       return;
     }
 
+    isCancelled = false;
+    captureSessionId = OCRCaptureUtils.createRequestId();
+    syncThemeFromStorage();
     isCapturing = true;
     createOverlay();
 
@@ -1978,6 +1967,7 @@
    * @description 防止内存泄漏
    */
   window.addEventListener('beforeunload', fullCleanup);
+  window.addEventListener('pagehide', fullCleanup);
 
   console.log('OCR文字识别助手已加载');
 })();

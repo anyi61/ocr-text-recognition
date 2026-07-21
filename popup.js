@@ -254,15 +254,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       historyItem.setAttribute('aria-label', `${OCRI18n.t('history_view_detail')}: ${text.substring(0, 30)}`);
 
       historyItem.innerHTML = `
-        <div class="history-item-text" title="${escapeHtml(text)}">${escapeHtml(text)}</div>
+        <div class="history-item-text"></div>
         <div class="history-item-meta">
           <div class="history-item-context">
             <div class="history-item-tags">
-              <span class="history-tag">${escapeHtml(providerLabels[item.provider] || item.provider || '-')}</span>
-              <span class="history-tag">${escapeHtml(getLanguageLabel(item.language))}</span>
-              <span class="timestamp">${escapeHtml(formatHistoryTimestamp(item))}</span>
+              <span class="history-tag history-provider"></span>
+              <span class="history-tag history-language"></span>
+              <span class="timestamp"></span>
             </div>
-            ${source ? `<span class="history-source" title="${escapeHtml(item.sourceUrl || source)}">${escapeHtml(source)}</span>` : ''}
+            ${source ? '<span class="history-source"></span>' : ''}
           </div>
           <div class="history-item-actions">
             <button class="history-copy-btn" type="button" title="${OCRI18n.t('content_btn_copy')}" aria-label="${OCRI18n.t('history_copy')}">
@@ -280,6 +280,20 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
         </div>
       `;
+
+      const textElement = historyItem.querySelector('.history-item-text');
+      textElement.textContent = text;
+      textElement.title = text;
+      historyItem.querySelector('.history-provider').textContent = providerLabels[item.provider]
+        || item.provider
+        || '-';
+      historyItem.querySelector('.history-language').textContent = getLanguageLabel(item.language);
+      historyItem.querySelector('.timestamp').textContent = formatHistoryTimestamp(item);
+      const sourceElement = historyItem.querySelector('.history-source');
+      if (sourceElement) {
+        sourceElement.textContent = source;
+        sourceElement.title = item.sourceUrl || source;
+      }
 
       historyItem.addEventListener('click', (event) => {
         if (event.target.closest('button')) return;
@@ -402,18 +416,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     link.remove();
     URL.revokeObjectURL(url);
     announcePopupStatus(OCRI18n.t('a11y_history_exported'));
-  };
-
-  /**
-   * HTML转义函数
-   * @param {string} text - 原始文本
-   * @returns {string} 转义后的HTML安全文本
-   * @description 防止XSS攻击，将特殊字符转换为HTML实体
-   */
-  const escapeHtml = (text) => {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
   };
 
   // 初始化

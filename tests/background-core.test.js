@@ -6,7 +6,12 @@ const {
   getBaiduLanguageType,
   createCredentialFingerprint,
   createRequestRegistry,
-  isAbortError
+  isAbortError,
+  isSameTabIdentity,
+  extractClaudeText,
+  assertOcrResponseComplete,
+  sanitizeSourceUrl,
+  appendHistoryBestEffort
 } = require('../background-core.js');
 
 test('buildRecognitionPrompt preserves auto prompt unchanged', () => {
@@ -69,4 +74,69 @@ test('finishing a stale duplicate request cannot remove its replacement', () => 
 test('isAbortError recognizes abort failures', () => {
   assert.equal(isAbortError(new DOMException('cancelled', 'AbortError')), true);
   assert.equal(isAbortError(new Error('network')), false);
+});
+
+test('capture sender remains the active tab only when both tab ids match', () => {
+  assert.equal(isSameTabIdentity({ id: 42 }, { id: 42 }), true);
+  assert.equal(isSameTabIdentity({ id: 42 }, { id: 43 }), false);
+  assert.equal(isSameTabIdentity({ id: 42 }, null), false);
+});
+
+test('Claude text extraction skips thinking blocks and joins visible text blocks', () => {
+  assert.equal(extractClaudeText({
+    content: [
+      { type: 'thinking', thinking: 'hidden reasoning' },
+      { type: 'text', text: 'first line' },
+      { type: 'text', text: 'second line' }
+    ]
+  }), 'first line\nsecond line');
+});
+
+test('completion validation rejects truncated provider responses', () => {
+  assert.throws(
+    () => assertOcrResponseComplete('claude', { stop_reason: 'max_tokens' }),
+    (error) => error.code === 'OCR_RESULT_TRUNCATED'
+  );
+  assert.throws(
+    () => assertOcrResponseComplete('openai', {
+      choices: [{ finish_reason: 'length' }]
+    }),
+    (error) => error.code === 'OCR_RESULT_TRUNCATED'
+  );
+  assert.doesNotThrow(() => assertOcrResponseComplete('openai', {
+    choices: [{ finish_reason: 'stop' }]
+  }));
+});
+
+test('history source URLs retain only a non-sensitive origin', () => {
+  assert.equal(
+    sanitizeSourceUrl('https://example.test/private/report?token=secret#section'),
+    'https://example.test'
+  );
+  assert.equal(sanitizeSourceUrl('file:///Users/person/secret.txt'), 'file://');
+  assert.equal(sanitizeSourceUrl('not a url'), '');
+});
+
+test('history persistence failure does not discard a successful OCR result', async () => {
+  const result = await appendHistoryBestEffort({
+    async append() {
+      throw new Error('quota exceeded');
+    }
+  }, { text: 'paid OCR result' });
+
+  assert.deepEqual(result, {
+    historyId: null,
+    warningCode: 'HISTORY_SAVE_FAILED'
+  });
+});
+
+test('history persistence still propagates cancellation', async () => {
+  await assert.rejects(
+    appendHistoryBestEffort({
+      async append() {
+        throw new DOMException('cancelled', 'AbortError');
+      }
+    }, { text: 'cancelled result' }),
+    (error) => error.name === 'AbortError'
+  );
 });

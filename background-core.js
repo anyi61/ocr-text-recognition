@@ -87,6 +87,58 @@
     }
   }
 
+  function isSameTabIdentity(senderTab, activeTab) {
+    return Number.isInteger(senderTab?.id)
+      && Number.isInteger(activeTab?.id)
+      && senderTab.id === activeTab.id;
+  }
+
+  function createCodedError(code, message) {
+    const error = new Error(message || code);
+    error.code = code;
+    return error;
+  }
+
+  function extractClaudeText(data) {
+    return (Array.isArray(data?.content) ? data.content : [])
+      .filter((block) => typeof block?.text === 'string'
+        && (!block.type || block.type === 'text'))
+      .map((block) => block.text)
+      .join('\n');
+  }
+
+  function assertOcrResponseComplete(provider, data) {
+    const claudeTruncated = provider === 'claude' && data?.stop_reason === 'max_tokens';
+    const chatTruncated = data?.choices?.some((choice) => choice?.finish_reason === 'length');
+    const responsesTruncated = data?.status === 'incomplete'
+      && data?.incomplete_details?.reason === 'max_output_tokens';
+    if (claudeTruncated || chatTruncated || responsesTruncated) {
+      throw createCodedError('OCR_RESULT_TRUNCATED', 'OCR response was truncated');
+    }
+  }
+
+  function sanitizeSourceUrl(value) {
+    try {
+      const url = new URL(String(value || ''));
+      if (url.protocol === 'http:' || url.protocol === 'https:') return url.origin;
+      if (url.protocol === 'file:') return 'file://';
+      return '';
+    } catch {
+      return '';
+    }
+  }
+
+  async function appendHistoryBestEffort(store, record, signal) {
+    try {
+      const historyRecord = await store.append(record, signal);
+      throwIfAborted(signal);
+      return { historyId: historyRecord.id };
+    } catch (error) {
+      if (isAbortError(error) || signal?.aborted) throw error;
+      return { historyId: null, warningCode: 'HISTORY_SAVE_FAILED' };
+    }
+  }
+
   const api = {
     LANGUAGE_INSTRUCTIONS,
     buildRecognitionPrompt,
@@ -94,7 +146,13 @@
     createCredentialFingerprint,
     createRequestRegistry,
     isAbortError,
-    throwIfAborted
+    throwIfAborted,
+    isSameTabIdentity,
+    createCodedError,
+    extractClaudeText,
+    assertOcrResponseComplete,
+    sanitizeSourceUrl,
+    appendHistoryBestEffort
   };
 
   globalScope.OCRBackgroundCore = api;

@@ -85,9 +85,48 @@
     };
   }
 
+  /**
+   * Resize or move a selection while preserving the opposite edge and keeping
+   * the rectangle inside the viewport.
+   */
+  function resizeSelectionRect(originalRect, dragType, deltaX, deltaY, viewport, minSize = 5) {
+    const values = [
+      originalRect?.left, originalRect?.top, originalRect?.width, originalRect?.height,
+      deltaX, deltaY, viewport?.width, viewport?.height, minSize
+    ];
+    if (values.some((value) => !Number.isFinite(value))
+      || originalRect.width <= 0 || originalRect.height <= 0
+      || viewport.width <= 0 || viewport.height <= 0 || minSize <= 0) {
+      throw new TypeError('Selection and viewport dimensions must be finite and positive');
+    }
+
+    const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value));
+    if (dragType === 'move') {
+      return {
+        left: clamp(originalRect.left + deltaX, 0, Math.max(0, viewport.width - originalRect.width)),
+        top: clamp(originalRect.top + deltaY, 0, Math.max(0, viewport.height - originalRect.height)),
+        width: originalRect.width,
+        height: originalRect.height
+      };
+    }
+
+    let left = originalRect.left;
+    let top = originalRect.top;
+    let right = originalRect.left + originalRect.width;
+    let bottom = originalRect.top + originalRect.height;
+
+    if (dragType.includes('w')) left = clamp(originalRect.left + deltaX, 0, right - minSize);
+    if (dragType.includes('e')) right = clamp(right + deltaX, left + minSize, viewport.width);
+    if (dragType.includes('n')) top = clamp(originalRect.top + deltaY, 0, bottom - minSize);
+    if (dragType.includes('s')) bottom = clamp(bottom + deltaY, top + minSize, viewport.height);
+
+    return { left, top, width: right - left, height: bottom - top };
+  }
+
   return {
     createRequestId,
     computeCropScale,
-    fitImageWithinLimits
+    fitImageWithinLimits,
+    resizeSelectionRect
   };
 });

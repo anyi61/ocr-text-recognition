@@ -7,7 +7,8 @@
     timeoutMs: 30_000,
     maxAttempts: 2,
     retryStatuses: [429, 502, 503, 504],
-    retryDelayMs: 250
+    retryDelayMs: 250,
+    maxRetryDelayMs: 5_000
   });
 
   function abortError(message = 'Request cancelled') {
@@ -56,53 +57,61 @@
     const settings = { ...DEFAULT_POLICY, ...policy };
     const attempts = Math.max(1, Math.min(2, settings.maxAttempts));
     const callerSignal = request.signal;
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(
+      () => timeoutController.abort(timeoutError()),
+      settings.timeoutMs
+    );
 
-    for (let attempt = 1; attempt <= attempts; attempt += 1) {
-      if (callerSignal?.aborted) throw abortError();
-      const timeoutController = new AbortController();
-      const timeoutId = setTimeout(() => timeoutController.abort(timeoutError()), settings.timeoutMs);
-      const requestController = new AbortController();
-      const abortFromCaller = () => requestController.abort(abortError());
-      const abortFromTimeout = () => requestController.abort(timeoutError());
-      callerSignal?.addEventListener('abort', abortFromCaller, { once: true });
-      timeoutController.signal.addEventListener('abort', abortFromTimeout, { once: true });
+    try {
+      for (let attempt = 1; attempt <= attempts; attempt += 1) {
+        if (callerSignal?.aborted) throw abortError();
+        if (timeoutController.signal.aborted) throw timeoutError();
+        const requestController = new AbortController();
+        const abortFromCaller = () => requestController.abort(abortError());
+        const abortFromTimeout = () => requestController.abort(timeoutError());
+        callerSignal?.addEventListener('abort', abortFromCaller, { once: true });
+        timeoutController.signal.addEventListener('abort', abortFromTimeout, { once: true });
 
-      try {
-        const response = await fetchImpl(request.url, {
-          ...request,
-          signal: requestController.signal
-        });
-        if (response.ok) {
-          try {
-            return await response.json();
-          } catch {
-            throw new Error('服务器返回了无效的 JSON 数据');
+        try {
+          const response = await fetchImpl(request.url, {
+            ...request,
+            signal: requestController.signal
+          });
+          if (response.ok) {
+            try {
+              return await response.json();
+            } catch {
+              throw new Error('服务器返回了无效的 JSON 数据');
+            }
           }
+          const shouldRetry = settings.retryStatuses.includes(response.status) && attempt < attempts;
+          if (!shouldRetry) throw responseError(response);
+          const delayMs = Math.min(
+            settings.maxRetryDelayMs,
+            retryAfterMs(response, settings.retryDelayMs * (2 ** (attempt - 1)))
+          );
+          await waitForRetry(delayMs, requestController.signal);
+        } catch (error) {
+          if (callerSignal?.aborted) throw abortError();
+          if (timeoutController.signal.aborted) throw timeoutError();
+          if (error?.name === 'AbortError' || error?.code === 'REQUEST_TIMEOUT') throw error;
+          const isNetworkFailure = error instanceof TypeError;
+          if (!isNetworkFailure || attempt >= attempts) throw error;
+          const delayMs = Math.min(
+            settings.maxRetryDelayMs,
+            settings.retryDelayMs * (2 ** (attempt - 1))
+          );
+          await waitForRetry(delayMs, requestController.signal);
+        } finally {
+          callerSignal?.removeEventListener('abort', abortFromCaller);
+          timeoutController.signal.removeEventListener('abort', abortFromTimeout);
         }
-        const shouldRetry = settings.retryStatuses.includes(response.status) && attempt < attempts;
-        if (!shouldRetry) throw responseError(response);
-        await waitForRetry(retryAfterMs(response, settings.retryDelayMs * (2 ** (attempt - 1))), callerSignal);
-      } catch (error) {
-        if (callerSignal?.aborted) {
-          throw abortError();
-        }
-        if (timeoutController.signal.aborted) {
-          throw timeoutError();
-        }
-        if (error?.name === 'AbortError') {
-          throw error;
-        }
-        if (error?.code === 'REQUEST_TIMEOUT') throw error;
-        const isNetworkFailure = error instanceof TypeError;
-        if (!isNetworkFailure || attempt >= attempts) throw error;
-        await waitForRetry(settings.retryDelayMs * (2 ** (attempt - 1)), callerSignal);
-      } finally {
-        clearTimeout(timeoutId);
-        callerSignal?.removeEventListener('abort', abortFromCaller);
-        timeoutController.signal.removeEventListener('abort', abortFromTimeout);
       }
+      throw new Error('网络连接失败，请检查网络或代理设置');
+    } finally {
+      clearTimeout(timeoutId);
     }
-    throw new Error('网络连接失败，请检查网络或代理设置');
   }
 
   function normalizeOcrText(value) {

@@ -19,6 +19,17 @@ const OCRI18n = (function() {
   // 是否已初始化
   let initialized = false;
   let storageListenerBound = false;
+  const ERROR_MESSAGE_KEYS = Object.freeze({
+    MISSING_API_KEY: 'error_missing_api_key',
+    CAPTURE_TAB_CHANGED: 'error_capture_tab_changed',
+    REQUEST_TIMEOUT: 'error_request_timeout',
+    EMPTY_OCR_RESULT: 'error_empty_ocr_result',
+    INVALID_OCR_RESULT: 'error_invalid_ocr_result',
+    OCR_RESULT_TRUNCATED: 'error_ocr_result_truncated',
+    HISTORY_SAVE_FAILED: 'error_history_save_failed',
+    NETWORK_ERROR: 'error_network',
+    UNKNOWN_PROVIDER: 'error_unknown_provider'
+  });
 
   function normalizeLanguageSetting(setting) {
     return ['auto', 'zh_CN', 'en'].includes(setting) ? setting : 'auto';
@@ -66,6 +77,10 @@ const OCRI18n = (function() {
       return 'zh_CN';
     }
     return 'en';
+  }
+
+  function isExtensionPage() {
+    return typeof location === 'undefined' || location.protocol === 'chrome-extension:';
   }
 
   /**
@@ -117,7 +132,9 @@ const OCRI18n = (function() {
 
     // 从存储中读取语言设置
     try {
-      const result = await chrome.storage.local.get(['uiLanguage']);
+      const result = isExtensionPage()
+        ? await chrome.storage.local.get(['uiLanguage'])
+        : await chrome.runtime.sendMessage({ action: 'getContentPreferences' });
       languageSetting = normalizeLanguageSetting(result.uiLanguage);
     } catch (error) {
       console.error('Error reading uiLanguage from storage:', error);
@@ -133,7 +150,7 @@ const OCRI18n = (function() {
       loadDictionary('en')
     ]);
 
-    bindStorageListener();
+    if (isExtensionPage()) bindStorageListener();
     initialized = true;
   }
 
@@ -163,6 +180,13 @@ const OCRI18n = (function() {
 
     // fallback: 返回 key（避免空文案）
     return key;
+  }
+
+  function errorMessage(error, fallbackKey = 'content_msg_recognition_failed') {
+    const code = error?.errorCode || error?.code;
+    const key = ERROR_MESSAGE_KEYS[code];
+    if (key) return t(key);
+    return String(error?.error || error?.message || t(fallbackKey));
   }
 
   /**
@@ -253,7 +277,8 @@ const OCRI18n = (function() {
     applyToDom,
     setLanguage,
     getLanguageSetting,
-    getResolvedLanguage
+    getResolvedLanguage,
+    errorMessage
   };
 })();
 

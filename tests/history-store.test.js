@@ -137,3 +137,32 @@ test('aborted append does not persist a record', async () => {
   );
   assert.deepEqual(storage.snapshot(), []);
 });
+
+test('aborting after a full history write restores the exact pre-image', async () => {
+  const original = Array.from({ length: 50 }, (_, index) => ({
+    id: `old-${index}`,
+    text: `Old ${index}`,
+    timestamp: 100 - index
+  }));
+  const controller = new AbortController();
+  let history = structuredClone(original);
+  let writes = 0;
+  const storage = {
+    async get() {
+      return { ocrHistory: structuredClone(history) };
+    },
+    async set(value) {
+      history = structuredClone(value.ocrHistory);
+      writes += 1;
+      if (writes === 1) controller.abort();
+    }
+  };
+  const store = create(storage, { limit: 50 });
+
+  await assert.rejects(
+    store.append({ id: 'new', text: 'New', timestamp: 999 }, controller.signal),
+    (error) => error?.name === 'AbortError'
+  );
+  assert.deepEqual(history, original);
+  assert.equal(writes, 2);
+});

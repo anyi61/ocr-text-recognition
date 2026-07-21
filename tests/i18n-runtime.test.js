@@ -27,9 +27,15 @@ function createRuntime(storedLanguage, browserLanguage = 'en-US') {
     },
     console: { error() {} },
     CustomEvent: class CustomEvent {},
-    fetch: async () => ({
+    fetch: async (url) => ({
       ok: true,
-      async json() { return { sample: { message: 'sample' } }; }
+      async json() {
+        const locale = String(url).includes('/zh_CN/') ? 'zh_CN' : 'en';
+        return JSON.parse(fs.readFileSync(
+          path.resolve(__dirname, `../_locales/${locale}/messages.json`),
+          'utf8'
+        ));
+      }
     })
   });
   vm.runInContext(SOURCE, context, { filename: 'i18n-runtime.js' });
@@ -51,4 +57,18 @@ test('invalid stored and requested UI languages fall back to auto safely', async
   assert.equal(runtime.getResolvedLanguage(), 'zh_CN');
   assert.equal(saved.length, 1);
   assert.equal(saved[0].uiLanguage, 'auto');
+});
+
+test('stable background error codes resolve through localized message keys', async () => {
+  const { runtime } = createRuntime('en', 'en-US');
+  await runtime.init();
+
+  assert.equal(
+    runtime.errorMessage({ errorCode: 'REQUEST_TIMEOUT', error: '请求超时' }),
+    'The request timed out. Check your network and try again.'
+  );
+  assert.equal(
+    runtime.errorMessage({ errorCode: 'UNKNOWN', error: 'provider detail' }),
+    'provider detail'
+  );
 });

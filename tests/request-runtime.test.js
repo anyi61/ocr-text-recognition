@@ -93,6 +93,40 @@ test('reports a timeout separately from caller cancellation', async () => {
   await assert.rejects(pending, (error) => error.name === 'AbortError');
 });
 
+test('the request deadline also aborts Retry-After waiting', async () => {
+  const startedAt = Date.now();
+  await assert.rejects(
+    fetchJsonWithPolicy(
+      async () => new Response('', {
+        status: 429,
+        headers: { 'retry-after': '0.2' }
+      }),
+      { url: 'https://example.test' },
+      { timeoutMs: 10, maxAttempts: 2, maxRetryDelayMs: 1_000 }
+    ),
+    (error) => error.code === 'REQUEST_TIMEOUT'
+  );
+  assert.ok(Date.now() - startedAt < 100, 'timeout should interrupt retry sleep');
+});
+
+test('caps an untrusted Retry-After value before retrying', async () => {
+  let calls = 0;
+  const startedAt = Date.now();
+  const result = await fetchJsonWithPolicy(async () => {
+    calls += 1;
+    return calls === 1
+      ? new Response('', { status: 503, headers: { 'retry-after': '9999' } })
+      : Response.json({ ok: true });
+  }, { url: 'https://example.test' }, {
+    timeoutMs: 1_000,
+    maxAttempts: 2,
+    maxRetryDelayMs: 5
+  });
+
+  assert.deepEqual(result, { ok: true });
+  assert.ok(Date.now() - startedAt < 100);
+});
+
 test('rejects empty OCR output and accepts trimmed text', () => {
   assert.throws(() => normalizeOcrText('   '), /EMPTY_OCR_RESULT/);
   assert.equal(normalizeOcrText('  readable text\n'), 'readable text');

@@ -62,7 +62,32 @@ const OptionsRuntime = (() => {
     return null;
   }
 
-  return { createStatusPresenter, buildExportData, applyImportedAppearance, validateImportPreferences };
+  function createModalLifecycle(documentApi, overlay, resolve, timerApi = globalThis) {
+    let closed = false;
+    const close = (result) => {
+      if (closed) return;
+      closed = true;
+      documentApi.removeEventListener('keydown', escHandler);
+      overlay.classList.remove('active');
+      timerApi.setTimeout(() => {
+        overlay.remove();
+        resolve(result);
+      }, 300);
+    };
+    const escHandler = (event) => {
+      if (event.key === 'Escape') close(false);
+    };
+    documentApi.addEventListener('keydown', escHandler);
+    return { close };
+  }
+
+  return {
+    createStatusPresenter,
+    buildExportData,
+    applyImportedAppearance,
+    validateImportPreferences,
+    createModalLifecycle
+  };
 })();
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -686,10 +711,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (response.success) {
         showStatus(OCRI18n.t('msg_test_success'), 'success');
       } else {
-        showStatus(OCRI18n.t('msg_test_failed') + ': ' + response.error, 'error');
+        showStatus(`${OCRI18n.t('msg_test_failed')}: ${OCRI18n.errorMessage(response)}`, 'error');
       }
     } catch (error) {
-      showStatus(OCRI18n.t('msg_test_failed') + ': ' + error.message, 'error');
+      showStatus(`${OCRI18n.t('msg_test_failed')}: ${OCRI18n.errorMessage(error)}`, 'error');
     }
 
     testBtn.disabled = false;
@@ -942,13 +967,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       const cancelBtn = overlay.querySelector('#modalCancel');
       const confirmBtn = overlay.querySelector('#modalConfirm');
 
-      const closeDialog = (result) => {
-        overlay.classList.remove('active');
-        setTimeout(() => {
-          document.body.removeChild(overlay);
-          resolve(result);
-        }, 300);
-      };
+      const { close: closeDialog } = OptionsRuntime.createModalLifecycle(
+        document,
+        overlay,
+        resolve
+      );
 
       cancelBtn.addEventListener('click', () => closeDialog(false));
       confirmBtn.addEventListener('click', () => closeDialog(true));
@@ -960,14 +983,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
 
-      // ESC键关闭
-      const escHandler = (e) => {
-        if (e.key === 'Escape') {
-          document.removeEventListener('keydown', escHandler);
-          closeDialog(false);
-        }
-      };
-      document.addEventListener('keydown', escHandler);
     });
   }
 

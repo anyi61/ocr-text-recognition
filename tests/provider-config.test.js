@@ -127,6 +127,11 @@ test('builds an optional host permission pattern from a custom endpoint', () => 
     getEndpointOriginPattern('http://127.0.0.1:3000/ocr'),
     'http://127.0.0.1:3000/*'
   );
+  assert.equal(
+    getEndpointOriginPattern('http://localhost:11434/v1/chat/completions'),
+    'http://localhost:11434/*'
+  );
+  assert.equal(getEndpointOriginPattern('http://ocr.example.com/v1/chat/completions'), null);
   assert.equal(getEndpointOriginPattern('file:///tmp/ocr'), null);
   assert.equal(getEndpointOriginPattern('not a URL'), null);
 });

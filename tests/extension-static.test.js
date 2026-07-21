@@ -44,7 +44,11 @@ test('manifest keeps the minimum expected extension surface', () => {
     'https://dashscope.aliyuncs.com/*',
     'https://open.bigmodel.cn/*'
   ]);
-  assert.deepEqual(manifest.optional_host_permissions, ['http://*/*', 'https://*/*']);
+  assert.deepEqual(manifest.optional_host_permissions, [
+    'https://*/*',
+    'http://localhost/*',
+    'http://127.0.0.1/*'
+  ]);
   assert.deepEqual(
     manifest.web_accessible_resources,
     [{ resources: ['_locales/*'], matches: ['<all_urls>'] }],
@@ -129,6 +133,21 @@ test('content capture waits for i18n and runtime updates the document language',
   assert.match(i18nRuntime, /documentElement\.lang = resolvedLanguage === 'zh_CN'/);
 });
 
+test('content capture uses a closed shadow root and rejects synthetic page events', () => {
+  const content = fs.readFileSync(path.join(ROOT, 'content.js'), 'utf8');
+
+  assert.match(content, /attachShadow\(\{\s*mode:\s*'closed'\s*\}\)/);
+  assert.match(content, /event\?\.isTrusted/);
+  assert.match(content, /window\.addEventListener\('pagehide',\s*fullCleanup\)/);
+});
+
+test('background restricts local storage to trusted extension contexts', () => {
+  const background = fs.readFileSync(path.join(ROOT, 'background.js'), 'utf8');
+
+  assert.match(background, /setAccessLevel\(\{\s*accessLevel:\s*'TRUSTED_CONTEXTS'/);
+  assert.match(background, /request\.action === 'getContentPreferences'/);
+});
+
 test('every project JavaScript file parses', () => {
   const files = walkJavaScript(ROOT);
   assert.ok(files.length > 0);
@@ -139,4 +158,26 @@ test('every project JavaScript file parses', () => {
       `${path.relative(ROOT, file)} must pass node --check`
     );
   }
+});
+
+test('package, manifest, and exported configuration versions stay aligned', () => {
+  const packageJson = readJson('package.json');
+  const manifest = readJson('manifest.json');
+  const options = fs.readFileSync(path.join(ROOT, 'options.js'), 'utf8');
+
+  assert.equal(packageJson.version, manifest.version);
+  assert.match(options, new RegExp(`version: '${packageJson.version.replaceAll('.', '\\.')}'`));
+});
+
+test('the default check includes browser E2E and release commands are documented', () => {
+  const packageJson = readJson('package.json');
+  const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
+
+  assert.match(packageJson.scripts.check, /npm test/);
+  assert.match(packageJson.scripts.check, /test:e2e/);
+  assert.match(packageJson.scripts.check, /npm run lint/);
+  assert.equal(packageJson.engines.node, '>=20');
+  assert.equal(packageJson.scripts.package, 'node scripts/package-extension.mjs');
+  assert.match(readme, /playwright install chromium/);
+  assert.match(readme, /npm run package/);
 });

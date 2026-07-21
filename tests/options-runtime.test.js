@@ -77,3 +77,37 @@ test('only imports supported theme, UI language, and OCR language values', () =>
   assert.match(OptionsRuntime.validateImportPreferences({ uiLanguage: 'fr' }), /uiLanguage/);
   assert.match(OptionsRuntime.validateImportPreferences({ language: 'de' }), /language/);
 });
+
+test('modal lifecycle removes its Escape listener and resolves only once', () => {
+  const OptionsRuntime = loadOptionsRuntime();
+  let addedHandler;
+  let removeCalls = 0;
+  let removeOverlayCalls = 0;
+  const results = [];
+  const fakeDocument = {
+    addEventListener(_name, handler) {
+      addedHandler = handler;
+    },
+    removeEventListener(_name, handler) {
+      assert.equal(handler, addedHandler);
+      removeCalls += 1;
+    }
+  };
+  const overlay = {
+    classList: { remove() {} },
+    remove() { removeOverlayCalls += 1; }
+  };
+  const lifecycle = OptionsRuntime.createModalLifecycle(
+    fakeDocument,
+    overlay,
+    (result) => results.push(result),
+    { setTimeout(callback) { callback(); } }
+  );
+
+  lifecycle.close(false);
+  lifecycle.close(true);
+
+  assert.equal(removeCalls, 1);
+  assert.equal(removeOverlayCalls, 1);
+  assert.deepEqual(results, [false]);
+});

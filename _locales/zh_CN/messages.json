@@ -946,5 +946,17 @@
   "err_import_invalid_prompt": { "message": "提示词格式无效" },
   "err_import_invalid_language": { "message": "识别语言无效" },
   "err_import_invalid_theme": { "message": "主题无效" },
-  "err_import_invalid_uiLanguage": { "message": "界面语言无效" }
+  "err_import_invalid_uiLanguage": { "message": "界面语言无效" },
+  "error_missing_api_key": { "message": "请先配置当前选择的 API，再开始识别。" },
+  "error_capture_tab_changed": { "message": "活动标签页已切换，请重新选择区域。" },
+  "error_request_timeout": { "message": "请求超时，请检查网络后重试。" },
+  "error_empty_ocr_result": { "message": "未识别到文字，请调整选区后重试。" },
+  "error_invalid_ocr_result": { "message": "服务商返回了无法识别的响应格式。" },
+  "error_ocr_result_truncated": { "message": "识别结果被截断，请缩小选区后重试。" },
+  "error_history_save_failed": { "message": "文字识别成功，但历史记录保存失败。" },
+  "error_network": { "message": "网络请求失败，请检查网络或代理设置。" },
+  "error_unknown_provider": { "message": "当前选择的 API 提供商不受支持。" },
+  "notification_config_required": { "message": "请先配置 API，再使用截图快捷键。" },
+  "notification_endpoint_permission_required": { "message": "请先在插件弹窗中授权访问自定义 API 域名。" },
+  "notification_capture_unavailable": { "message": "当前页面无法启动截图，请切换到普通网页后重试。" }
 }

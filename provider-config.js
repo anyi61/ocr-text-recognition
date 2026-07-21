@@ -137,6 +137,9 @@
       return false;
     }
     if (CONFIGURABLE_PROVIDERS.has(provider)) {
+      if (!getEndpointOriginPattern(config.endpoint)) {
+        return false;
+      }
       if (config.authMode !== 'none' && !isPresent(config.apiKey)) {
         return false;
       }
@@ -170,7 +173,9 @@
   function getEndpointOriginPattern(endpoint) {
     try {
       const url = new URL(endpoint);
-      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      const loopbackHttp = url.protocol === 'http:'
+        && (url.hostname === 'localhost' || url.hostname === '127.0.0.1');
+      if (url.protocol !== 'https:' && !loopbackHttp) {
         return null;
       }
       return `${url.origin}/*`;

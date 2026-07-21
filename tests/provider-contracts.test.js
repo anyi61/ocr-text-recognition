@@ -255,3 +255,37 @@ test('all provider adapters reject empty or unknown text shapes', async () => {
     );
   }
 });
+
+test('Claude returns visible text when adaptive thinking blocks come first', async () => {
+  const harness = createBackgroundHarness([{
+    stop_reason: 'end_turn',
+    content: [
+      { type: 'thinking', thinking: 'internal reasoning' },
+      { type: 'text', text: 'VISIBLE OCR TEXT' }
+    ]
+  }]);
+
+  assert.equal(
+    await harness.call('callClaudeAPI(__image, __config)', { apiKey: 'key' }),
+    'VISIBLE OCR TEXT'
+  );
+});
+
+test('provider adapters reject truncated OCR output instead of saving partial text', async () => {
+  const claude = createBackgroundHarness([{
+    stop_reason: 'max_tokens',
+    content: [{ type: 'text', text: 'partial' }]
+  }]);
+  await assert.rejects(
+    claude.call('callClaudeAPI(__image, __config)', { apiKey: 'key' }),
+    (error) => error.code === 'OCR_RESULT_TRUNCATED'
+  );
+
+  const openai = createBackgroundHarness([{
+    choices: [{ finish_reason: 'length', message: { content: 'partial' } }]
+  }]);
+  await assert.rejects(
+    openai.call('callOpenAIAPI(__image, __config)', { apiKey: 'key' }),
+    (error) => error.code === 'OCR_RESULT_TRUNCATED'
+  );
+});
