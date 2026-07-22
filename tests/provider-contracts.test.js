@@ -200,6 +200,27 @@ test('Baidu exchanges credentials once and sends an encoded image to general_bas
   assert.match(harness.requests[1].options.body, /image=ZmFrZS1wbmc%3D/);
 });
 
+test('Baidu connection test accepts a recognized API path when its synthetic image returns 216630', async () => {
+  const harness = createBackgroundHarness([
+    { access_token: 'baidu-token', expires_in: 3600 },
+    { error_code: 216630, error_msg: 'recognize error' }
+  ]);
+
+  await harness.call(
+    'testAPIConnection(__config, (value) => { globalThis.__testResponse = value; })',
+    {
+      apiProvider: 'baidu',
+      apiKey: 'baidu-key',
+      customSecret: 'baidu-secret'
+    }
+  );
+  const response = await harness.call('__testResponse');
+
+  assert.equal(response.success, true);
+  assert.equal(response.warningCode, 'BAIDU_TEST_IMAGE_RECOGNIZE_ERROR');
+  assert.equal(harness.requests.length, 2);
+});
+
 test('Custom supports Responses mode, no auth, and a configured response path', async () => {
   const harness = createBackgroundHarness([
     { payload: { recognized: 'custom response text' } }

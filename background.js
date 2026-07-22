@@ -468,7 +468,9 @@ async function callBaiduOCR(base64Image, config, signal) {
     });
 
     if (ocrData.error_code) {
-      throw new Error(`百度OCR错误: ${ocrData.error_code}`);
+      const error = new Error(`百度OCR错误: ${ocrData.error_code}`);
+      error.code = String(ocrData.error_code);
+      throw error;
     }
 
     return OCRRequestRuntime.normalizeOcrText(ocrData.words_result?.map((item) => item.words).join('\n'));
@@ -749,6 +751,16 @@ async function testAPIConnection(config, sendResponse) {
 
     sendResponse({ success: true, message: '连接成功' });
   } catch (error) {
+    // 216630 表示测试图片识别失败；此时鉴权和 OCR 接口连接均已成功。
+    // 正式识别仍由 callBaiduOCR 抛出该错误，避免隐藏真实图片的识别故障。
+    if (config.apiProvider === 'baidu' && String(error.code) === '216630') {
+      sendResponse({
+        success: true,
+        message: '连接成功',
+        warningCode: 'BAIDU_TEST_IMAGE_RECOGNIZE_ERROR'
+      });
+      return;
+    }
     sendResponse({ success: false, error: error.message, errorCode: error.code });
   }
 }
