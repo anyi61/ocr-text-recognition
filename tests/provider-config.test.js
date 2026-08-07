@@ -26,7 +26,7 @@ function createStorage(initial = {}, hooks = {}) {
       for (const key of keys) {
         if (state[key] !== undefined) selected[key] = structuredClone(state[key]);
       }
-      return selected;
+      return hooks.transformGet ? hooks.transformGet(selected) : selected;
     },
     async set(values) {
       setCalls += 1;
@@ -149,6 +149,40 @@ test('legacy migration is idempotent and shares one in-flight promise', async ()
   assert.deepEqual(storage.state.apiConfigs.claude, {
     apiKey: 'legacy-secret',
     model: 'legacy-model'
+  });
+});
+
+test('legacy migration accepts reordered Chrome storage readback', async () => {
+  const storage = createStorage({
+    apiKey: 'legacy-secret',
+    model: 'legacy-model',
+    openaiApiKey: 'openai-secret',
+    openaiModel: 'openai-model'
+  }, {
+    transformGet(selected) {
+      if (!selected.apiConfigs) return selected;
+      return {
+        ...selected,
+        apiConfigs: {
+          openai: {
+            model: selected.apiConfigs.openai.model,
+            apiKey: selected.apiConfigs.openai.apiKey
+          },
+          claude: {
+            model: selected.apiConfigs.claude.model,
+            apiKey: selected.apiConfigs.claude.apiKey
+          }
+        }
+      };
+    }
+  });
+
+  await migrateLegacyConfigOnce(storage);
+  assert.equal(storage.state.apiKey, undefined);
+  assert.equal(storage.state.openaiApiKey, undefined);
+  assert.deepEqual(storage.state.apiConfigs, {
+    claude: { apiKey: 'legacy-secret', model: 'legacy-model' },
+    openai: { apiKey: 'openai-secret', model: 'openai-model' }
   });
 });
 
