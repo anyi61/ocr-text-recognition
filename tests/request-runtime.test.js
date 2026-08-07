@@ -4,12 +4,18 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  DEFAULT_POLICY,
   fetchJsonWithPolicy,
   normalizeOcrText,
   buildCustomHeaders,
   buildCustomRequestBody,
   extractCustomText
 } = require('../request-runtime.js');
+
+test('default request deadline stays below the service worker fetch boundary', () => {
+  assert.equal(DEFAULT_POLICY.timeoutMs, 27_000);
+  assert.ok(DEFAULT_POLICY.timeoutMs < 30_000);
+});
 
 test('retries one transient 503 then succeeds', async () => {
   let calls = 0;

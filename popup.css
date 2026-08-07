@@ -617,6 +617,20 @@ body {
 }
 
 /* === 底部 (Footer) === */
+.shortcut-status {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-sub);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.shortcut-status.warning {
+  color: var(--status-warning, #9a6700);
+}
+
 .footer {
   display: flex;
   justify-content: space-between;

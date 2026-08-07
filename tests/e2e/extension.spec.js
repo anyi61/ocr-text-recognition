@@ -68,7 +68,8 @@ async function configureExtension(browser, endpoint, model = 'mock-vision-model'
       },
       language: 'en',
       prompt: 'Recognize the text.',
-      ocrHistory: []
+      ocrHistory: [],
+      uploadNoticeAcknowledgedVersion: 1
     });
   }, { endpoint, model });
 }
@@ -172,6 +173,39 @@ test('captures a selection, returns OCR text, and stores history', async () => {
     await expect.poll(() => readHistory(browser.serviceWorker)).toHaveLength(1);
     expect((await readHistory(browser.serviceWorker))[0].text).toBe(RESULT_TEXT);
     expect((await readHistory(browser.serviceWorker))[0].sourceUrl).toBe(mock.origin);
+  } finally {
+    await browser.context.close();
+    fs.rmSync(browser.userDataDir, { recursive: true, force: true });
+    fs.rmSync(browser.extensionDir, { recursive: true, force: true });
+    await mock.close();
+  }
+});
+
+test('requires one-time upload consent before the first provider request', async () => {
+  const mock = await startMockServer();
+  const browser = await launchExtension(mock.origin);
+  try {
+    await configureExtension(browser, `${mock.origin}/v1/chat/completions`);
+    await browser.serviceWorker.evaluate(() => chrome.storage.local.remove('uploadNoticeAcknowledgedVersion'));
+    const page = await browser.context.newPage();
+    await page.goto(mock.origin);
+
+    await startCapture(browser, page);
+    await selectAndConfirm(page);
+    await page.waitForTimeout(150);
+    expect(mock.state.requests).toHaveLength(0);
+
+    // Escape closes only the notice and retains the selected area.
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Enter');
+    await mock.waitForRequestCount(1);
+
+    const acknowledgedVersion = await browser.serviceWorker.evaluate(async () => (
+      (await chrome.storage.local.get('uploadNoticeAcknowledgedVersion')).uploadNoticeAcknowledgedVersion
+    ));
+    expect(acknowledgedVersion).toBe(1);
   } finally {
     await browser.context.close();
     fs.rmSync(browser.userDataDir, { recursive: true, force: true });

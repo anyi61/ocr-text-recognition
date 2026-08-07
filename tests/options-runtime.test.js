@@ -5,13 +5,9 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 function loadOptionsRuntime() {
-  const optionsPath = path.resolve(__dirname, '../options.js');
+  const optionsPath = path.resolve(__dirname, '../options/runtime.js');
   delete require.cache[optionsPath];
-  const previousDocument = global.document;
-  global.document = { addEventListener() {} };
-  const runtime = require(optionsPath);
-  global.document = previousDocument;
-  return runtime;
+  return require(optionsPath);
 }
 
 test('status presenter clears an older hide timer before showing a newer status', () => {
@@ -55,8 +51,9 @@ test('exports appearance preferences and preserves them when importing old backu
     language: 'en',
     theme: 'dark',
     uiLanguage: 'en'
-  }, { openai: { model: 'gpt-test' } }, '2026-07-19T00:00:00.000Z');
+  }, { openai: { model: 'gpt-test' } }, '2.3.4', '2026-07-19T00:00:00.000Z');
 
+  assert.equal(exported.version, '2.3.4');
   assert.equal(exported.config.theme, 'dark');
   assert.equal(exported.config.uiLanguage, 'en');
   assert.deepEqual(
@@ -110,4 +107,12 @@ test('modal lifecycle removes its Escape listener and resolves only once', () =>
   assert.equal(removeCalls, 1);
   assert.equal(removeOverlayCalls, 1);
   assert.deepEqual(results, [false]);
+});
+
+test('import confirmation assigns imported metadata through textContent', () => {
+  const fs = require('node:fs');
+  const source = fs.readFileSync(path.resolve(__dirname, '../options.js'), 'utf8');
+  assert.match(source, /provider\.querySelector\('span'\)\.textContent/);
+  assert.match(source, /exportDate\.querySelector\('span'\)\.textContent/);
+  assert.doesNotMatch(source, /\$\{configInfo\.apiProvider/);
 });

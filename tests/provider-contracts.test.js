@@ -200,6 +200,23 @@ test('Baidu exchanges credentials once and sends an encoded image to general_bas
   assert.match(harness.requests[1].options.body, /image=ZmFrZS1wbmc%3D/);
 });
 
+test('Baidu routes an explicitly selected handwriting mode to its matching endpoint', async () => {
+  const harness = createBackgroundHarness([
+    { access_token: 'baidu-token', expires_in: 3600 },
+    { words_result: [{ words: '手写文本' }] }
+  ]);
+
+  const text = await harness.call('callBaiduOCR(__image, __config)', {
+    apiKey: 'baidu-key',
+    customSecret: 'baidu-secret',
+    mode: 'handwriting',
+    language: 'zh'
+  });
+
+  assert.equal(text, '手写文本');
+  assert.match(harness.requests[1].url, /\/ocr\/v1\/handwriting\?/);
+});
+
 test('Baidu connection test accepts a recognized API path when its synthetic image returns 216630', async () => {
   const harness = createBackgroundHarness([
     { access_token: 'baidu-token', expires_in: 3600 },

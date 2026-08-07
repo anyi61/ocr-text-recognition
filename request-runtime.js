@@ -1,10 +1,13 @@
+// @ts-check
 /**
  * Shared request policy for OCR providers. Kept dependency-free so it can be
  * loaded by the MV3 service worker and exercised directly in Node tests.
  */
 (function initRequestRuntime(globalScope) {
   const DEFAULT_POLICY = Object.freeze({
-    timeoutMs: 30_000,
+    // Leave a safety margin before Chrome terminates an extension service
+    // worker whose fetch response takes more than 30 seconds to arrive.
+    timeoutMs: 27_000,
     maxAttempts: 2,
     retryStatuses: [429, 502, 503, 504],
     retryDelayMs: 250,
@@ -16,15 +19,15 @@
   }
 
   function timeoutError() {
-    const error = new Error('请求超时，请检查网络后重试');
-    error.code = 'REQUEST_TIMEOUT';
-    return error;
+    return Object.assign(new Error('请求超时，请检查网络后重试'), {
+      code: 'REQUEST_TIMEOUT'
+    });
   }
 
   function responseError(response, message) {
-    const error = new Error(message || `HTTP ${response.status}`);
-    error.status = response.status;
-    return error;
+    return Object.assign(new Error(message || `HTTP ${response.status}`), {
+      status: response.status
+    });
   }
 
   function retryAfterMs(response, fallbackMs) {
@@ -42,7 +45,7 @@
       const timer = setTimeout(done, delayMs);
       function done() {
         signal?.removeEventListener('abort', onAbort);
-        resolve();
+        resolve(undefined);
       }
       function onAbort() {
         clearTimeout(timer);
@@ -116,15 +119,15 @@
 
   function normalizeOcrText(value) {
     if (typeof value !== 'string') {
-      const error = new Error('INVALID_OCR_RESULT: 服务端响应不包含可识别的文本字段');
-      error.code = 'INVALID_OCR_RESULT';
-      throw error;
+      throw Object.assign(new Error('INVALID_OCR_RESULT: 服务端响应不包含可识别的文本字段'), {
+        code: 'INVALID_OCR_RESULT'
+      });
     }
     const text = value.trim();
     if (!text) {
-      const error = new Error('EMPTY_OCR_RESULT: 未识别到文字，请调整选区后重试');
-      error.code = 'EMPTY_OCR_RESULT';
-      throw error;
+      throw Object.assign(new Error('EMPTY_OCR_RESULT: 未识别到文字，请调整选区后重试'), {
+        code: 'EMPTY_OCR_RESULT'
+      });
     }
     return text;
   }

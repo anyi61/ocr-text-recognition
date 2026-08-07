@@ -18,6 +18,7 @@
   const CONTENT_SCRIPT_FILES = Object.freeze([
     'i18n-runtime.js',
     'capture-utils.js',
+    'content/styles.js',
     'content.js'
   ]);
 

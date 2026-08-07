@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Shared provider storage mapping and credential helpers.
  * Exposed as a browser global and as CommonJS for Node.js tests.
@@ -40,6 +41,10 @@
       model: 'customModel'
     }
   });
+  const LEGACY_STORAGE_KEYS = Object.freeze([
+    ...new Set(Object.values(LEGACY_FIELDS).flatMap((fields) => Object.values(fields)))
+  ]);
+  const migrationPromises = new WeakMap();
 
   const REQUIRED_FIELDS = Object.freeze({
     claude: ['apiKey'],
@@ -104,6 +109,55 @@
         .filter(([, legacyField]) => legacy[legacyField] !== undefined)
         .map(([field, legacyField]) => [field, legacy[legacyField]])
     );
+  }
+
+  function mergeModernAndLegacyConfigs(apiConfigs, legacy = {}) {
+    const mergedConfigs = apiConfigs && typeof apiConfigs === 'object' && !Array.isArray(apiConfigs)
+      ? { ...apiConfigs }
+      : {};
+
+    for (const provider of Object.keys(STORAGE_KEYS)) {
+      const storageKey = getStorageKey(provider);
+      const modern = mergedConfigs[storageKey];
+      const modernConfig = modern && typeof modern === 'object' && !Array.isArray(modern)
+        ? modern
+        : {};
+      const legacyConfig = getLegacyConfig(legacy, provider);
+      if (Object.keys(modernConfig).length === 0 && Object.keys(legacyConfig).length === 0) {
+        continue;
+      }
+      // Spreading modern values last ensures even an intentionally empty value
+      // is never resurrected from a retired legacy key.
+      mergedConfigs[storageKey] = { ...legacyConfig, ...modernConfig };
+    }
+    return mergedConfigs;
+  }
+
+  function migrateLegacyConfigOnce(storage) {
+    if (!storage || typeof storage !== 'object') {
+      return Promise.reject(new TypeError('A Chrome storage area is required'));
+    }
+    const existing = migrationPromises.get(storage);
+    if (existing) return existing;
+
+    const migration = (async () => {
+      const stored = await storage.get(['apiConfigs', ...LEGACY_STORAGE_KEYS]);
+      const legacyKeys = LEGACY_STORAGE_KEYS.filter((key) => stored[key] !== undefined);
+      const apiConfigs = mergeModernAndLegacyConfigs(stored.apiConfigs, stored);
+      if (legacyKeys.length === 0) return apiConfigs;
+
+      await storage.set({ apiConfigs });
+      const verified = await storage.get(['apiConfigs']);
+      if (JSON.stringify(verified.apiConfigs) !== JSON.stringify(apiConfigs)) {
+        throw new Error('Provider configuration migration verification failed');
+      }
+      await storage.remove(legacyKeys);
+      return apiConfigs;
+    })();
+
+    migrationPromises.set(storage, migration);
+    migration.catch(() => migrationPromises.delete(storage));
+    return migration;
   }
 
   function normalizeConfig(provider, config) {
@@ -200,58 +254,17 @@
     return merged;
   }
 
-  function buildLegacySettings(apiConfigs, existing = {}) {
-    const legacy = {};
-    const claude = apiConfigs?.claude;
-    if (claude) {
-      legacy.apiKey = claude.apiKey ?? existing.apiKey ?? '';
-      legacy.model = claude.model ?? existing.model ?? 'claude-sonnet-5';
-    }
-    const openai = apiConfigs?.openai;
-    if (openai) {
-      legacy.openaiApiKey = openai.apiKey ?? existing.openaiApiKey ?? '';
-      legacy.openaiModel = openai.model ?? existing.openaiModel ?? 'gpt-5-mini';
-    }
-    const baidu = apiConfigs?.baidu;
-    if (baidu) {
-      legacy.baiduApiKey = baidu.apiKey ?? existing.baiduApiKey ?? '';
-      legacy.customSecret = baidu.secret ?? existing.customSecret ?? '';
-    }
-    const aliyun = apiConfigs?.aliyun;
-    if (aliyun) {
-      legacy.aliyunApiKey = aliyun.apiKey ?? existing.aliyunApiKey ?? '';
-      legacy.aliyunModel = aliyun.model ?? existing.aliyunModel ?? 'qwen-vl-max';
-    }
-    const zhipu = apiConfigs?.zhipu;
-    if (zhipu) {
-      legacy.zhipuApiKey = zhipu.apiKey ?? existing.zhipuApiKey ?? '';
-      legacy.zhipuModel = zhipu.model ?? existing.zhipuModel ?? 'glm-4v';
-    }
-    const compatible = apiConfigs?.openaiCompatible;
-    if (compatible) {
-      legacy.compatibleEndpoint = compatible.endpoint ?? existing.compatibleEndpoint ?? '';
-      legacy.compatibleApiKey = compatible.apiKey ?? existing.compatibleApiKey ?? '';
-      legacy.compatibleModel = compatible.model ?? existing.compatibleModel ?? '';
-    }
-    const custom = apiConfigs?.custom;
-    if (custom) {
-      legacy.customEndpoint = custom.endpoint ?? existing.customEndpoint ?? '';
-      legacy.customApiKey = custom.apiKey ?? existing.customApiKey ?? '';
-      legacy.customModel = custom.model ?? existing.customModel ?? '';
-    }
-    return legacy;
-  }
-
   return Object.freeze({
     getStorageKey,
     getProviderConfig,
+    mergeModernAndLegacyConfigs,
+    migrateLegacyConfigOnce,
     normalizeConfig,
     isValidHeaderName,
     hasRequiredCredentials,
     redactApiConfigs,
     getEndpointOriginPattern,
     migrateRetiredModel,
-    mergeImportedApiConfigs,
-    buildLegacySettings
+    mergeImportedApiConfigs
   });
 }));

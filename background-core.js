@@ -128,6 +128,10 @@
     }
   }
 
+  function shouldPersistHistory(senderTab) {
+    return senderTab?.incognito !== true;
+  }
+
   async function appendHistoryBestEffort(store, record, signal) {
     try {
       const historyRecord = await store.append(record, signal);
@@ -152,6 +156,7 @@
     extractClaudeText,
     assertOcrResponseComplete,
     sanitizeSourceUrl,
+    shouldPersistHistory,
     appendHistoryBestEffort
   };
 

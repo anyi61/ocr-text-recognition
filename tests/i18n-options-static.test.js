@@ -32,6 +32,19 @@ test('options and popup use translated messages for import/export and file acces
   assert.match(popupJs, /alert\(OCRI18n\.t\(key\)\)/);
 });
 
+test('options displays the browser-assigned capture shortcut', () => {
+  const optionsJs = read('options.js');
+  const optionsHtml = read('options.html');
+  assert.match(optionsHtml, /id="captureShortcutStatus"/);
+  assert.match(optionsJs, /chrome\.commands\.getAll\(\)/);
+  assert.match(optionsJs, /command\.name === 'start-capture'/);
+  const popupJs = read('popup.js');
+  const popupHtml = read('popup.html');
+  assert.match(popupHtml, /id="popupShortcutStatus"/);
+  assert.match(popupJs, /chrome\.commands\.getAll\(\)/);
+  assert.match(popupJs, /shortcut_status_unavailable/);
+});
+
 test('locales carry every options and popup regression key', () => {
   const required = [
     'provider_claude', 'provider_openai', 'provider_zhipu', 'provider_baidu',

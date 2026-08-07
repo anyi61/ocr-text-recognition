@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 初始化 i18n
   await OCRI18n.init();
   OCRI18n.applyToDom(document);
+  await OCRProviderConfig.migrateLegacyConfigOnce(chrome.storage.local);
 
   // 获取DOM元素
   const captureBtn = document.getElementById('captureBtn');
@@ -31,6 +32,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const closePreviewBtn = document.getElementById('closePreviewBtn');
   const previewCopyBtn = document.getElementById('previewCopyBtn');
   const a11yLive = document.getElementById('a11y-live');
+  const popupShortcutStatus = document.getElementById('popupShortcutStatus');
 
   /**
    * 统一的状态播报函数
@@ -93,20 +95,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyTheme(theme);
   };
 
+  const loadShortcutStatus = async () => {
+    popupShortcutStatus.classList.remove('warning');
+    try {
+      const commands = await chrome.commands.getAll();
+      const captureCommand = commands.find((command) => command.name === 'start-capture');
+      const shortcut = String(captureCommand?.shortcut || '').trim();
+      popupShortcutStatus.textContent = shortcut
+        ? OCRI18n.t('shortcut_assigned', [shortcut])
+        : OCRI18n.t('shortcut_unassigned_help');
+      popupShortcutStatus.classList.toggle('warning', !shortcut);
+    } catch (error) {
+      console.warn('读取快捷键状态失败:', error);
+      popupShortcutStatus.textContent = OCRI18n.t('shortcut_status_unavailable');
+    }
+  };
+
   // 检查是否已配置API（支持多API配置）
   const checkConfig = async () => {
-    const result = await chrome.storage.local.get([
-      'apiProvider', 'apiConfigs', 'apiKey',
-      'compatibleEndpoint', 'compatibleApiKey', 'compatibleModel',
-      'customEndpoint', 'customApiKey', 'customModel'
-    ]);
+    const result = await chrome.storage.local.get(['apiProvider', 'apiConfigs']);
     const provider = result.apiProvider || 'claude';
 
-    // 共享映射会处理 openai-compatible 的存储键及旧版 Claude 配置。
     const hasApiKey = OCRProviderConfig.hasRequiredCredentials(
       result.apiConfigs,
-      provider,
-      result
+      provider
     );
 
     if (!hasApiKey) {
@@ -122,11 +134,7 @@ document.addEventListener('DOMContentLoaded', async () => {
    * is not covered by the extension's fixed host permissions.
    */
   const requestEndpointPermission = async () => {
-    const result = await chrome.storage.local.get([
-      'apiProvider', 'apiConfigs',
-      'compatibleEndpoint', 'compatibleApiKey', 'compatibleModel',
-      'customEndpoint', 'customApiKey', 'customModel'
-    ]);
+    const result = await chrome.storage.local.get(['apiProvider', 'apiConfigs']);
     const provider = result.apiProvider || 'claude';
 
     if (provider !== 'openai-compatible' && provider !== 'custom') {
@@ -134,13 +142,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const modernConfig = OCRProviderConfig.getProviderConfig(result.apiConfigs, provider);
-    const legacyEndpoint = provider === 'openai-compatible'
-      ? result.compatibleEndpoint
-      : result.customEndpoint;
     return OCRExtensionRuntime.requestEndpointPermission(
       chrome,
       provider,
-      modernConfig.endpoint || legacyEndpoint
+      modernConfig.endpoint
     );
   };
 
@@ -152,32 +157,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   const formatHistoryTimestamp = (item) => {
-    const timestamp = Number(item?.timestamp);
-    if (!Number.isFinite(timestamp)) {
-      return String(item?.date || '');
-    }
-    const locale = OCRI18n.getResolvedLanguage() === 'en' ? 'en-US' : 'zh-CN';
-    return new Intl.DateTimeFormat(locale, {
-      dateStyle: 'medium',
-      timeStyle: 'short'
-    }).format(new Date(timestamp));
+    return OCRPopupRuntime.formatHistoryTimestamp(item, OCRI18n.getResolvedLanguage());
   };
 
-  const getHistorySource = (item) => (
-    String(item?.sourceTitle || item?.sourceUrl || '').trim()
-  );
+  const getHistorySource = OCRPopupRuntime.getHistorySource;
 
   const getFilteredHistory = () => {
-    const query = historySearch.value.trim().toLocaleLowerCase();
-    if (!query) return [...historyData];
-
-    return historyData.filter((item) => [
-      item.text,
-      item.provider,
-      item.language,
-      item.sourceTitle,
-      item.sourceUrl
-    ].some((value) => String(value || '').toLocaleLowerCase().includes(query)));
+    return OCRPopupRuntime.filterHistory(historyData, historySearch.value);
   };
 
   /**
@@ -262,16 +248,16 @@ document.addEventListener('DOMContentLoaded', async () => {
               <span class="history-tag history-language"></span>
               <span class="timestamp"></span>
             </div>
-            ${source ? '<span class="history-source"></span>' : ''}
+            <span class="history-source hidden"></span>
           </div>
           <div class="history-item-actions">
-            <button class="history-copy-btn" type="button" title="${OCRI18n.t('content_btn_copy')}" aria-label="${OCRI18n.t('history_copy')}">
+            <button class="history-copy-btn" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
               </svg>
             </button>
-            <button class="history-delete-btn" type="button" title="${OCRI18n.t('history_delete')}" aria-label="${OCRI18n.t('history_delete')}">
+            <button class="history-delete-btn" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -290,7 +276,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       historyItem.querySelector('.history-language').textContent = getLanguageLabel(item.language);
       historyItem.querySelector('.timestamp').textContent = formatHistoryTimestamp(item);
       const sourceElement = historyItem.querySelector('.history-source');
-      if (sourceElement) {
+      if (source) {
+        sourceElement.classList.remove('hidden');
         sourceElement.textContent = source;
         sourceElement.title = item.sourceUrl || source;
       }
@@ -307,6 +294,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
 
       const copyBtn = historyItem.querySelector('.history-copy-btn');
+      copyBtn.title = OCRI18n.t('content_btn_copy');
+      copyBtn.setAttribute('aria-label', OCRI18n.t('history_copy'));
+      const deleteBtn = historyItem.querySelector('.history-delete-btn');
+      deleteBtn.title = OCRI18n.t('history_delete');
+      deleteBtn.setAttribute('aria-label', OCRI18n.t('history_delete'));
       copyBtn.addEventListener('click', async (event) => {
         event.stopPropagation();
         try {
@@ -320,7 +312,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       });
 
-      historyItem.querySelector('.history-delete-btn').addEventListener('click', async (event) => {
+      deleteBtn.addEventListener('click', async (event) => {
         event.stopPropagation();
         if (!confirm(OCRI18n.t('confirm_delete_history'))) return;
 
@@ -351,8 +343,11 @@ document.addEventListener('DOMContentLoaded', async () => {
    */
   const loadHistory = async () => {
     try {
-      const result = await chrome.storage.local.get(['ocrHistory']);
-      historyData = Array.isArray(result.ocrHistory) ? result.ocrHistory : [];
+      const result = await chrome.runtime.sendMessage({ action: 'listHistory' });
+      if (!result?.success) {
+        throw new Error(result?.error || 'History unavailable');
+      }
+      historyData = Array.isArray(result.records) ? result.records : [];
       renderHistory();
     } catch (error) {
       console.error('加载历史记录失败:', error);
@@ -423,7 +418,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   languageSelect.value = OCRI18n.getLanguageSetting();
   await loadTheme();
   await checkConfig();
+  await loadShortcutStatus();
   await loadHistory();
+
+  // Keep an open popup synchronized with OCR results written by content tabs.
+  // renderHistory reads the existing search input, preserving the active filter.
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'local' && changes.ocrHistory) {
+      loadHistory();
+    }
+  });
 
   // 主题切换按钮事件
   themeBtn.addEventListener('click', toggleTheme);
@@ -433,6 +437,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const newLang = e.target.value;
     await OCRI18n.setLanguage(newLang);
     OCRI18n.applyToDom(document);
+    await loadShortcutStatus();
     renderHistory();
   });
 

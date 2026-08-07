@@ -408,6 +408,17 @@ body {
   font-weight: 600;
 }
 
+.upload-disclosure {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(180, 83, 9, 0.28);
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .modal-dialog .config-info {
   background: var(--bg-sub);
   padding: 16px;

@@ -4,15 +4,41 @@ const assert = require('node:assert/strict');
 const {
   getStorageKey,
   getProviderConfig,
+  mergeModernAndLegacyConfigs,
+  migrateLegacyConfigOnce,
   hasRequiredCredentials,
   redactApiConfigs,
   getEndpointOriginPattern,
   migrateRetiredModel,
   mergeImportedApiConfigs,
-  buildLegacySettings,
   normalizeConfig,
   isValidHeaderName
 } = require('../provider-config.js');
+
+function createStorage(initial = {}, hooks = {}) {
+  const state = structuredClone(initial);
+  let setCalls = 0;
+  return {
+    state,
+    get setCalls() { return setCalls; },
+    async get(keys) {
+      const selected = {};
+      for (const key of keys) {
+        if (state[key] !== undefined) selected[key] = structuredClone(state[key]);
+      }
+      return selected;
+    },
+    async set(values) {
+      setCalls += 1;
+      if (hooks.failSet) throw new Error('write failed');
+      Object.assign(state, structuredClone(values));
+      if (hooks.corruptReadback) state.apiConfigs = { corrupted: true };
+    },
+    async remove(keys) {
+      for (const key of keys) delete state[key];
+    }
+  };
+}
 
 test('maps the OpenAI-compatible provider to its camelCase storage key', () => {
   assert.equal(getStorageKey('openai-compatible'), 'openaiCompatible');
@@ -93,6 +119,66 @@ test('accepts the legacy Claude API key', () => {
   assert.equal(hasRequiredCredentials({}, 'claude', { apiKey: '  ' }), false);
 });
 
+test('legacy migration prefers modern values and fills only missing fields', async () => {
+  const storage = createStorage({
+    apiConfigs: {
+      openai: { apiKey: '', model: 'modern-model' },
+      baidu: { apiKey: 'modern-baidu' }
+    },
+    openaiApiKey: 'legacy-openai',
+    openaiModel: 'legacy-model',
+    baiduApiKey: 'legacy-baidu',
+    customSecret: 'legacy-secret'
+  });
+
+  const migrated = await migrateLegacyConfigOnce(storage);
+  assert.deepEqual(migrated.openai, { apiKey: '', model: 'modern-model' });
+  assert.deepEqual(migrated.baidu, { apiKey: 'modern-baidu', secret: 'legacy-secret' });
+  assert.equal(storage.state.openaiApiKey, undefined);
+  assert.equal(storage.state.customSecret, undefined);
+});
+
+test('legacy migration is idempotent and shares one in-flight promise', async () => {
+  const storage = createStorage({ apiKey: 'legacy-secret', model: 'legacy-model' });
+  const first = migrateLegacyConfigOnce(storage);
+  const second = migrateLegacyConfigOnce(storage);
+  assert.equal(first, second);
+  await first;
+  await migrateLegacyConfigOnce(storage);
+  assert.equal(storage.setCalls, 1);
+  assert.deepEqual(storage.state.apiConfigs.claude, {
+    apiKey: 'legacy-secret',
+    model: 'legacy-model'
+  });
+});
+
+test('legacy migration preserves original fields when write or verification fails', async () => {
+  const writeFailure = createStorage({ apiKey: 'keep-me' }, { failSet: true });
+  await assert.rejects(migrateLegacyConfigOnce(writeFailure), /write failed/);
+  assert.equal(writeFailure.state.apiKey, 'keep-me');
+
+  const verificationFailure = createStorage({ apiKey: 'also-keep-me' }, { corruptReadback: true });
+  await assert.rejects(migrateLegacyConfigOnce(verificationFailure), /verification failed/);
+  assert.equal(verificationFailure.state.apiKey, 'also-keep-me');
+});
+
+test('legacy import conversion accepts a legacy-only configuration object', () => {
+  assert.deepEqual(mergeModernAndLegacyConfigs(undefined, {
+    apiKey: 'claude-key',
+    model: 'claude-model',
+    compatibleEndpoint: 'https://example.test/v1/chat/completions',
+    compatibleApiKey: 'compatible-key',
+    compatibleModel: 'vision-model'
+  }), {
+    claude: { apiKey: 'claude-key', model: 'claude-model' },
+    openaiCompatible: {
+      endpoint: 'https://example.test/v1/chat/completions',
+      apiKey: 'compatible-key',
+      model: 'vision-model'
+    }
+  });
+});
+
 test('redacts credentials without mutating the source configuration', () => {
   const source = {
     claude: { apiKey: 'claude-secret', model: 'claude-model' },
@@ -151,10 +237,6 @@ test('redacted imports preserve modern and legacy credentials', () => {
       openai: { model: 'gpt-5-mini' }
     }
   );
-  const legacy = buildLegacySettings(merged, { apiKey: 'legacy-secret' });
-
   assert.equal(merged.openai.apiKey, 'modern-secret');
-  assert.equal(legacy.apiKey, 'legacy-secret');
-  assert.equal(legacy.openaiApiKey, 'modern-secret');
-  assert.equal(legacy.openaiModel, 'gpt-5-mini');
+  assert.equal(merged.openai.model, 'gpt-5-mini');
 });

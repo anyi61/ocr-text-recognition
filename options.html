@@ -36,6 +36,9 @@
             <option value="custom" data-i18n="provider_custom">自定义API接口</option>
           </select>
           <p class="help-text" data-i18n="help_select_provider">选择您想要使用的文字识别服务</p>
+          <p class="upload-disclosure" data-i18n="upload_disclosure_fixed">
+            识别时，所选区域的截图会上传至当前服务商，可能产生费用，并适用该服务商的数据处理政策。
+          </p>
         </div>
       </section>
 
@@ -105,6 +108,15 @@
             <input type="password" id="baiduSecret" class="input" placeholder="">
             <span class="field-status" aria-live="polite"></span>
           </div>
+        </div>
+        <div class="form-group">
+          <label for="baiduMode" data-i18n="label_baidu_mode">识别模式</label>
+          <select id="baiduMode" class="select">
+            <option value="general_basic" data-i18n="baidu_mode_general">通用文字识别（标准）</option>
+            <option value="accurate_basic" data-i18n="baidu_mode_accurate">通用文字识别（高精度）</option>
+            <option value="handwriting" data-i18n="baidu_mode_handwriting">手写文字识别</option>
+          </select>
+          <p class="help-text" data-i18n="help_baidu_mode">高精度和手写模式需要在百度智能云控制台开通相应能力。</p>
         </div>
       </section>
 
@@ -363,13 +375,14 @@
       <section class="info-card">
         <h3 data-i18n="card_shortcuts_title">快捷键</h3>
         <ul>
-          <li><kbd>Ctrl+Shift+S</kbd> / <kbd>Cmd+Shift+S</kbd> - <span data-i18n="shortcut_capture">开始截图识别</span></li>
+          <li><kbd id="captureShortcutStatus">—</kbd> - <span data-i18n="shortcut_capture">开始截图识别</span></li>
           <li><kbd>ESC</kbd> - <span data-i18n="shortcut_cancel">取消截图</span></li>
           <li><kbd>鼠标拖拽</kbd> - <span data-i18n="shortcut_drag">框选区域</span></li>
         </ul>
         <p class="help-text" data-i18n="shortcut_customize_hint">
           提示：可以在 chrome://extensions/shortcuts 中自定义快捷键
         </p>
+        <p class="help-text" id="shortcutAssignmentState" aria-live="polite"></p>
       </section>
 
       <section class="info-card">
@@ -389,6 +402,7 @@
   <script src="i18n-runtime.js"></script>
   <script src="provider-config.js"></script>
   <script src="extension-runtime.js"></script>
+  <script src="options/runtime.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

@@ -5,8 +5,11 @@ const sharedGlobals = Object.fromEntries([
   'console', 'crypto', 'document', 'fetch', 'global', 'globalThis', 'importScripts', 'location', 'module',
   'navigator', 'process', 'requestAnimationFrame', 'require', 'self', 'setInterval',
   'setTimeout', 'structuredClone', 'window', '__dirname', 'OCRBackgroundCore',
-  'OCRCaptureUtils', 'OCRExtensionRuntime', 'OCRHistoryStore', 'OCRI18n',
-  'OCRProviderConfig', 'OCRRequestRuntime'
+  'OCRBackgroundMessageRouter',
+  'OCRCaptureUtils', 'OCRContentStyles', 'OCRExtensionRuntime', 'OCRHistoryStore', 'OCRI18n',
+  'OCROptionsRuntime', 'OCRPopupRuntime', 'OCRProviderAdapters', 'OCRProviderConfig', 'OCRRequestRuntime',
+  'callAliyunOCR', 'callBaiduOCR', 'callClaudeAPI', 'callCustomAPI',
+  'callOpenAIAPI', 'callOpenAICompatibleAPI', 'callZhipuAPI'
 ].map((name) => [name, 'readonly']));
 
 export default [

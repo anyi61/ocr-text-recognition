@@ -59,11 +59,11 @@ test('manifest keeps the minimum expected extension surface', () => {
 test('extension pages load shared configuration before their entry scripts', () => {
   assert.deepEqual(
     scriptSources('popup.html'),
-    ['i18n-runtime.js', 'provider-config.js', 'extension-runtime.js', 'popup.js']
+    ['i18n-runtime.js', 'provider-config.js', 'extension-runtime.js', 'popup/runtime.js', 'popup.js']
   );
   assert.deepEqual(
     scriptSources('options.html'),
-    ['i18n-runtime.js', 'provider-config.js', 'extension-runtime.js', 'options.js']
+    ['i18n-runtime.js', 'provider-config.js', 'extension-runtime.js', 'options/runtime.js', 'options.js']
   );
 });
 
@@ -113,11 +113,11 @@ test('background and popup preserve dependency injection order', () => {
 
   assert.match(
     background,
-    /importScripts\([\s\S]*'provider-config\.js',[\s\S]*'extension-runtime\.js',[\s\S]*'background-core\.js',[\s\S]*'request-runtime\.js',[\s\S]*'history-store\.js'[\s\S]*\)/
+    /importScripts\([\s\S]*'provider-config\.js',[\s\S]*'extension-runtime\.js',[\s\S]*'background-core\.js',[\s\S]*'request-runtime\.js',[\s\S]*'history-store\.js',[\s\S]*'providers\/runtime\.js',[\s\S]*'providers\/registry\.js'[\s\S]*\)/
   );
   assert.match(
     extensionRuntime,
-    /'i18n-runtime\.js',\s*'capture-utils\.js',\s*'content\.js'/
+    /'i18n-runtime\.js',\s*'capture-utils\.js',\s*'content\/styles\.js',\s*'content\.js'/
   );
 });
 
@@ -141,11 +141,22 @@ test('content capture uses a closed shadow root and rejects synthetic page event
   assert.match(content, /window\.addEventListener\('pagehide',\s*fullCleanup\)/);
 });
 
+test('dynamic translations are assigned through DOM properties outside HTML templates', () => {
+  for (const relativePath of ['content.js', 'popup.js', 'options.js']) {
+    const source = fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
+    assert.doesNotMatch(
+      source,
+      /innerHTML\s*=\s*`[^`]*OCRI18n\.t/s,
+      `${relativePath} must not interpolate translated strings into innerHTML`
+    );
+  }
+});
+
 test('background restricts local storage to trusted extension contexts', () => {
   const background = fs.readFileSync(path.join(ROOT, 'background.js'), 'utf8');
 
   assert.match(background, /setAccessLevel\(\{\s*accessLevel:\s*'TRUSTED_CONTEXTS'/);
-  assert.match(background, /request\.action === 'getContentPreferences'/);
+  assert.match(background, /getContentPreferences\(_request, _sender, sendResponse\)/);
 });
 
 test('every project JavaScript file parses', () => {
@@ -164,9 +175,13 @@ test('package, manifest, and exported configuration versions stay aligned', () =
   const packageJson = readJson('package.json');
   const manifest = readJson('manifest.json');
   const options = fs.readFileSync(path.join(ROOT, 'options.js'), 'utf8');
+  const optionsRuntime = fs.readFileSync(path.join(ROOT, 'options/runtime.js'), 'utf8');
+  const checkScript = fs.readFileSync(path.join(ROOT, 'scripts/check-version-sync.mjs'), 'utf8');
 
   assert.equal(packageJson.version, manifest.version);
-  assert.match(options, new RegExp(`version: '${packageJson.version.replaceAll('.', '\\.')}'`));
+  assert.match(options, /chrome\.runtime\.getManifest\(\)\.version/);
+  assert.match(optionsRuntime, /version:\s*runtimeVersion/);
+  assert.match(checkScript, /packageJson\.version !== manifest\.version/);
 });
 
 test('the default check includes browser E2E and release commands are documented', () => {
@@ -176,6 +191,7 @@ test('the default check includes browser E2E and release commands are documented
   assert.match(packageJson.scripts.check, /npm test/);
   assert.match(packageJson.scripts.check, /test:e2e/);
   assert.match(packageJson.scripts.check, /npm run lint/);
+  assert.match(packageJson.scripts.check, /npm run typecheck/);
   assert.equal(packageJson.engines.node, '>=20');
   assert.equal(packageJson.scripts.package, 'node scripts/package-extension.mjs');
   assert.match(readme, /playwright install chromium/);

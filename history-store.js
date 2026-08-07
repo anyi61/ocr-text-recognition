@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Serialized local history operations shared by the background worker, popup,
  * and Node tests.

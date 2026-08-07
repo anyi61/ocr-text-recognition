@@ -73,7 +73,7 @@ test('missing content listener triggers ordered injection and retry', async () =
     'inject',
     {
       target: { tabId: 42 },
-      files: ['i18n-runtime.js', 'capture-utils.js', 'content.js']
+      files: ['i18n-runtime.js', 'capture-utils.js', 'content/styles.js', 'content.js']
     }
   ]);
   assert.equal(attempts, 2);

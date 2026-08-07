@@ -11,6 +11,7 @@ const {
   extractClaudeText,
   assertOcrResponseComplete,
   sanitizeSourceUrl,
+  shouldPersistHistory,
   appendHistoryBestEffort
 } = require('../background-core.js');
 
@@ -115,6 +116,12 @@ test('history source URLs retain only a non-sensitive origin', () => {
   );
   assert.equal(sanitizeSourceUrl('file:///Users/person/secret.txt'), 'file://');
   assert.equal(sanitizeSourceUrl('not a url'), '');
+});
+
+test('incognito OCR results are never eligible for persistent history', () => {
+  assert.equal(shouldPersistHistory({ incognito: true }), false);
+  assert.equal(shouldPersistHistory({ incognito: false }), true);
+  assert.equal(shouldPersistHistory(undefined), true);
 });
 
 test('history persistence failure does not discard a successful OCR result', async () => {

@@ -35,6 +35,17 @@ test('popup exposes searchable, deletable, exportable history controls', () => {
   assert.match(popup, /sourceUrl/);
 });
 
+test('popup reads serialized history through the worker and refreshes on storage changes', () => {
+  const popup = read('popup.js');
+  const background = read('background.js');
+
+  assert.match(popup, /action:\s*'listHistory'/);
+  assert.match(popup, /chrome\.storage\.onChanged\.addListener/);
+  assert.match(popup, /changes\.ocrHistory/);
+  assert.match(background, /listHistory\(_request, _sender, sendResponse\)/);
+  assert.match(background, /historyStore\.list\(\)/);
+});
+
 test('history rendering assigns untrusted text through DOM properties', () => {
   const popup = read('popup.js');
 
@@ -47,10 +58,11 @@ test('history rendering assigns untrusted text through DOM properties', () => {
 
 test('history timestamps are rendered from timestamp using the active UI locale', () => {
   const popup = read('popup.js');
+  const runtime = read('popup/runtime.js');
 
   assert.match(popup, /OCRI18n\.getResolvedLanguage\(\)/);
-  assert.match(popup, /Intl\.DateTimeFormat/);
-  assert.match(popup, /item\.timestamp/);
+  assert.match(runtime, /Intl\.DateTimeFormat/);
+  assert.match(runtime, /item\?\.timestamp/);
 });
 
 test('popup passes complete tab context and explains unsupported pages', () => {

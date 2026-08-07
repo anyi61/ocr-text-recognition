@@ -67,6 +67,7 @@
   let activeRequestId = null;
   let captureSessionId = null;
   let isProcessing = false;
+  let uploadNoticeOpen = false;
 
   // Shadow DOM 相关变量
   let shadowHost = null;      // Shadow DOM 宿主元素
@@ -107,265 +108,6 @@
     themeListenerBound = true;
   }
 
-  /**
-   * 获取所有样式内容
-   * @returns {string} 样式文本
-   */
-  function getAllStyles() {
-    return `
-    :host {
-      --bg-main: #FFFFFF;
-      --bg-sub: #F5F5F7;
-      --bg-hover: #EAEAEC;
-      --text-primary: #1D1D1F;
-      --text-secondary: #6B6B6E;
-      --text-tertiary: #9E9EA3;
-      --accent: #000000;
-      --accent-inverse: #FFFFFF;
-      --border: rgba(0, 0, 0, 0.08);
-      --divider: rgba(0, 0, 0, 0.06);
-      --radius-xs: 6px;
-      --radius-sm: 8px;
-      --radius-md: 12px;
-      --radius-lg: 14px;
-      --radius-xl: 24px;
-      --duration-fast: 150ms;
-      --duration-normal: 300ms;
-      --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    :host([data-theme="dark"]) {
-      --bg-main: #0A0A0A;
-      --bg-sub: #1C1C1E;
-      --bg-hover: #2C2C2E;
-      --text-primary: #F5F5F7;
-      --text-secondary: #A0A0A5;
-      --text-tertiary: #6C6C70;
-      --accent: #FFFFFF;
-      --accent-inverse: #000000;
-      --border: rgba(255, 255, 255, 0.10);
-      --divider: rgba(255, 255, 255, 0.08);
-    }
-
-    /* 进度通知样式 */
-    #ocr-progress-notification {
-      position: fixed;
-      top: 32px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--bg-sub);
-      color: var(--text-primary);
-      padding: 16px 24px;
-      border-radius: var(--radius-md);
-      z-index: ${Z.PROGRESS};
-      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
-      border: 1px solid var(--border);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      animation: ocr-progress-fadeIn var(--duration-normal) var(--ease-smooth);
-    }
-    @keyframes ocr-progress-fadeIn {
-      from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
-      to { opacity: 1; transform: translateX(-50%) translateY(0); }
-    }
-    .ocr-progress-content {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-    .ocr-progress-spinner {
-      width: 20px;
-      height: 20px;
-      border: 2px solid var(--divider);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: ocr-spin 0.8s linear infinite;
-    }
-    @keyframes ocr-spin {
-      to { transform: rotate(360deg); }
-    }
-    .ocr-progress-info {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .ocr-progress-message {
-      font-size: 14px;
-      font-weight: 600;
-    }
-    .ocr-progress-time {
-      font-size: 12px;
-      color: var(--text-tertiary);
-    }
-    .ocr-progress-cancel {
-      background: var(--bg-hover);
-      border: none;
-      color: var(--text-secondary);
-      padding: 6px 14px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 500;
-      transition: all var(--duration-fast);
-    }
-    .ocr-progress-cancel:hover {
-      background: var(--text-tertiary);
-      color: var(--bg-main);
-    }
-
-    /* 编辑模式样式 */
-    .ocr-handle {
-      position: fixed;
-      width: 10px;
-      height: 10px;
-      background: var(--accent);
-      border: 2px solid var(--bg-main);
-      border-radius: 50%;
-      cursor: pointer;
-      pointer-events: auto;
-      z-index: ${Z.HANDLE};
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      transition: transform var(--duration-fast) var(--ease-smooth);
-    }
-    .ocr-handle::before {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      background: transparent;
-    }
-    .ocr-handle:hover {
-      transform: scale(1.4);
-    }
-    .ocr-handle:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 4px;
-    }
-    .ocr-handle-nw { cursor: nwse-resize; }
-    .ocr-handle-ne { cursor: nesw-resize; }
-    .ocr-handle-sw { cursor: nesw-resize; }
-    .ocr-handle-se { cursor: nwse-resize; }
-    .ocr-handle-n, .ocr-handle-s { cursor: ns-resize; }
-    .ocr-handle-e, .ocr-handle-w { cursor: ew-resize; }
-
-    /* 选区框样式 */
-    #ocr-selection-box {
-      border: 2px solid var(--accent);
-      box-sizing: border-box;
-      box-shadow: 0 0 0 1px var(--bg-main), 0 0 20px rgba(0,0,0,0.1);
-      transition: none !important; /* 禁止选区框动画 */
-    }
-
-    /* 工具栏样式 */
-    #ocr-toolbar {
-      position: fixed;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding: 10px 16px;
-      background: var(--bg-main);
-      border-radius: var(--radius-md);
-      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
-      border: 1px solid var(--border);
-      pointer-events: auto;
-      z-index: ${Z.TOOLBAR};
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      animation: ocr-toolbar-fadeIn var(--duration-normal) var(--ease-smooth);
-      transition: none !important;
-    }
-    @keyframes ocr-toolbar-fadeIn {
-      from { opacity: 0; transform: translate(-50%, 10px); }
-      to { opacity: 1; transform: translate(-50%, 0); }
-    }
-    .ocr-size-info {
-      color: var(--text-secondary);
-      font-size: 13px;
-      font-weight: 600;
-      font-family: ui-monospace, SFMono-Regular, monospace;
-      min-width: 80px;
-    }
-    .ocr-size-warning {
-      color: #FF3B30;
-    }
-    .ocr-toolbar-buttons {
-      display: flex;
-      gap: 10px;
-    }
-    .ocr-btn {
-      padding: 8px 16px;
-      border: none;
-      border-radius: var(--radius-sm);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all var(--duration-fast) var(--ease-smooth);
-      font-family: inherit;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .ocr-btn:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-    }
-    .ocr-btn-primary {
-      background: var(--accent);
-      color: var(--accent-inverse);
-    }
-    .ocr-btn-primary:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .ocr-btn-primary:active:not(:disabled) {
-      transform: scale(0.97);
-    }
-    .ocr-btn-secondary {
-      background: var(--bg-sub);
-      color: var(--text-primary);
-      border: 1px solid var(--border);
-    }
-    .ocr-btn-secondary:hover:not(:disabled) {
-      background: var(--bg-hover);
-    }
-    .ocr-btn-cancel {
-      background: transparent;
-      color: var(--text-tertiary);
-      border: 1px solid var(--divider);
-    }
-    .ocr-btn-cancel:hover:not(:disabled) {
-      background: var(--bg-sub);
-      color: var(--text-primary);
-      border-color: var(--text-tertiary);
-    }
-    .ocr-btn:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 3px;
-    }
-
-    /* 编辑模式下的选区框 */
-    #ocr-selection-box.edit-mode {
-      pointer-events: auto;
-      cursor: move;
-      background: rgba(0, 0, 0, 0.03);
-    }
-
-    /* 无障碍：屏幕阅读器专用 */
-    .ocr-sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
-    }
-    `;
-  }
 
   /**
    * 初始化 Shadow DOM
@@ -396,7 +138,7 @@
 
     // 创建样式元素
     styleEl = document.createElement('style');
-    styleEl.textContent = getAllStyles();
+    styleEl.textContent = OCRContentStyles.getAllStyles(Z);
     shadowRoot.appendChild(styleEl);
 
     // 添加到页面
@@ -726,14 +468,26 @@
     toolbar.id = 'ocr-toolbar';
     toolbar.setAttribute('role', 'toolbar');
     toolbar.innerHTML = `
-      <span class="ocr-size-info">${Math.round(currentRect.width)} × ${Math.round(currentRect.height)} px</span>
+      <span class="ocr-size-info"></span>
       <div class="ocr-toolbar-buttons">
-        <button class="ocr-btn ocr-btn-secondary" id="ocr-undo-btn" aria-label="${OCRI18n.t('content_aria_undo')}" disabled>${OCRI18n.t('content_btn_undo')}</button>
-        <button class="ocr-btn ocr-btn-primary" id="ocr-confirm-btn" aria-label="${OCRI18n.t('content_aria_confirm')}">${OCRI18n.t('content_btn_confirm')}</button>
-        <button class="ocr-btn ocr-btn-secondary" id="ocr-reselect-btn" aria-label="${OCRI18n.t('content_aria_reselect')}">${OCRI18n.t('content_btn_reselect')}</button>
-        <button class="ocr-btn ocr-btn-cancel" id="ocr-cancel-btn" aria-label="${OCRI18n.t('content_aria_cancel')}">${OCRI18n.t('content_btn_cancel_capture')}</button>
+        <button class="ocr-btn ocr-btn-secondary" id="ocr-undo-btn" disabled></button>
+        <button class="ocr-btn ocr-btn-primary" id="ocr-confirm-btn"></button>
+        <button class="ocr-btn ocr-btn-secondary" id="ocr-reselect-btn"></button>
+        <button class="ocr-btn ocr-btn-cancel" id="ocr-cancel-btn"></button>
       </div>
     `;
+
+    toolbar.querySelector('.ocr-size-info').textContent = `${Math.round(currentRect.width)} × ${Math.round(currentRect.height)} px`;
+    for (const [selector, textKey, ariaKey] of [
+      ['#ocr-undo-btn', 'content_btn_undo', 'content_aria_undo'],
+      ['#ocr-confirm-btn', 'content_btn_confirm', 'content_aria_confirm'],
+      ['#ocr-reselect-btn', 'content_btn_reselect', 'content_aria_reselect'],
+      ['#ocr-cancel-btn', 'content_btn_cancel_capture', 'content_aria_cancel']
+    ]) {
+      const button = toolbar.querySelector(selector);
+      button.textContent = OCRI18n.t(textKey);
+      button.setAttribute('aria-label', OCRI18n.t(ariaKey));
+    }
 
     if (shadowRoot) {
       shadowRoot.appendChild(toolbar);
@@ -798,7 +552,11 @@
     const confirmBtn = toolbar.querySelector('#ocr-confirm-btn');
 
     if (currentRect.width < 10 || currentRect.height < 10) {
-      sizeInfo.innerHTML = `<span class="ocr-size-warning">${Math.round(currentRect.width)} × ${Math.round(currentRect.height)} px - ${OCRI18n.t('content_msg_selection_small_edit')}</span>`;
+      sizeInfo.replaceChildren();
+      const warning = document.createElement('span');
+      warning.className = 'ocr-size-warning';
+      warning.textContent = `${Math.round(currentRect.width)} × ${Math.round(currentRect.height)} px - ${OCRI18n.t('content_msg_selection_small_edit')}`;
+      sizeInfo.appendChild(warning);
       confirmBtn.disabled = true;
     } else {
       sizeInfo.textContent = `${Math.round(currentRect.width)} × ${Math.round(currentRect.height)} px`;
@@ -1135,13 +893,103 @@
     }
   }
 
+  function getProviderLabel(provider) {
+    const keys = {
+      claude: 'provider_claude',
+      openai: 'provider_openai',
+      baidu: 'provider_baidu',
+      aliyun: 'provider_aliyun',
+      zhipu: 'provider_zhipu',
+      'openai-compatible': 'provider_openai_compatible',
+      custom: 'provider_custom'
+    };
+    return OCRI18n.t(keys[provider] || 'provider_custom');
+  }
+
+  async function confirmUploadNoticeIfNeeded() {
+    const state = await chrome.runtime.sendMessage({ action: 'getUploadNoticeState' });
+    if (!state?.success) {
+      throw new Error(OCRI18n.t('content_upload_notice_state_failed'));
+    }
+    if (state.acknowledged) return true;
+    if (!shadowRoot) return false;
+
+    uploadNoticeOpen = true;
+    const accepted = await new Promise((resolve) => {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'ocr-upload-notice-backdrop';
+
+      const dialog = document.createElement('div');
+      dialog.className = 'ocr-upload-notice-dialog';
+      dialog.setAttribute('role', 'dialog');
+      dialog.setAttribute('aria-modal', 'true');
+
+      const title = document.createElement('h2');
+      title.textContent = OCRI18n.t('content_upload_notice_title');
+      const message = document.createElement('p');
+      message.textContent = OCRI18n.t('content_upload_notice_message', [
+        getProviderLabel(state.provider)
+      ]);
+
+      const actions = document.createElement('div');
+      actions.className = 'ocr-upload-notice-actions';
+      const cancelButton = document.createElement('button');
+      cancelButton.type = 'button';
+      cancelButton.className = 'ocr-upload-notice-cancel';
+      cancelButton.textContent = OCRI18n.t('btn_cancel');
+      const acceptButton = document.createElement('button');
+      acceptButton.type = 'button';
+      acceptButton.className = 'ocr-upload-notice-accept';
+      acceptButton.textContent = OCRI18n.t('content_upload_notice_accept');
+
+      const finish = (value) => {
+        backdrop.remove();
+        uploadNoticeOpen = false;
+        resolve(value);
+      };
+      cancelButton.addEventListener('click', (event) => {
+        if (event?.isTrusted) finish(false);
+      });
+      acceptButton.addEventListener('click', (event) => {
+        if (event?.isTrusted) finish(true);
+      });
+      dialog.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          finish(false);
+        }
+      });
+
+      actions.append(cancelButton, acceptButton);
+      dialog.append(title, message, actions);
+      backdrop.appendChild(dialog);
+      shadowRoot.appendChild(backdrop);
+      cancelButton.focus();
+    });
+
+    if (!accepted) return false;
+    const result = await chrome.runtime.sendMessage({ action: 'acknowledgeUploadNotice' });
+    if (!result?.success) {
+      throw new Error(OCRI18n.t('content_upload_notice_state_failed'));
+    }
+    return true;
+  }
+
   /**
    * 确认选区并开始识别
    */
   async function confirmSelection(event) {
-    if (!event?.isTrusted || isProcessing || !captureSessionId) return;
+    if (!event?.isTrusted || isProcessing || uploadNoticeOpen || !captureSessionId) return;
     if (!currentRect || currentRect.width < 10 || currentRect.height < 10) {
       showNotification(OCRI18n.t('content_msg_selection_small_edit'), 'warning');
+      return;
+    }
+
+    try {
+      if (!(await confirmUploadNoticeIfNeeded())) return;
+    } catch (error) {
+      showNotification(error.message, 'error');
       return;
     }
 
@@ -1287,6 +1135,7 @@
   // 键盘事件
   function onKeyDown(e) {
     if (!e?.isTrusted) return;
+    if (uploadNoticeOpen) return;
     if (e.key === 'Escape') {
       if (isEditMode) {
         // 编辑模式下ESC取消
@@ -1619,8 +1468,8 @@
         }
       </style>
       <div class="ocr-result-header">
-        <span class="ocr-result-title">${OCRI18n.t('preview_title')}</span>
-        <button class="ocr-close-btn" title="${OCRI18n.t('btn_close')}" aria-label="${OCRI18n.t('content_aria_close')}">
+        <span class="ocr-result-title"></span>
+        <button class="ocr-close-btn">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -1628,17 +1477,17 @@
         </button>
       </div>
       <div class="ocr-result-content">
-        <textarea class="ocr-result-textarea" id="ocr-result-text" placeholder="${OCRI18n.t('content_result_title')}" aria-label="${OCRI18n.t('content_aria_result')}"></textarea>
+        <textarea class="ocr-result-textarea" id="ocr-result-text"></textarea>
         <div class="ocr-result-actions">
-          <button class="ocr-result-btn ocr-result-btn-primary copy-btn" aria-label="${OCRI18n.t('content_aria_copy')}">
+          <button class="ocr-result-btn ocr-result-btn-primary copy-btn">
             <svg class="copy-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
-            <span class="btn-text">${OCRI18n.t('content_btn_copy')}</span>
+            <span class="btn-text"></span>
           </button>
-          <button class="ocr-result-btn ocr-result-btn-secondary save-changes-btn" type="button" disabled>${OCRI18n.t('content_btn_save_changes')}</button>
-          <button class="ocr-result-btn ocr-result-btn-secondary close-popup-btn" aria-label="${OCRI18n.t('btn_close')}">${OCRI18n.t('btn_close')}</button>
+          <button class="ocr-result-btn ocr-result-btn-secondary save-changes-btn" type="button" disabled></button>
+          <button class="ocr-result-btn ocr-result-btn-secondary close-popup-btn"></button>
         </div>
       </div>
     `;
@@ -1658,6 +1507,16 @@
     const saveChangesBtn = popup.querySelector('.save-changes-btn');
     const btnText = copyBtn.querySelector('.btn-text');
     const copyIcon = copyBtn.querySelector('.copy-icon');
+    popup.querySelector('.ocr-result-title').textContent = OCRI18n.t('preview_title');
+    closeBtn.title = OCRI18n.t('btn_close');
+    closeBtn.setAttribute('aria-label', OCRI18n.t('content_aria_close'));
+    textarea.placeholder = OCRI18n.t('content_result_title');
+    textarea.setAttribute('aria-label', OCRI18n.t('content_aria_result'));
+    copyBtn.setAttribute('aria-label', OCRI18n.t('content_aria_copy'));
+    btnText.textContent = OCRI18n.t('content_btn_copy');
+    saveChangesBtn.textContent = OCRI18n.t('content_btn_save_changes');
+    closePopupBtn.textContent = OCRI18n.t('btn_close');
+    closePopupBtn.setAttribute('aria-label', OCRI18n.t('btn_close'));
     let lastSavedText = textarea.value.trim();
 
     const updateSaveButtonState = () => {
@@ -1832,12 +1691,19 @@
       <div class="ocr-progress-content">
         <div class="ocr-progress-spinner"></div>
         <div class="ocr-progress-info">
-          <div class="ocr-progress-message">${message}</div>
-          <div class="ocr-progress-time">${OCRI18n.t('content_progress_elapsed')}: 0 ${OCRI18n.t('content_progress_seconds')}</div>
+          <div class="ocr-progress-message"></div>
+          <div class="ocr-progress-time"></div>
         </div>
-        ${showCancel ? `<button class="ocr-progress-cancel">${OCRI18n.t('content_progress_cancel')}</button>` : ''}
       </div>
     `;
+    notification.querySelector('.ocr-progress-message').textContent = message;
+    notification.querySelector('.ocr-progress-time').textContent = `${OCRI18n.t('content_progress_elapsed')}: 0 ${OCRI18n.t('content_progress_seconds')}`;
+    if (showCancel) {
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'ocr-progress-cancel';
+      cancelButton.textContent = OCRI18n.t('content_progress_cancel');
+      notification.querySelector('.ocr-progress-content').appendChild(cancelButton);
+    }
 
     if (shadowRoot) {
       shadowRoot.appendChild(notification);

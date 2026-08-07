@@ -238,6 +238,26 @@
     "message": "Secret Key",
     "description": "Secret Key label"
   },
+  "label_baidu_mode": {
+    "message": "识别模式",
+    "description": "Baidu OCR mode label"
+  },
+  "baidu_mode_general": {
+    "message": "通用文字识别（标准）",
+    "description": "Baidu general OCR mode"
+  },
+  "baidu_mode_accurate": {
+    "message": "通用文字识别（高精度）",
+    "description": "Baidu accurate OCR mode"
+  },
+  "baidu_mode_handwriting": {
+    "message": "手写文字识别",
+    "description": "Baidu handwriting OCR mode"
+  },
+  "help_baidu_mode": {
+    "message": "高精度和手写模式需要在百度智能云控制台开通相应能力。",
+    "description": "Baidu OCR mode help"
+  },
   "label_model_name": {
     "message": "模型名称",
     "description": "Model name label"
@@ -530,6 +550,22 @@
   "shortcut_customize_hint": {
     "message": "提示：可以在 chrome://extensions/shortcuts 中自定义快捷键",
     "description": "Customize shortcut hint"
+  },
+  "shortcut_unassigned": {
+    "message": "未设置",
+    "description": "Unassigned shortcut label"
+  },
+  "shortcut_assigned": {
+    "message": "当前全局快捷键：{0}",
+    "description": "Assigned shortcut state"
+  },
+  "shortcut_unassigned_help": {
+    "message": "当前未分配快捷键，请在浏览器扩展快捷键页面中设置。",
+    "description": "Unassigned shortcut help"
+  },
+  "shortcut_status_unavailable": {
+    "message": "暂时无法读取快捷键状态，可在 chrome://extensions/shortcuts 中查看。",
+    "description": "Shortcut API unavailable message"
   },
 
   "api_claude_opus": {
@@ -958,5 +994,10 @@
   "error_unknown_provider": { "message": "当前选择的 API 提供商不受支持。" },
   "notification_config_required": { "message": "请先配置 API，再使用截图快捷键。" },
   "notification_endpoint_permission_required": { "message": "请先在插件弹窗中授权访问自定义 API 域名。" },
-  "notification_capture_unavailable": { "message": "当前页面无法启动截图，请切换到普通网页后重试。" }
+  "notification_capture_unavailable": { "message": "当前页面无法启动截图，请切换到普通网页后重试。" },
+  "upload_disclosure_fixed": { "message": "识别时，所选区域的截图会上传至当前服务商，可能产生费用，并适用该服务商的数据处理政策。" },
+  "content_upload_notice_title": { "message": "发送截图前请确认" },
+  "content_upload_notice_message": { "message": "所选区域的截图将上传至 {0} 进行识别，可能产生费用。请确认截图不包含不应交给该服务商处理的敏感信息。" },
+  "content_upload_notice_accept": { "message": "同意并开始识别" },
+  "content_upload_notice_state_failed": { "message": "无法保存上传确认状态，请稍后重试。" }
 }

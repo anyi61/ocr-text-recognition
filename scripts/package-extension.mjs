@@ -9,18 +9,23 @@ export const PRODUCTION_FILES = Object.freeze([
   'manifest.json',
   'background.js',
   'background-core.js',
+  'background-message-router.js',
   'capture-utils.js',
+  'content',
   'content.js',
   'extension-runtime.js',
   'history-store.js',
   'i18n-runtime.js',
   'provider-config.js',
+  'providers',
   'request-runtime.js',
   'options.html',
   'options.css',
+  'options',
   'options.js',
   'popup.html',
   'popup.css',
+  'popup',
   'popup.js',
   '_locales',
   'icons'
@@ -30,10 +35,11 @@ export function readReleaseVersion(root = ROOT) {
   const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
   const optionsSource = fs.readFileSync(path.join(root, 'options.js'), 'utf8');
-  const exportedVersion = optionsSource.match(/version:\s*'([^']+)'/)?.[1];
-  const versions = [packageJson.version, manifest.version, exportedVersion];
-  if (!versions.every((version) => version === packageJson.version)) {
-    throw new Error(`Version mismatch: package=${packageJson.version}, manifest=${manifest.version}, export=${exportedVersion}`);
+  if (packageJson.version !== manifest.version) {
+    throw new Error(`Version mismatch: package=${packageJson.version}, manifest=${manifest.version}`);
+  }
+  if (!/chrome\.runtime\.getManifest\(\)\.version/.test(optionsSource)) {
+    throw new Error('Export configuration must read the runtime manifest version');
   }
   return packageJson.version;
 }

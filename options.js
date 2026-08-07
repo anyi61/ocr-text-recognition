@@ -5,99 +5,13 @@
 
 // 使用统一的 OCRI18n API（来自 i18n-runtime.js）
 
-const OptionsRuntime = (() => {
-  function createStatusPresenter(statusMessage, timerApi = globalThis) {
-    let hideTimer = null;
-    return (message, type) => {
-      if (hideTimer !== null) {
-        timerApi.clearTimeout(hideTimer);
-        hideTimer = null;
-      }
-      statusMessage.textContent = message;
-      statusMessage.className = 'status-message ' + type;
-      statusMessage.classList.remove('hidden');
-      if (type !== 'loading') {
-        hideTimer = timerApi.setTimeout(() => {
-          statusMessage.classList.add('hidden');
-          hideTimer = null;
-        }, 5000);
-      }
-    };
-  }
-
-  function buildExportData(result, apiConfigs, exportDate = new Date().toISOString()) {
-    return {
-      version: '1.1.0',
-      exportDate,
-      appName: 'OCR文字识别助手',
-      config: {
-        apiProvider: result.apiProvider || 'claude',
-        apiConfigs,
-        prompt: result.prompt || '',
-        language: result.language || 'auto',
-        theme: result.theme || 'light',
-        uiLanguage: result.uiLanguage || 'auto'
-      }
-    };
-  }
-
-  function applyImportedAppearance(config, existingSettings) {
-    return {
-      // Old exports do not carry these fields, so retain local preferences.
-      theme: config.theme ?? existingSettings.theme ?? 'light',
-      uiLanguage: config.uiLanguage ?? existingSettings.uiLanguage ?? 'auto'
-    };
-  }
-
-  function validateImportPreferences(config) {
-    if (config.theme !== undefined && !['light', 'dark'].includes(config.theme)) {
-      return 'theme';
-    }
-    if (config.uiLanguage !== undefined && !['auto', 'zh_CN', 'en'].includes(config.uiLanguage)) {
-      return 'uiLanguage';
-    }
-    if (config.language !== undefined && !['auto', 'zh', 'en', 'ja', 'ko'].includes(config.language)) {
-      return 'language';
-    }
-    return null;
-  }
-
-  function createModalLifecycle(documentApi, overlay, resolve, timerApi = globalThis) {
-    let closed = false;
-    const close = (result) => {
-      if (closed) return;
-      closed = true;
-      documentApi.removeEventListener('keydown', escHandler);
-      overlay.classList.remove('active');
-      timerApi.setTimeout(() => {
-        overlay.remove();
-        resolve(result);
-      }, 300);
-    };
-    const escHandler = (event) => {
-      if (event.key === 'Escape') close(false);
-    };
-    documentApi.addEventListener('keydown', escHandler);
-    return { close };
-  }
-
-  return {
-    createStatusPresenter,
-    buildExportData,
-    applyImportedAppearance,
-    validateImportPreferences,
-    createModalLifecycle
-  };
-})();
-
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = OptionsRuntime;
-}
+const OptionsRuntime = OCROptionsRuntime;
 
 document.addEventListener('DOMContentLoaded', async () => {
   // 初始化 i18n
   await OCRI18n.init();
   OCRI18n.applyToDom(document);
+  await OCRProviderConfig.migrateLegacyConfigOnce(chrome.storage.local);
 
   // 获取DOM元素
   const apiProvider = document.getElementById('apiProvider');
@@ -120,6 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 百度元素
   const baiduApiKey = document.getElementById('baiduApiKey');
   const baiduSecret = document.getElementById('baiduSecret');
+  const baiduMode = document.getElementById('baiduMode');
 
   // 阿里云元素
   const aliyunApiKey = document.getElementById('aliyunApiKey');
@@ -159,6 +74,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   const importBtn = document.getElementById('importBtn');
   const importFileInput = document.getElementById('importFileInput');
   const includeApiKeys = document.getElementById('includeApiKeys');
+  const captureShortcutStatus = document.getElementById('captureShortcutStatus');
+  const shortcutAssignmentState = document.getElementById('shortcutAssignmentState');
+
+  async function loadShortcutStatus() {
+    try {
+      const commands = await chrome.commands.getAll();
+      const captureCommand = commands.find((command) => command.name === 'start-capture');
+      const shortcut = String(captureCommand?.shortcut || '').trim();
+      captureShortcutStatus.textContent = shortcut || OCRI18n.t('shortcut_unassigned');
+      shortcutAssignmentState.textContent = shortcut
+        ? OCRI18n.t('shortcut_assigned', [shortcut])
+        : OCRI18n.t('shortcut_unassigned_help');
+    } catch (error) {
+      console.warn('读取快捷键状态失败:', error);
+      captureShortcutStatus.textContent = OCRI18n.t('shortcut_unassigned');
+      shortcutAssignmentState.textContent = OCRI18n.t('shortcut_status_unavailable');
+    }
+  }
 
   /**
    * 根据提供商显示对应的配置区块
@@ -212,15 +145,8 @@ document.addEventListener('DOMContentLoaded', async () => {
    * @description 从chrome.storage加载所有API配置和设置，兼容新旧配置格式
    */
   async function loadSettings() {
-    // 统一从 apiConfigs 对象中加载各API配置，同时兼容旧版配置
     const result = await chrome.storage.local.get([
-      'apiProvider', 'apiConfigs', 'prompt', 'language',
-      // 以下是为了兼容旧版本配置
-      'apiKey', 'model', 'customEndpoint', 'customSecret', 'customModel',
-      'openaiApiKey', 'openaiModel', 'baiduApiKey',
-      'aliyunApiKey', 'aliyunModel', 'zhipuApiKey', 'zhipuModel',
-      'compatibleEndpoint', 'compatibleApiKey', 'compatibleModel',
-      'customApiKey'
+      'apiProvider', 'apiConfigs', 'prompt', 'language'
     ]);
 
     // 设置API提供商
@@ -229,51 +155,51 @@ document.addEventListener('DOMContentLoaded', async () => {
       showConfigSection(result.apiProvider);
     }
 
-    // 优先从新的 apiConfigs 对象加载，否则兼容旧配置
     const configs = result.apiConfigs || {};
 
     // Claude 配置
     const claudeConfig = OCRProviderConfig.getProviderConfig(configs, 'claude');
-    claudeApiKey.value = claudeConfig.apiKey || result.apiKey || '';
+    claudeApiKey.value = claudeConfig.apiKey || '';
     claudeModel.value = OCRProviderConfig.migrateRetiredModel(
       'claude',
-      claudeConfig.model || result.model || 'claude-sonnet-5'
+      claudeConfig.model || 'claude-sonnet-5'
     );
 
     // OpenAI 配置
     const openaiConfig = OCRProviderConfig.getProviderConfig(configs, 'openai');
-    openaiApiKey.value = openaiConfig.apiKey || result.openaiApiKey || '';
+    openaiApiKey.value = openaiConfig.apiKey || '';
     openaiModel.value = OCRProviderConfig.migrateRetiredModel(
       'openai',
-      openaiConfig.model || result.openaiModel || 'gpt-5-mini'
+      openaiConfig.model || 'gpt-5-mini'
     );
 
     // 百度配置
     const baiduConfig = OCRProviderConfig.getProviderConfig(configs, 'baidu');
-    baiduApiKey.value = baiduConfig.apiKey || result.baiduApiKey || '';
-    baiduSecret.value = baiduConfig.secret || result.customSecret || '';
+    baiduApiKey.value = baiduConfig.apiKey || '';
+    baiduSecret.value = baiduConfig.secret || '';
+    baiduMode.value = baiduConfig.mode || 'general_basic';
 
     // 阿里云配置
     const aliyunCfg = OCRProviderConfig.getProviderConfig(configs, 'aliyun');
-    aliyunApiKey.value = aliyunCfg.apiKey || result.aliyunApiKey || '';
-    aliyunModel.value = aliyunCfg.model || result.aliyunModel || 'qwen-vl-max';
+    aliyunApiKey.value = aliyunCfg.apiKey || '';
+    aliyunModel.value = aliyunCfg.model || 'qwen-vl-max';
 
     // 智谱AI配置
     const zhipuCfg = OCRProviderConfig.getProviderConfig(configs, 'zhipu');
-    zhipuApiKey.value = zhipuCfg.apiKey || result.zhipuApiKey || '';
-    zhipuModel.value = zhipuCfg.model || result.zhipuModel || 'glm-4v';
+    zhipuApiKey.value = zhipuCfg.apiKey || '';
+    zhipuModel.value = zhipuCfg.model || 'glm-4v';
 
     // 通用OpenAI兼容接口配置
     const compatibleCfg = OCRProviderConfig.getProviderConfig(configs, 'openai-compatible');
-    compatibleEndpoint.value = compatibleCfg.endpoint || result.compatibleEndpoint || '';
-    compatibleApiKey.value = compatibleCfg.apiKey || result.compatibleApiKey || '';
-    compatibleModel.value = compatibleCfg.model || result.compatibleModel || '';
+    compatibleEndpoint.value = compatibleCfg.endpoint || '';
+    compatibleApiKey.value = compatibleCfg.apiKey || '';
+    compatibleModel.value = compatibleCfg.model || '';
 
     // 自定义API配置
     const customCfg = OCRProviderConfig.getProviderConfig(configs, 'custom');
-    customEndpointInput.value = customCfg.endpoint || result.customEndpoint || '';
-    customApiKeyInput.value = customCfg.apiKey || result.customApiKey || '';
-    customModelInput.value = customCfg.model || result.customModel || '';
+    customEndpointInput.value = customCfg.endpoint || '';
+    customApiKeyInput.value = customCfg.apiKey || '';
+    customModelInput.value = customCfg.model || '';
     customRequestMode.value = customCfg.requestMode;
     customAuthMode.value = customCfg.authMode;
     customHeaderName.value = customCfg.headerName || '';
@@ -350,7 +276,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       },
       baidu: {
         apiKey: baiduApiKey.value,
-        secret: baiduSecret.value
+        secret: baiduSecret.value,
+        mode: baiduMode.value
       },
       aliyun: {
         apiKey: aliyunApiKey.value,
@@ -376,30 +303,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     };
 
-    // 同时保存旧格式以兼容旧代码
     const settings = {
       apiProvider: provider,
       prompt: prompt.value,
       language: language.value,
       theme: themeSelect.value,
-      apiConfigs: apiConfigs,
-      // 以下是为了兼容 background.js 中的旧代码
-      apiKey: claudeApiKey.value,
-      model: claudeModel.value,
-      openaiApiKey: openaiApiKey.value,
-      openaiModel: openaiModel.value,
-      baiduApiKey: baiduApiKey.value,
-      customSecret: baiduSecret.value,
-      aliyunApiKey: aliyunApiKey.value,
-      aliyunModel: aliyunModel.value,
-      zhipuApiKey: zhipuApiKey.value,
-      zhipuModel: zhipuModel.value,
-      compatibleEndpoint: compatibleEndpoint.value,
-      compatibleApiKey: compatibleApiKey.value,
-      compatibleModel: compatibleModel.value,
-      customEndpoint: customEndpointInput.value,
-      customApiKey: customApiKeyInput.value,
-      customModel: customModelInput.value
+      apiConfigs
     };
 
     await chrome.storage.local.set(settings);
@@ -441,7 +350,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       case 'openai':
         return { apiKey: openaiApiKey.value, model: openaiModel.value };
       case 'baidu':
-        return { apiKey: baiduApiKey.value, secret: baiduSecret.value };
+        return { apiKey: baiduApiKey.value, secret: baiduSecret.value, mode: baiduMode.value };
       case 'aliyun':
         return { apiKey: aliyunApiKey.value, model: aliyunModel.value };
       case 'zhipu':
@@ -674,6 +583,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       case 'baidu':
         config.apiKey = baiduApiKey.value;
         config.customSecret = baiduSecret.value;
+        config.mode = baiduMode.value;
         break;
       case 'aliyun':
         config.apiKey = aliyunApiKey.value;
@@ -828,7 +738,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         : OCRProviderConfig.redactApiConfigs(apiConfigs);
 
       // 构建导出数据结构
-      const exportData = OptionsRuntime.buildExportData(result, exportedApiConfigs);
+      const runtimeVersion = chrome.runtime.getManifest().version;
+      const exportData = OptionsRuntime.buildExportData(result, exportedApiConfigs, runtimeVersion);
 
       // 创建并下载JSON文件
       const jsonString = JSON.stringify(exportData, null, 2);
@@ -871,6 +782,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!config || typeof config !== 'object') {
       return { valid: false, error: OCRI18n.t('err_import_missing_config'), config: null };
     }
+
+    config = {
+      ...config,
+      apiConfigs: OCRProviderConfig.mergeModernAndLegacyConfigs(config.apiConfigs, config)
+    };
 
     // 验证apiProvider
     const validProviders = ['claude', 'openai', 'baidu', 'aliyun', 'zhipu', 'openai-compatible', 'custom'];
@@ -929,32 +845,43 @@ document.addEventListener('DOMContentLoaded', async () => {
    */
   function showConfirmDialog(title, message, configInfo) {
     return new Promise((resolve) => {
-      // 构建配置信息HTML
-      let infoHtml = '';
-      if (configInfo) {
-        infoHtml = `
-          <div class="config-info">
-            <p><strong>${OCRI18n.t('modal_api_provider')}:</strong> ${configInfo.apiProvider || 'claude'}</p>
-            ${configInfo.exportDate ? `<p><strong>${OCRI18n.t('modal_export_date')}:</strong> ${new Date(configInfo.exportDate).toLocaleString()}</p>` : ''}
-          </div>
-        `;
-      }
-
-      // 创建对话框HTML
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
       overlay.innerHTML = `
         <div class="modal-dialog">
-          <h3>${title}</h3>
-          <p>${message}</p>
-          ${infoHtml}
-          <p class="warning-text">${OCRI18n.t('modal_import_warning')}</p>
+          <h3 class="modal-title"></h3>
+          <p class="modal-message"></p>
+          <div class="config-info hidden">
+            <p class="config-provider"><strong></strong><span></span></p>
+            <p class="config-export-date hidden"><strong></strong><span></span></p>
+          </div>
+          <p class="warning-text"></p>
           <div class="modal-actions">
-            <button class="btn btn-secondary" id="modalCancel">${OCRI18n.t('btn_cancel')}</button>
-            <button class="btn btn-primary" id="modalConfirm">${OCRI18n.t('btn_confirm_import')}</button>
+            <button class="btn btn-secondary" id="modalCancel"></button>
+            <button class="btn btn-primary" id="modalConfirm"></button>
           </div>
         </div>
       `;
+
+      overlay.querySelector('.modal-title').textContent = title;
+      overlay.querySelector('.modal-message').textContent = message;
+      overlay.querySelector('.warning-text').textContent = OCRI18n.t('modal_import_warning');
+      overlay.querySelector('#modalCancel').textContent = OCRI18n.t('btn_cancel');
+      overlay.querySelector('#modalConfirm').textContent = OCRI18n.t('btn_confirm_import');
+
+      if (configInfo) {
+        const info = overlay.querySelector('.config-info');
+        info.classList.remove('hidden');
+        const provider = info.querySelector('.config-provider');
+        provider.querySelector('strong').textContent = `${OCRI18n.t('modal_api_provider')}: `;
+        provider.querySelector('span').textContent = String(configInfo.apiProvider || 'claude');
+        if (configInfo.exportDate) {
+          const exportDate = info.querySelector('.config-export-date');
+          exportDate.classList.remove('hidden');
+          exportDate.querySelector('strong').textContent = `${OCRI18n.t('modal_export_date')}: `;
+          exportDate.querySelector('span').textContent = new Date(configInfo.exportDate).toLocaleString();
+        }
+      }
 
       document.body.appendChild(overlay);
 
@@ -1047,12 +974,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       showStatus(OCRI18n.t('msg_applying_config'), 'loading');
 
       const existingSettings = await chrome.storage.local.get([
-        'apiConfigs',
-        'apiKey', 'model', 'customEndpoint', 'customSecret', 'customModel',
-        'openaiApiKey', 'openaiModel', 'baiduApiKey',
-        'aliyunApiKey', 'aliyunModel', 'zhipuApiKey', 'zhipuModel',
-        'compatibleEndpoint', 'compatibleApiKey', 'compatibleModel',
-        'customApiKey', 'theme', 'uiLanguage'
+        'apiConfigs', 'theme', 'uiLanguage'
       ]);
       const importedApiConfigs = validation.config.apiConfigs || {};
       const existingApiConfigs = existingSettings.apiConfigs || {};
@@ -1070,12 +992,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         language: validation.config.language || 'auto',
         ...OptionsRuntime.applyImportedAppearance(validation.config, existingSettings)
       };
-
-      // 为了兼容性，也保存旧格式字段；脱敏导入会保留本机已有凭据。
-      Object.assign(
-        settingsToSave,
-        OCRProviderConfig.buildLegacySettings(settingsToSave.apiConfigs, existingSettings)
-      );
 
       // 保存到chrome.storage
       await chrome.storage.local.set(settingsToSave);
@@ -1117,6 +1033,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const newLang = uiLanguageSelect.value;
     await OCRI18n.setLanguage(newLang);
     OCRI18n.applyToDom(document);
+    await loadShortcutStatus();
     setFieldStatus(uiLanguageSelect, 'success', OCRI18n.t('msg_field_saved'));
     setTimeout(() => clearFieldStatus(uiLanguageSelect), 3000);
   });
@@ -1133,6 +1050,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 加载主题设置
   await loadTheme();
+
+  await loadShortcutStatus();
 
   // 设置自动保存
   setupAutoSave();
