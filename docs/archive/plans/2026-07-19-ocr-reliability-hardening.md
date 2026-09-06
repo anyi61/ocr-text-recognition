@@ -1,5 +1,7 @@
 # OCR Reliability Hardening Implementation Plan
 
+> 历史计划：2026-09-06 整理归档。以下要求和验证数字仅记录当时实施情况；当前规格、架构与验收状态见 [OpenSpec 导航](../../../openspec/README.md)。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use subagent-driven development to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 修复配置识别、语言选择、请求取消、模型默认值、密钥导出、权限范围和可维护性问题，并通过自动化浏览器端到端验收。

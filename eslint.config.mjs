@@ -18,7 +18,6 @@ export default [
   {
     ignores: [
       '.codegraph/**',
-      '银行卡活动/**',
       'dist/**',
       'node_modules/**',
       'playwright-report/**',

@@ -1,5 +1,7 @@
 # OCR Functional Completion Implementation Plan
 
+> 历史计划：2026-09-06 整理归档。以下要求和验证数字仅记录当时实施情况；当前规格、架构与验收状态见 [OpenSpec 导航](../../../openspec/README.md)。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use subagent-driven development when available. In this workspace the primary agent will use built-in Codex subagents, review every work package, and run each acceptance gate before integration.
 
 **Goal:** Turn the extension from a single-shot viewport OCR tool into a reliable daily-use workflow by fixing the confirmed selection bugs, hardening image and Provider handling, making configurable endpoints truthful, and closing the result/history loop.
