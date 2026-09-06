@@ -8,6 +8,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const PRODUCTION_FILES = Object.freeze([
   'manifest.json',
   'background.js',
+  'background',
   'background-core.js',
   'background-message-router.js',
   'capture-utils.js',

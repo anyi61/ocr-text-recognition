@@ -25,6 +25,10 @@
 
 项目没有运行时构建步骤，可以直接加载源码目录。
 
+## 架构与需求规划
+
+现有行为规格、架构设计与分阶段任务见 [OpenSpec 导航](openspec/README.md)。五阶段结构重构已完成并归档，Chrome 生产环境验收通过；Edge 本次按用户决定不验收。验证证据见 OpenSpec 导航。
+
 ## 使用流程
 
 1. 点击扩展图标或使用快捷键。
@@ -76,12 +80,21 @@ npm run package
 
 ## 核心文件
 
-- `background.js`：截图、Provider 路由、API 请求、取消和历史。
-- `content.js`：页面选区、裁剪、进度和结果 UI。
-- `provider-config.js`：Provider 存储映射、凭据校验、脱敏和模型迁移。
-- `extension-runtime.js`：自定义域名授权与内容脚本按需注入。
-- `background-core.js`：语言提示、百度语言映射、请求注册表和可取消历史写入。
-- `request-runtime.js`：超时、重试、取消、响应校验和自定义接口请求契约。
-- `history-store.js`：串行化的历史新增、修订、搜索、删除和保留策略。
-- `capture-utils.js`：请求 ID 与截图缩放计算。
-- `options.js` / `popup.js`：设置和扩展 Popup。
+| 区域 | 职责与状态所有者 |
+|---|---|
+| `background.js` | 加载依赖、组装实例、安装迁移和快捷键监听 |
+| `background/capture-service.js`、`recognition-service.js`、`message-handlers.js` | 截图身份校验；识别/取消/历史编排；兼容消息响应 |
+| `providers/registry.js`、`transport.js`、七个服务商模块 | 配置标准化与路由；共用请求策略；服务商协议和解析，百度实例持有 token 缓存 |
+| `content.js`、`content/session.js` | 注入幂等和平台监听；会话 ID、请求 ID、UI 生命周期及销毁 |
+| `content/selection.js`、`capture-pipeline.js` | 选区几何和撤销栈；截图、裁剪与识别流水线 |
+| `content/notice-view.js`、`result-view.js`、`styles.js` | 上传告知/进度；安全显示、复制和修订；样式 |
+| `options.js`、`options/controller.js` | 页面启动；初始化、事件订阅和清理 |
+| `options/provider-form.js`、`config-transfer.js`、`runtime.js` | 字段和保存状态；导入导出/确认框；纯 helper 和对话框生命周期 |
+| `popup.js`、`popup/controller.js`、`history-view.js`、`runtime.js` | 页面启动；捕获入口/历史订阅；列表、搜索和操作；纯 helper |
+| `provider-config.js` | 存储映射、凭据校验、脱敏和兼容迁移 |
+| `extension-runtime.js` | 自定义域名授权与内容脚本按需注入 |
+| `background-core.js`、`background-message-router.js` | 后台纯 helper、请求注册表；消息分派与异常兜底 |
+| `request-runtime.js`、`history-store.js` | 请求超时、重试与取消；本地历史串行写入及保留上限 |
+| `capture-utils.js`、`i18n-runtime.js` | 截图计算与请求 ID；字典和界面语言 |
+
+加载顺序为公共 helper → 视图/适配器 → controller/service → 入口组装。后台通过 `importScripts`、页面通过 HTML、内容脚本通过 `CONTENT_SCRIPT_FILES` 明确加载。配置和历史继续使用本机存储，无运行时构建或框架依赖。

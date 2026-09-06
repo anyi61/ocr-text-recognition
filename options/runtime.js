@@ -57,21 +57,31 @@
 
   function createModalLifecycle(documentApi, overlay, resolve, timerApi = globalThis) {
     let closed = false;
+    let settled = false;
+    let removeTimer = null;
+    const settle = (result) => {
+      if (settled) return;
+      settled = true;
+      overlay.remove();
+      resolve(result);
+    };
     const close = (result) => {
       if (closed) return;
       closed = true;
       documentApi.removeEventListener('keydown', escHandler);
       overlay.classList.remove('active');
-      timerApi.setTimeout(() => {
-        overlay.remove();
-        resolve(result);
-      }, 300);
+      removeTimer = timerApi.setTimeout(() => settle(result), 300);
     };
     const escHandler = (event) => {
       if (event.key === 'Escape') close(false);
     };
     documentApi.addEventListener('keydown', escHandler);
-    return { close };
+    return { close, destroy() {
+      closed = true;
+      documentApi.removeEventListener('keydown', escHandler);
+      if (removeTimer !== null) timerApi.clearTimeout(removeTimer);
+      settle(false);
+    } };
   }
 
   return Object.freeze({

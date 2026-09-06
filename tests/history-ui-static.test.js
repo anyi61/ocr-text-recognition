@@ -12,7 +12,7 @@ function read(file) {
 }
 
 test('result popup can persist corrected OCR text to its history record', () => {
-  const content = read('content.js');
+  const content = read('content/capture-pipeline.js') + read('content/result-view.js');
 
   assert.match(content, /showResultPopup\(ocrResponse\.text,\s*ocrResponse\.historyId\)/);
   assert.match(content, /action:\s*'updateHistoryRecord'/);
@@ -22,7 +22,7 @@ test('result popup can persist corrected OCR text to its history record', () => 
 
 test('popup exposes searchable, deletable, exportable history controls', () => {
   const html = read('popup.html');
-  const popup = read('popup.js');
+  const popup = read('popup/controller.js') + read('popup/history-view.js');
 
   for (const id of ['historySearch', 'exportHistoryBtn', 'historySearchEmptyState']) {
     assert.match(html, new RegExp(`id="${id}"`));
@@ -36,8 +36,8 @@ test('popup exposes searchable, deletable, exportable history controls', () => {
 });
 
 test('popup reads serialized history through the worker and refreshes on storage changes', () => {
-  const popup = read('popup.js');
-  const background = read('background.js');
+  const popup = read('popup/controller.js') + read('popup/history-view.js');
+  const background = read('background/message-handlers.js');
 
   assert.match(popup, /action:\s*'listHistory'/);
   assert.match(popup, /chrome\.storage\.onChanged\.addListener/);
@@ -47,7 +47,7 @@ test('popup reads serialized history through the worker and refreshes on storage
 });
 
 test('history rendering assigns untrusted text through DOM properties', () => {
-  const popup = read('popup.js');
+  const popup = read('popup/controller.js') + read('popup/history-view.js');
 
   assert.doesNotMatch(popup, /title="\$\{escapeHtml\(/);
   assert.match(popup, /textElement\.textContent = text/);
@@ -57,7 +57,7 @@ test('history rendering assigns untrusted text through DOM properties', () => {
 });
 
 test('history timestamps are rendered from timestamp using the active UI locale', () => {
-  const popup = read('popup.js');
+  const popup = read('popup/controller.js') + read('popup/history-view.js');
   const runtime = read('popup/runtime.js');
 
   assert.match(popup, /OCRI18n\.getResolvedLanguage\(\)/);
@@ -66,7 +66,7 @@ test('history timestamps are rendered from timestamp using the active UI locale'
 });
 
 test('popup passes complete tab context and explains unsupported pages', () => {
-  const popup = read('popup.js');
+  const popup = read('popup/controller.js') + read('popup/history-view.js');
 
   assert.match(popup, /startCaptureInTab\(chrome,\s*tab\)/);
   assert.match(popup, /UNSUPPORTED_PAGE/);

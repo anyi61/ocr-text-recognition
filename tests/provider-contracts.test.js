@@ -102,7 +102,7 @@ function jsonBody(request) {
 test('vision chat providers send their documented endpoints, auth, model and PNG payload', async () => {
   const cases = [
     {
-      expression: 'callClaudeAPI(__image, __config)',
+      expression: 'providerAdapters.recognize("claude", __image, __config)',
       config: { apiKey: 'claude-key', model: 'claude-test', language: 'auto' },
       response: { content: [{ text: 'claude text' }] },
       text: 'claude text',
@@ -115,28 +115,28 @@ test('vision chat providers send their documented endpoints, auth, model and PNG
       }
     },
     {
-      expression: 'callOpenAIAPI(__image, __config)',
+      expression: 'providerAdapters.recognize("openai", __image, __config)',
       config: { apiKey: 'openai-key', model: 'gpt-5-mini', language: 'en' },
       response: { choices: [{ message: { content: 'openai text' } }] },
       text: 'openai text',
       endpoint: 'https://api.openai.com/v1/chat/completions'
     },
     {
-      expression: 'callAliyunOCR(__image, __config)',
+      expression: 'providerAdapters.recognize("aliyun", __image, __config)',
       config: { apiKey: 'aliyun-key', customModel: 'qwen-vl-max', language: 'zh' },
       response: { choices: [{ message: { content: 'aliyun text' } }] },
       text: 'aliyun text',
       endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
     },
     {
-      expression: 'callZhipuAPI(__image, __config)',
+      expression: 'providerAdapters.recognize("zhipu", __image, __config)',
       config: { apiKey: 'zhipu-key', model: 'glm-4v', language: 'auto' },
       response: { choices: [{ message: { content: 'zhipu text' } }] },
       text: 'zhipu text',
       endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
     },
     {
-      expression: 'callOpenAICompatibleAPI(__image, __config)',
+      expression: 'providerAdapters.recognize("openai-compatible", __image, __config)',
       config: {
         apiKey: 'compatible-key',
         customEndpoint: 'https://compatible.example/v1/chat/completions',
@@ -182,7 +182,7 @@ test('Baidu exchanges credentials once and sends an encoded image to general_bas
     { words_result: [{ words: '百度' }, { words: '文本' }] }
   ]);
 
-  const text = await harness.call('callBaiduOCR(__image, __config)', {
+  const text = await harness.call('providerAdapters.recognize("baidu", __image, __config)', {
     apiKey: 'baidu-key',
     customSecret: 'baidu-secret',
     language: 'zh'
@@ -206,7 +206,7 @@ test('Baidu routes an explicitly selected handwriting mode to its matching endpo
     { words_result: [{ words: '手写文本' }] }
   ]);
 
-  const text = await harness.call('callBaiduOCR(__image, __config)', {
+  const text = await harness.call('providerAdapters.recognize("baidu", __image, __config)', {
     apiKey: 'baidu-key',
     customSecret: 'baidu-secret',
     mode: 'handwriting',
@@ -224,7 +224,7 @@ test('Baidu connection test accepts a recognized API path when its synthetic ima
   ]);
 
   await harness.call(
-    'testAPIConnection(__config, (value) => { globalThis.__testResponse = value; })',
+    'recognitionService.testConnection(__config, (value) => { globalThis.__testResponse = value; })',
     {
       apiProvider: 'baidu',
       apiKey: 'baidu-key',
@@ -243,7 +243,7 @@ test('Custom supports Responses mode, no auth, and a configured response path', 
     { payload: { recognized: 'custom response text' } }
   ]);
 
-  const text = await harness.call('callCustomAPI(__image, __config)', {
+  const text = await harness.call('providerAdapters.recognize("custom", __image, __config)', {
     apiKey: '',
     authMode: 'none',
     customEndpoint: 'http://localhost:11434/v1/responses',
@@ -264,10 +264,10 @@ test('Custom supports Responses mode, no auth, and a configured response path', 
 
 test('all provider adapters reject empty or unknown text shapes', async () => {
   const cases = [
-    ['callClaudeAPI(__image, __config)', { apiKey: 'key' }, { content: [] }],
-    ['callOpenAIAPI(__image, __config)', { apiKey: 'key' }, { choices: [] }],
+    ['providerAdapters.recognize("claude", __image, __config)', { apiKey: 'key' }, { content: [] }],
+    ['providerAdapters.recognize("openai", __image, __config)', { apiKey: 'key' }, { choices: [] }],
     [
-      'callOpenAICompatibleAPI(__image, __config)',
+      'providerAdapters.recognize("openai-compatible", __image, __config)',
       {
         apiKey: 'key',
         customEndpoint: 'https://compatible.example/v1/chat/completions'
@@ -275,7 +275,7 @@ test('all provider adapters reject empty or unknown text shapes', async () => {
       { unexpected: true }
     ],
     [
-      'callCustomAPI(__image, __config)',
+      'providerAdapters.recognize("custom", __image, __config)',
       {
         apiKey: '',
         authMode: 'none',
@@ -304,7 +304,7 @@ test('Claude returns visible text when adaptive thinking blocks come first', asy
   }]);
 
   assert.equal(
-    await harness.call('callClaudeAPI(__image, __config)', { apiKey: 'key' }),
+    await harness.call('providerAdapters.recognize("claude", __image, __config)', { apiKey: 'key' }),
     'VISIBLE OCR TEXT'
   );
 });
@@ -315,7 +315,7 @@ test('provider adapters reject truncated OCR output instead of saving partial te
     content: [{ type: 'text', text: 'partial' }]
   }]);
   await assert.rejects(
-    claude.call('callClaudeAPI(__image, __config)', { apiKey: 'key' }),
+    claude.call('providerAdapters.recognize("claude", __image, __config)', { apiKey: 'key' }),
     (error) => error.code === 'OCR_RESULT_TRUNCATED'
   );
 
@@ -323,7 +323,7 @@ test('provider adapters reject truncated OCR output instead of saving partial te
     choices: [{ finish_reason: 'length', message: { content: 'partial' } }]
   }]);
   await assert.rejects(
-    openai.call('callOpenAIAPI(__image, __config)', { apiKey: 'key' }),
+    openai.call('providerAdapters.recognize("openai", __image, __config)', { apiKey: 'key' }),
     (error) => error.code === 'OCR_RESULT_TRUNCATED'
   );
 });

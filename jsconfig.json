@@ -6,7 +6,11 @@
     "noImplicitAny": false,
     "noEmit": true,
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "WebWorker"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "WebWorker"
+    ],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "skipLibCheck": true
@@ -16,6 +20,28 @@
     "history-store.js",
     "request-runtime.js",
     "background-message-router.js",
-    "providers/registry.js"
+    "providers/registry.js",
+    "providers/transport.js",
+    "providers/claude.js",
+    "providers/openai.js",
+    "providers/openai-compatible.js",
+    "providers/custom.js",
+    "providers/baidu.js",
+    "providers/aliyun.js",
+    "providers/zhipu.js",
+    "background/capture-service.js",
+    "background/recognition-service.js",
+    "background/message-handlers.js",
+    "content/selection.js",
+    "content/notice-view.js",
+    "content/result-view.js",
+    "content/capture-pipeline.js",
+    "content/session.js",
+    "options/provider-form.js",
+    "options/config-transfer.js",
+    "options/controller.js",
+    "popup/history-view.js",
+    "popup/controller.js",
+    "options/runtime.js"
   ]
 }

@@ -1,0 +1,35 @@
+schema: spec-driven
+
+context: |
+  Language: zh-CN
+  All artifacts must be written in zh-CN.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+  Project: OCR文字识别助手，Chrome/Edge Manifest V3 扩展，原生 JavaScript，零运行时构建。
+  Scope: 仅根目录浏览器扩展；银行卡活动/ 是独立项目，不纳入本次规格和重构。
+  Baseline: 现有行为在 openspec/specs；新行为通过 change delta 提出；纯重构使用 skip_specs。
+  Compatibility: 保持消息 action、Provider ID、存储字段、导入导出格式与用户操作兼容。
+  Quality: npm run check 包含版本、lint、局部 checkJs、Node 测试及 Chromium Mock E2E。
+  Packaging: scripts/package-extension.mjs 使用显式生产白名单；新增脚本需同步加载顺序与打包检查。
+  Planning: 中文说明、英文标识符；明确现状、拟议结构、验证证据和待验收项。
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing

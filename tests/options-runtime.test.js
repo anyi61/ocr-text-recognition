@@ -111,8 +111,28 @@ test('modal lifecycle removes its Escape listener and resolves only once', () =>
 
 test('import confirmation assigns imported metadata through textContent', () => {
   const fs = require('node:fs');
-  const source = fs.readFileSync(path.resolve(__dirname, '../options.js'), 'utf8');
+  const source = fs.readFileSync(path.resolve(__dirname, '../options/config-transfer.js'), 'utf8');
   assert.match(source, /provider\.querySelector\('span'\)\.textContent/);
   assert.match(source, /exportDate\.querySelector\('span'\)\.textContent/);
   assert.doesNotMatch(source, /\$\{configInfo\.apiProvider/);
+});
+
+test('destroying a closing modal clears its timer and settles cancellation once', () => {
+  const runtime = loadOptionsRuntime();
+  const document = new globalThis.EventTarget();
+  const results = [];
+  const timers = new Map();
+  let removed = 0;
+  const modal = runtime.createModalLifecycle(document, {
+    classList: { remove() {} }, remove() { removed++; }
+  }, value => results.push(value), {
+    setTimeout(callback) { timers.set(1, callback); return 1; },
+    clearTimeout(id) { timers.delete(id); }
+  });
+  modal.close(true);
+  modal.destroy();
+  modal.destroy();
+  assert.equal(timers.size, 0);
+  assert.equal(removed, 1);
+  assert.deepEqual(results, [false]);
 });

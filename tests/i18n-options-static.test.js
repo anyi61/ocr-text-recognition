@@ -21,8 +21,8 @@ test('provider options and popup accessibility labels are localizable', () => {
 });
 
 test('options and popup use translated messages for import/export and file access failures', () => {
-  const optionsJs = read('options.js');
-  const popupJs = read('popup.js');
+  const optionsJs = read('options/controller.js') + read('options/provider-form.js') + read('options/config-transfer.js');
+  const popupJs = read('popup/controller.js') + read('popup/history-view.js');
 
   for (const key of ['msg_export_failed', 'msg_import_failed', 'modal_import_title', 'modal_import_message', 'modal_import_warning', 'modal_api_provider', 'modal_export_date']) {
     assert.match(optionsJs, new RegExp(`OCRI18n\\.t\\('${key}'`));
@@ -33,12 +33,12 @@ test('options and popup use translated messages for import/export and file acces
 });
 
 test('options displays the browser-assigned capture shortcut', () => {
-  const optionsJs = read('options.js');
+  const optionsJs = read('options/controller.js') + read('options/provider-form.js') + read('options/config-transfer.js');
   const optionsHtml = read('options.html');
   assert.match(optionsHtml, /id="captureShortcutStatus"/);
   assert.match(optionsJs, /chrome\.commands\.getAll\(\)/);
   assert.match(optionsJs, /command\.name === 'start-capture'/);
-  const popupJs = read('popup.js');
+  const popupJs = read('popup/controller.js') + read('popup/history-view.js');
   const popupHtml = read('popup.html');
   assert.match(popupHtml, /id="popupShortcutStatus"/);
   assert.match(popupJs, /chrome\.commands\.getAll\(\)/);

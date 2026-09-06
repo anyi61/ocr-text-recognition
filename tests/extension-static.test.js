@@ -59,11 +59,11 @@ test('manifest keeps the minimum expected extension surface', () => {
 test('extension pages load shared configuration before their entry scripts', () => {
   assert.deepEqual(
     scriptSources('popup.html'),
-    ['i18n-runtime.js', 'provider-config.js', 'extension-runtime.js', 'popup/runtime.js', 'popup.js']
+    ['i18n-runtime.js', 'provider-config.js', 'extension-runtime.js', 'popup/runtime.js', 'popup/history-view.js', 'popup/controller.js', 'popup.js']
   );
   assert.deepEqual(
     scriptSources('options.html'),
-    ['i18n-runtime.js', 'provider-config.js', 'extension-runtime.js', 'options/runtime.js', 'options.js']
+    ['i18n-runtime.js', 'provider-config.js', 'extension-runtime.js', 'options/runtime.js', 'options/provider-form.js', 'options/config-transfer.js', 'options/controller.js', 'options.js']
   );
 });
 
@@ -88,7 +88,10 @@ test('every referenced translation key exists in both locale catalogs', () => {
   const referenced = new Set();
   for (const relativePath of [
     'manifest.json', 'popup.html', 'options.html',
-    'popup.js', 'options.js', 'content.js', 'i18n-runtime.js'
+    'popup.js', 'options.js', 'content.js', 'i18n-runtime.js',
+    'options/controller.js', 'options/provider-form.js', 'options/config-transfer.js',
+    'popup/controller.js', 'popup/history-view.js',
+    ...['selection', 'notice-view', 'result-view', 'capture-pipeline', 'session'].map(name => `content/${name}.js`)
   ]) {
     const source = fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
     for (const match of source.matchAll(/OCRI18n\.t\(\s*['"]([^'"]+)['"]/g)) {
@@ -113,11 +116,20 @@ test('background and popup preserve dependency injection order', () => {
 
   assert.match(
     background,
-    /importScripts\([\s\S]*'provider-config\.js',[\s\S]*'extension-runtime\.js',[\s\S]*'background-core\.js',[\s\S]*'request-runtime\.js',[\s\S]*'history-store\.js',[\s\S]*'providers\/runtime\.js',[\s\S]*'providers\/registry\.js'[\s\S]*\)/
+    /importScripts\([\s\S]*'provider-config\.js',[\s\S]*'extension-runtime\.js',[\s\S]*'background-core\.js',[\s\S]*'request-runtime\.js',[\s\S]*'history-store\.js',[\s\S]*'providers\/transport\.js',[\s\S]*'providers\/registry\.js'[\s\S]*\)/
   );
+  const imports = [...background.match(/importScripts\(([\s\S]*?)\);/)[1].matchAll(/'([^']+)'/g)]
+    .map(match => match[1]);
+  for (const id of ['claude', 'openai', 'openai-compatible', 'custom', 'baidu', 'aliyun', 'zhipu']) {
+    assert.ok(imports.indexOf('providers/transport.js') < imports.indexOf(`providers/${id}.js`));
+    assert.ok(imports.indexOf(`providers/${id}.js`) < imports.indexOf('providers/registry.js'));
+  }
+  for (const service of ['capture-service', 'recognition-service', 'message-handlers']) {
+    assert.ok(imports.indexOf(`background/${service}.js`) > imports.indexOf('providers/registry.js'));
+  }
   assert.match(
     extensionRuntime,
-    /'i18n-runtime\.js',\s*'capture-utils\.js',\s*'content\/styles\.js',\s*'content\.js'/
+    /'i18n-runtime\.js',\s*'capture-utils\.js',\s*'content\/styles\.js',[\s\S]*'content\/session\.js',\s*'content\.js'/
   );
 });
 
@@ -128,7 +140,7 @@ test('content capture waits for i18n and runtime updates the document language',
   assert.match(content, /const i18nReady = OCRI18n\.init\(\)/);
   assert.match(
     content,
-    /if \(request\.action === 'startCapture'\)[\s\S]*i18nReady\.then\(\(\) => \{[\s\S]*startCapture\(\)/
+    /if \(request\.action === 'startCapture'\)[\s\S]*i18nReady\.then\(\(\) => \{[\s\S]*session\.start\(\)/
   );
   assert.match(i18nRuntime, /documentElement\.lang = resolvedLanguage === 'zh_CN'/);
 });
@@ -136,13 +148,14 @@ test('content capture waits for i18n and runtime updates the document language',
 test('content capture uses a closed shadow root and rejects synthetic page events', () => {
   const content = fs.readFileSync(path.join(ROOT, 'content.js'), 'utf8');
 
-  assert.match(content, /attachShadow\(\{\s*mode:\s*'closed'\s*\}\)/);
-  assert.match(content, /event\?\.isTrusted/);
+  const session = fs.readFileSync(path.join(ROOT, 'content/session.js'), 'utf8');
+  assert.match(session, /attachShadow\(\{\s*mode:\s*'closed'\s*\}\)/);
+  assert.match(session, /event\?\.isTrusted/);
   assert.match(content, /window\.addEventListener\('pagehide',\s*fullCleanup\)/);
 });
 
 test('dynamic translations are assigned through DOM properties outside HTML templates', () => {
-  for (const relativePath of ['content.js', 'popup.js', 'options.js']) {
+  for (const relativePath of ['content.js', 'content/selection.js', 'content/notice-view.js', 'content/result-view.js', 'popup.js', 'options.js', 'popup/history-view.js', 'options/config-transfer.js']) {
     const source = fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
     assert.doesNotMatch(
       source,
@@ -156,7 +169,8 @@ test('background restricts local storage to trusted extension contexts', () => {
   const background = fs.readFileSync(path.join(ROOT, 'background.js'), 'utf8');
 
   assert.match(background, /setAccessLevel\(\{\s*accessLevel:\s*'TRUSTED_CONTEXTS'/);
-  assert.match(background, /getContentPreferences\(_request, _sender, sendResponse\)/);
+  const handlers = fs.readFileSync(path.join(ROOT, 'background/message-handlers.js'), 'utf8');
+  assert.match(handlers, /getContentPreferences\(_request, _sender, sendResponse\)/);
 });
 
 test('every project JavaScript file parses', () => {

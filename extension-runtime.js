@@ -19,6 +19,11 @@
     'i18n-runtime.js',
     'capture-utils.js',
     'content/styles.js',
+    'content/selection.js',
+    'content/notice-view.js',
+    'content/result-view.js',
+    'content/capture-pipeline.js',
+    'content/session.js',
     'content.js'
   ]);
 

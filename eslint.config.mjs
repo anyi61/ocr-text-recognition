@@ -8,14 +8,17 @@ const sharedGlobals = Object.fromEntries([
   'OCRBackgroundMessageRouter',
   'OCRCaptureUtils', 'OCRContentStyles', 'OCRExtensionRuntime', 'OCRHistoryStore', 'OCRI18n',
   'OCROptionsRuntime', 'OCRPopupRuntime', 'OCRProviderAdapters', 'OCRProviderConfig', 'OCRRequestRuntime',
-  'callAliyunOCR', 'callBaiduOCR', 'callClaudeAPI', 'callCustomAPI',
-  'callOpenAIAPI', 'callOpenAICompatibleAPI', 'callZhipuAPI'
+  'OCROptionsController', 'OCRProviderForm', 'OCRConfigTransfer', 'OCRPopupController', 'OCRHistoryView',
+  'OCRCaptureSession', 'OCRSelection', 'OCRNoticeView', 'OCRResultView', 'OCRCapturePipeline',
+  'OCRCaptureService', 'OCRRecognitionService', 'OCRBackgroundHandlers',
+  'OCRProviderTransport', 'OCRClaudeProvider', 'OCROpenAIProvider', 'OCROpenAICompatibleProvider', 'OCRCustomProvider', 'OCRBaiduProvider', 'OCRAliyunProvider', 'OCRZhipuProvider',
 ].map((name) => [name, 'readonly']));
 
 export default [
   {
     ignores: [
       '.codegraph/**',
+      '银行卡活动/**',
       'dist/**',
       'node_modules/**',
       'playwright-report/**',
