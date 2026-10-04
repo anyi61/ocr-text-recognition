@@ -1436,7 +1436,7 @@
     "message": "正在丢弃草稿…"
   },
   "draft_conflict": {
-    "message": "原文或草稿已在其他窗口变更，当前文字仍保留在此。请先复制，再重新打开该记录核对最新内容。"
+    "message": "原文或草稿已在其他窗口变更，当前文字仍保留在此。请核对已保存正文后继续，或另存为新记录。"
   },
   "draft_error": {
     "message": "无法读取或保存草稿。请保持窗口打开后重试，或在关闭前复制修改内容。"
@@ -1562,9 +1562,168 @@
     "message": "尚未授权此 API 域名，请打开设置重新授权后重试原图。"
   },
   "content_msg_changes_conflict": {
-    "message": "原文已在其他窗口更新，当前编辑已保留。请复制当前编辑后重新打开历史记录，再核对保存。"
+    "message": "原文已在其他窗口更新，当前编辑已保留。请核对下方已保存正文，再继续编辑或另存为新记录。"
   },
   "msg_settings_save_failed": {
     "message": "设置保存失败，已保留当前修改，请重试。"
+  },
+  "history_restore": {
+    "message": "恢复历史备份"
+  },
+  "history_cleanup": {
+    "message": "清理普通历史"
+  },
+  "history_filter_label": {
+    "message": "显示记录"
+  },
+  "history_filter_all": {
+    "message": "全部"
+  },
+  "history_filter_favorites": {
+    "message": "收藏"
+  },
+  "history_filter_drafts": {
+    "message": "未完成草稿"
+  },
+  "history_filter_favorites_empty": {
+    "message": "暂无收藏记录。"
+  },
+  "history_filter_drafts_empty": {
+    "message": "暂无未完成草稿。"
+  },
+  "history_restore_description": {
+    "message": "合并历史备份，保留现有记录；同一 ID 仅保留一条。新普通记录填入 50 条上限的剩余空间，收藏和未完成草稿不受上限影响。"
+  },
+  "history_cleanup_description": {
+    "message": "删除全部普通历史，不受当前筛选或搜索限制；保留收藏和未完成草稿。此操作无法撤销。"
+  },
+  "history_restore_total": {
+    "message": "备份记录数"
+  },
+  "history_restore_added": {
+    "message": "即将添加"
+  },
+  "history_restore_duplicates": {
+    "message": "同 ID 保留、不重复添加"
+  },
+  "history_restore_capacity": {
+    "message": "普通记录超限跳过"
+  },
+  "history_restore_favorites": {
+    "message": "添加的收藏"
+  },
+  "history_restore_drafts": {
+    "message": "添加的未完成草稿"
+  },
+  "history_cleanup_deleted": {
+    "message": "即将删除的普通记录"
+  },
+  "history_cleanup_kept": {
+    "message": "保留的受保护记录"
+  },
+  "history_cleanup_favorites": {
+    "message": "保留的收藏"
+  },
+  "history_cleanup_drafts": {
+    "message": "保留的未完成草稿"
+  },
+  "history_management_cancel": {
+    "message": "取消"
+  },
+  "history_management_close": {
+    "message": "关闭"
+  },
+  "history_management_refresh": {
+    "message": "刷新预览"
+  },
+  "history_restore_confirm": {
+    "message": "确认恢复"
+  },
+  "history_cleanup_confirm": {
+    "message": "确认删除普通历史"
+  },
+  "history_management_loading": {
+    "message": "正在准备预览…"
+  },
+  "history_management_saving": {
+    "message": "正在保存…"
+  },
+  "history_management_ready": {
+    "message": "请核对以上数量，确认后才会修改历史。"
+  },
+  "history_management_stale": {
+    "message": "历史记录已发生变化，请刷新预览后再确认。"
+  },
+  "history_management_expired": {
+    "message": "预览已过期，请刷新后再确认。"
+  },
+  "history_management_failed": {
+    "message": "未能完成操作，已保留当前选择。请刷新预览，核对最新历史后重试。"
+  },
+  "history_restore_invalid": {
+    "message": "此文件不是受支持的历史备份，请选择有效的 OCR 历史 JSON 文件。"
+  },
+  "history_restore_too_large": {
+    "message": "备份超过 20 MiB 文件上限或 10,000 条记录上限，请选择较小的备份。"
+  },
+  "history_restore_read_failed": {
+    "message": "无法读取文件，请关闭预览后重新选择。"
+  },
+  "history_restore_done": {
+    "message": "已恢复 {0} 条记录，原有记录已保留。"
+  },
+  "history_cleanup_done": {
+    "message": "已删除 {0} 条普通记录，收藏和未完成草稿已保留。"
+  },
+  "conflict_title": {
+    "message": "核对已保存正文与当前编辑"
+  },
+  "conflict_local_preserved": {
+    "message": "当前编辑保留在上方原编辑框。请核对下方已保存正文；继续编辑将保留本地文字，并以下方版本作为下次保存的核对基线。"
+  },
+  "conflict_latest_label": {
+    "message": "最新已保存正文（只读）"
+  },
+  "conflict_idle": {
+    "message": "核对已保存正文，并保留当前编辑。"
+  },
+  "conflict_loading": {
+    "message": "正在读取最新已保存正文…"
+  },
+  "conflict_ready": {
+    "message": "请核对这一已保存版本后继续。保存时仍会检查其他窗口是否再次修改。"
+  },
+  "conflict_missing": {
+    "message": "这条记录已被删除。当前编辑仍在，可以另存为新记录。"
+  },
+  "conflict_read_error": {
+    "message": "无法刷新已保存正文。下方内容可能已过期；请刷新后再继续，或将当前编辑另存为新记录。"
+  },
+  "conflict_save_error": {
+    "message": "无法另存为新记录。已保留当前编辑，请重试。"
+  },
+  "conflict_saving": {
+    "message": "正在另存为新记录…保存完成后即可继续编辑。"
+  },
+  "conflict_compare": {
+    "message": "核对已保存正文"
+  },
+  "conflict_refresh": {
+    "message": "刷新已保存正文"
+  },
+  "conflict_rebase": {
+    "message": "以此版本为基线继续编辑"
+  },
+  "conflict_save_new": {
+    "message": "另存为新记录"
+  },
+  "conflict_close": {
+    "message": "关闭比较"
+  },
+  "conflict_rebased": {
+    "message": "已更新保存基线，当前编辑保持不变。核对完成后可保存。"
+  },
+  "conflict_saved_new": {
+    "message": "已另存为新记录。后续编辑将关联这条新记录。"
   }
 }

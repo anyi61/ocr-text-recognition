@@ -8,6 +8,7 @@ importScripts(
   'extension-runtime.js',
   'background-core.js',
   'request-runtime.js',
+  'history-backup.js',
   'history-store.js',
   'translation-runtime.js',
   'translation-preferences.js',
@@ -176,6 +177,40 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         ? { success: true, record }
         : { success: false, errorCode: 'HISTORY_RECORD_MISSING' }))
       .catch(() => sendResponse({ success: false, errorCode: 'HISTORY_READ_FAILED' }));
+    return true;
+  }
+
+  if (['previewHistoryImport', 'commitHistoryImport', 'previewHistoryCleanup',
+    'commitHistoryCleanup', 'cancelHistoryPreview'].includes(request.action)) {
+    const pageUrl = String(sender?.url || '').split(/[?#]/, 1)[0];
+    if (pageUrl !== chrome.runtime.getURL('popup.html')) {
+      sendResponse({ success: false, errorCode: 'HISTORY_ACCESS_DENIED' });
+      return true;
+    }
+    // Chrome supplies this immutable ID per document. Tokens from another
+    // popup window cannot confirm or cancel this popup's pending action.
+    const scope = sender.documentId || pageUrl;
+    const operations = {
+      previewHistoryImport: async () => ({ preview: await historyStore.previewImport(request.backup, scope) }),
+      commitHistoryImport: () => historyStore.commitImport(request.token, scope),
+      previewHistoryCleanup: async () => ({ preview: await historyStore.previewCleanup(scope) }),
+      commitHistoryCleanup: () => historyStore.commitCleanup(request.token, scope),
+      cancelHistoryPreview: () => historyStore.cancelPreview(request.token, scope)
+    };
+    const publicErrors = ['HISTORY_ACCESS_DENIED', 'HISTORY_BACKUP_INVALID', 'HISTORY_BACKUP_TOO_LARGE',
+      'HISTORY_PREVIEW_EXPIRED', 'HISTORY_PREVIEW_STALE'];
+    Promise.resolve().then(operations[request.action])
+      .then((result) => sendResponse({ success: true, ...result }))
+      .catch((error) => sendResponse({ success: false, errorCode:
+        publicErrors.includes(error.code) ? error.code : 'HISTORY_WRITE_FAILED' }));
+    return true;
+  }
+
+  if (request.action === 'saveHistoryAsNew') {
+    historyStore.saveAsNew(request.sourceId, request.text)
+      .then((record) => sendResponse({ success: true, record }))
+      .catch((error) => sendResponse({ success: false, errorCode:
+        error.code === 'HISTORY_TEXT_INVALID' ? error.code : 'HISTORY_WRITE_FAILED' }));
     return true;
   }
 

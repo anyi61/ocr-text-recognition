@@ -26,6 +26,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const historySearchEmptyState = document.getElementById('historySearchEmptyState');
   const historySearchWrap = document.getElementById('historySearchWrap');
   const historySearch = document.getElementById('historySearch');
+  const historyFilterWrap = document.getElementById('historyFilterWrap');
+  const historyFilter = document.getElementById('historyFilter');
+  const restoreHistoryBtn = document.getElementById('restoreHistoryBtn');
+  const cleanupHistoryBtn = document.getElementById('cleanupHistoryBtn');
   const exportHistoryBtn = document.getElementById('exportHistoryBtn');
   const clearHistoryBtn = document.getElementById('clearHistoryBtn');
   const historyPreview = document.getElementById('historyPreview');
@@ -38,6 +42,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const historyPreviewStatus = document.getElementById('historyPreviewStatus');
   const historyTranslation = document.getElementById('historyTranslation');
   const historyDraft = document.getElementById('historyDraft');
+  const historyConflict = document.getElementById('historyConflict');
   const previewFavoriteBtn = document.getElementById('previewFavoriteBtn');
   const historyName = document.getElementById('historyName');
   const historyNameSaveBtn = document.getElementById('historyNameSaveBtn');
@@ -61,20 +66,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   let previewRecord = null;
   let previewSavedText = '';
   let previewSaving = false;
+  let conflictSaving = false;
   let languageSaving = false;
   let previewTranslation = null;
   let previewDraft = null;
+  let previewConflict = null;
   let repeatAvailable = false;
   let previewSavedName = '';
   const pendingMetadata = new Set();
   const historyFieldVersions = new Map();
   let historyFieldVersion = 0;
+  const historyManagement = globalThis.OCRHistoryManagementUI.mount({ announce: announcePopupStatus });
 
   const destroyPreviewTranslation = () => {
     previewTranslation?.destroy();
     previewTranslation = null;
     previewDraft?.destroy();
     previewDraft = null;
+    previewConflict?.destroy();
+    previewConflict = null;
+    conflictSaving = false;
   };
   window.addEventListener('pagehide', destroyPreviewTranslation);
 
@@ -86,7 +97,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const updateMetadataControls = () => {
     const record = historyData.find((item) => item.id === activePreviewId);
-    const busy = pendingMetadata.has(activePreviewId);
+    const busy = pendingMetadata.has(activePreviewId) || conflictSaving;
     const favorite = record?.favorite === true;
     previewFavoriteBtn.textContent = OCRI18n.t(favorite ? 'history_unfavorite' : 'history_favorite');
     previewFavoriteBtn.setAttribute('aria-pressed', String(favorite));
@@ -98,15 +109,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   const updatePreviewSaveState = () => {
-    previewSaveBtn.disabled = previewSaving || !historyPreviewText.value.trim() || !hasPreviewChanges();
-    previewRevertBtn.disabled = previewSaving || !hasPreviewChanges();
-    historyPreviewText.readOnly = previewSaving;
-    closePreviewBtn.disabled = previewSaving;
-    for (const control of [captureBtn, imageImportBtn, settingsBtn, configTip, clearHistoryBtn, exportHistoryBtn]) {
-      control.disabled = previewSaving;
+    const busy = previewSaving || conflictSaving;
+    historyManagement.setBlocked(busy);
+    previewConflict?.setBusy(previewSaving);
+    previewSaveBtn.disabled = busy || !historyPreviewText.value.trim() || !hasPreviewChanges();
+    previewRevertBtn.disabled = busy || !hasPreviewChanges();
+    historyPreviewText.readOnly = busy;
+    closePreviewBtn.disabled = busy;
+    for (const control of [captureBtn, imageImportBtn, settingsBtn, configTip, clearHistoryBtn, exportHistoryBtn, restoreHistoryBtn, cleanupHistoryBtn]) {
+      control.disabled = busy;
     }
-    languageSelect.disabled = previewSaving || languageSaving;
-    repeatCaptureBtn.disabled = previewSaving || !repeatAvailable;
+    languageSelect.disabled = busy || languageSaving;
+    repeatCaptureBtn.disabled = busy || !repeatAvailable;
   };
 
   const providerLabels = Object.freeze({
@@ -252,11 +266,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const getFilteredHistory = () => {
     const query = historySearch.value.trim().toLocaleLowerCase();
-    if (!query) return [...historyData];
-
-    return historyData.filter((item) => [
+    const history = historyData.filter((item) => historyFilter.value === 'favorites'
+      ? item.favorite === true
+      : historyFilter.value === 'drafts'
+        ? typeof item.draft?.text === 'string' && item.draft.text !== item.text
+        : true);
+    if (!query) return history;
+    return history.filter((item) => [
       item.name,
       item.text,
+      item.draft?.text,
       item.provider,
       item.language,
       item.sourceTitle,
@@ -287,10 +306,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   };
 
-  /**
-   * 显示历史详情预览
-   * @param {Object} item - 历史记录
-   */
+  const mountPreviewDraft = () => {
+    previewDraft?.destroy();
+    previewDraft = globalThis.OCRDraftUI.mount({
+      container: historyDraft,
+      sourceTextarea: historyPreviewText,
+      historyId: activePreviewId,
+      getSavedText: () => previewSavedText,
+      onConflict: () => previewConflict?.open(),
+      onRestore: () => {
+        previewTranslation?.notifySourceChanged();
+        updatePreviewSaveState();
+      },
+      announce: announcePopupStatus
+    });
+  };
+
+  const mountPreviewTranslation = () => {
+    previewTranslation?.destroy();
+    previewTranslation = globalThis.OCRTranslationUI.mount({
+      container: historyTranslation,
+      sourceTextarea: historyPreviewText,
+      idPrefix: 'history-translation',
+      historyId: activePreviewId,
+      announce: announcePopupStatus,
+      openSettings: () => openSettings()
+    });
+  };
+
+  /** Open one saved record; label refreshes never rebuild these sessions. */
   const showHistoryPreview = (item) => {
     activePreviewId = item.id;
     previewRecord = item;
@@ -308,24 +352,48 @@ document.addEventListener('DOMContentLoaded', async () => {
     historySearchEmptyState.classList.add('hidden');
     historyEmptyState.classList.add('hidden');
     historySearchWrap.classList.add('hidden');
+    historyFilterWrap.classList.add('hidden');
     updatePreviewSaveState();
     destroyPreviewTranslation();
-    previewTranslation = globalThis.OCRTranslationUI.mount({
-      container: historyTranslation,
+    mountPreviewTranslation();
+    mountPreviewDraft();
+    previewConflict = globalThis.OCRConflictUI.mount({
+      container: historyConflict,
       sourceTextarea: historyPreviewText,
-      idPrefix: 'history-translation',
-      historyId: item.id,
-      announce: announcePopupStatus,
-      openSettings: () => openSettings()
-    });
-    previewDraft = globalThis.OCRDraftUI.mount({
-      container: historyDraft,
-      sourceTextarea: historyPreviewText,
-      historyId: item.id,
-      getSavedText: () => previewSavedText,
-      onRestore: () => {
-        previewTranslation?.notifySourceChanged();
+      getHistoryId: () => activePreviewId,
+      onRebase(record) {
+        previewSavedText = record.text;
+        previewRecord = record;
+        mountPreviewDraft();
+        renderPreviewMetadata(record);
+        historyPreviewStatus.textContent = OCRI18n.t('conflict_rebased');
         updatePreviewSaveState();
+      },
+      onSavedAsNew(record, submittedText) {
+        const keepName = hasPreviewNameChanges();
+        activePreviewId = record.id;
+        previewRecord = record;
+        previewSavedText = record.text;
+        previewSavedName = record.name || '';
+        if (!keepName) historyName.value = previewSavedName;
+        if (historyPreviewText.value === submittedText) historyPreviewText.value = record.text;
+        mountPreviewTranslation();
+        mountPreviewDraft();
+        const newDraft = previewDraft;
+        void newDraft.ready.then(() => {
+          if (previewDraft === newDraft && activePreviewId === record.id
+            && historyPreviewText.value !== previewSavedText) void newDraft.notifySourceChanged(true);
+        });
+        renderPreviewMetadata(record);
+        historyPreviewStatus.textContent = OCRI18n.t('conflict_saved_new');
+        updateMetadataControls();
+        updatePreviewSaveState();
+      },
+      onBusyChange(value) {
+        conflictSaving = value;
+        previewDraft?.setPaused(value);
+        updatePreviewSaveState();
+        updateMetadataControls();
       },
       announce: announcePopupStatus
     });
@@ -336,7 +404,7 @@ document.addEventListener('DOMContentLoaded', async () => {
    * 隐藏历史详情预览
    */
   const hideHistoryPreview = () => {
-    if (previewSaving || pendingMetadata.has(activePreviewId)) return false;
+    if (previewSaving || conflictSaving || pendingMetadata.has(activePreviewId)) return false;
     if (hasPreviewChanges() && !confirm(OCRI18n.t('history_discard_changes'))) return false;
     if (hasPreviewNameChanges() && !confirm(OCRI18n.t('history_discard_name_changes'))) return false;
     const previousId = activePreviewId;
@@ -373,11 +441,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       historyPreviewText.value = text;
       previewTranslation?.notifySourceChanged();
       await previewDraft?.refresh();
+      previewConflict?.close();
       historyPreviewStatus.textContent = OCRI18n.t('content_msg_changes_saved');
     } catch (error) {
       console.error('保存历史修改失败:', error);
       historyPreviewStatus.textContent = OCRI18n.t(error.code === 'HISTORY_TEXT_CONFLICT'
         ? 'content_msg_changes_conflict' : 'content_msg_changes_save_failed');
+      if (['HISTORY_TEXT_CONFLICT', 'HISTORY_RECORD_MISSING'].includes(error.code)) void previewConflict?.open();
     } finally {
       previewSaving = false;
       updatePreviewSaveState();
@@ -432,6 +502,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     historyPreview.classList.add('hidden');
     historyEmptyState.classList.toggle('hidden', historyData.length > 0);
     historySearchWrap.classList.toggle('hidden', historyData.length === 0);
+    historyFilterWrap.classList.toggle('hidden', historyData.length === 0);
+    cleanupHistoryBtn.classList.toggle('hidden', historyData.length === 0);
     clearHistoryBtn.classList.toggle('hidden', historyData.length === 0);
     exportHistoryBtn.classList.toggle('hidden', historyData.length === 0);
 
@@ -442,6 +514,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const history = getFilteredHistory();
+    historySearchEmptyState.querySelector('p').textContent = OCRI18n.t(historySearch.value.trim()
+      ? 'history_search_empty'
+      : historyFilter.value === 'favorites' ? 'history_filter_favorites_empty' : 'history_filter_drafts_empty');
     historySearchEmptyState.classList.toggle('hidden', history.length > 0);
     historyList.classList.toggle('hidden', history.length === 0);
 
@@ -708,6 +783,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       historyFieldVersions.set(id, versions);
     }
     historyData = Array.isArray(changes.ocrHistory.newValue) ? changes.ocrHistory.newValue : [];
+    historyManagement.notifyHistoryChanged();
+    cleanupHistoryBtn.classList.toggle('hidden', historyData.length === 0);
     if (activePreviewId === null) renderHistory();
     else {
       const record = historyData.find((item) => item.id === activePreviewId);
@@ -727,6 +804,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const refreshLanguageDisplay = () => {
     languageSelect.value = OCRI18n.getLanguageSetting();
     OCRI18n.applyToDom(document);
+    historyManagement.refreshLabels();
     if (activePreviewId === null) renderHistory();
     else {
       // Changing labels must not reopen the record or discard its local edits,
@@ -735,6 +813,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       updateMetadataControls();
       previewTranslation?.refreshLabels();
       previewDraft?.refreshLabels();
+      previewConflict?.refreshLabels();
     }
     refreshRepeatCapture();
   };
@@ -761,6 +840,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   historySearch.addEventListener('input', renderHistory);
+  historyFilter.addEventListener('change', renderHistory);
   exportHistoryBtn.addEventListener('click', exportHistory);
 
   // 清空历史按钮事件
@@ -802,6 +882,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.addEventListener('keydown', (event) => {
     if (activePreviewId === null) return;
+    if (event.key === 'Escape' && historyConflict.querySelector('[data-conflict="panel"]:not([hidden])')) {
+      event.preventDefault();
+      previewConflict?.close();
+      historyPreviewText.focus();
+      return;
+    }
     if (event.target === historyName && (event.key === 'Escape' || event.key === 'Enter'
       || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's'))) {
       event.preventDefault();

@@ -38,6 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let copyGeneration = 0;
   let autoCopyStatusKey = '';
   let saving = false;
+  let conflictSaving = false;
   let disposed = false;
   let port = null;
   let requestId = null;
@@ -45,6 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let historyId = null;
   let translation = null;
   let draft = null;
+  let conflict = null;
   let statusKey = '';
   let statusArgs = [];
   let resultStatusKey = '';
@@ -57,19 +59,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     resultStatus.textContent = key ? OCRI18n.t(key) : '';
   };
   function updateButtons() {
-    recognize.disabled = !image || loading || busy || saving || !config?.configured;
+    const writing = saving || conflictSaving;
+    recognize.disabled = !image || loading || busy || writing || !config?.configured;
     recognize.hidden = recovering;
     recoveryActions.hidden = !recovering;
     retry.disabled = recognize.disabled;
-    chooseNew.disabled = saving;
-    recoverySettings.disabled = saving;
+    chooseNew.disabled = writing;
+    recoverySettings.disabled = writing;
     cancel.hidden = !busy;
-    save.disabled = saving || busy || !historyId || !source.value.trim() || source.value === savedText;
-    source.readOnly = busy;
-    fileInput.disabled = saving;
-    settings.disabled = saving;
-    resultSection.setAttribute('aria-busy', String(saving));
+    save.disabled = writing || busy || !historyId || !source.value.trim() || source.value === savedText;
+    // Until save-as-new returns its new ID, edits cannot be persisted against
+    // that record if this tab closes. Keep the submitted snapshot stable.
+    source.readOnly = busy || conflictSaving;
+    fileInput.disabled = writing;
+    settings.disabled = writing;
+    resultSection.setAttribute('aria-busy', String(writing));
     dropZone.setAttribute('aria-busy', String(loading));
+    conflict?.setBusy(saving || busy);
   }
   function focusRecoveryAction() {
     if (recovering && !busy && !disposed) (retry.disabled ? recoverySettings : retry).focus({ preventScroll: true });
@@ -86,6 +92,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (autoCopyStatusKey) autoCopyStatus.textContent = OCRI18n.t(autoCopyStatusKey);
     translation?.refreshLabels();
     draft?.refreshLabels();
+    conflict?.refreshLabels();
   }
   async function loadConfig() {
     const version = ++configRead;
@@ -122,11 +129,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     invalidateCopyFeedback();
     translation?.destroy(); translation = null;
     draft?.destroy(); draft = null;
+    conflict?.destroy(); conflict = null;
+    conflictSaving = false;
     historyId = null; savedText = ''; source.value = '';
     resultSection.hidden = true; setResultStatus('');
   }
   async function selectFiles(files) {
-    if (saving || disposed) return;
+    if (saving || conflictSaving || disposed) return;
     stopRequest();
     recovering = false;
     loading = false;
@@ -151,24 +160,52 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (version === generation) { loading = false; updateButtons(); }
     }
   }
+  function mountResultSessions(resetTranslation = true) {
+    draft?.destroy();
+    if (resetTranslation) {
+      translation?.destroy();
+      translation = globalThis.OCRTranslationUI.mount({
+        container: get('imageTranslation'), sourceTextarea: source,
+        idPrefix: 'image-translation', historyId,
+        openSettings: () => chrome.runtime.openOptionsPage()
+      });
+    }
+    if (historyId && globalThis.OCRDraftUI) {
+      draft = globalThis.OCRDraftUI.mount({
+        container: get('imageDraft'), sourceTextarea: source, historyId,
+        getSavedText: () => savedText,
+        onConflict: () => conflict?.open(),
+        onRestore: () => { invalidateCopyFeedback(); setResultStatus(''); translation?.notifySourceChanged(); updateButtons(); }
+      });
+    }
+  }
   function showResult(response) {
     destroyResult();
     historyId = response.historyId || null;
     savedText = response.text;
     source.value = response.text;
     resultSection.hidden = false;
-    translation = globalThis.OCRTranslationUI.mount({
-      container: get('imageTranslation'), sourceTextarea: source,
-      idPrefix: 'image-translation', historyId,
-      openSettings: () => chrome.runtime.openOptionsPage()
+    mountResultSessions();
+    conflict = globalThis.OCRConflictUI?.mount({
+      container: get('imageConflict'), sourceTextarea: source, getHistoryId: () => historyId,
+      onRebase(record) {
+        savedText = record.text;
+        mountResultSessions(false);
+        setResultStatus('conflict_rebased'); updateButtons();
+      },
+      onSavedAsNew(record, submittedText) {
+        historyId = record.id; savedText = record.text;
+        if (source.value === submittedText) source.value = record.text;
+        invalidateCopyFeedback();
+        mountResultSessions();
+        const newDraft = draft;
+        void newDraft?.ready.then(() => {
+          if (!disposed && draft === newDraft && source.value !== savedText) void newDraft.notifySourceChanged(true);
+        });
+        setResultStatus('conflict_saved_new'); updateButtons();
+      },
+      onBusyChange(value) { conflictSaving = value; draft?.setPaused?.(value); updateButtons(); }
     });
-    if (historyId && globalThis.OCRDraftUI) {
-      draft = globalThis.OCRDraftUI.mount({
-        container: get('imageDraft'), sourceTextarea: source, historyId,
-        getSavedText: () => savedText,
-        onRestore: () => { invalidateCopyFeedback(); setResultStatus(''); translation?.notifySourceChanged(); updateButtons(); }
-      });
-    }
     setResultStatus(response.warningCode ? 'error_history_save_failed' : 'image_import_history_saved');
     updateButtons(); source.focus();
     if (response.autoCopy === true) void copyText(true, response.text);
@@ -291,8 +328,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (source.value.trim() !== savedText) void draft?.notifySourceChanged(true);
       setResultStatus('content_msg_changes_saved');
     } catch (error) {
-      if (isCurrent()) setResultStatus(error.code === 'HISTORY_TEXT_CONFLICT'
-        ? 'content_msg_changes_conflict' : 'content_msg_changes_save_failed');
+      if (isCurrent()) {
+        setResultStatus(error.code === 'HISTORY_TEXT_CONFLICT'
+          ? 'content_msg_changes_conflict' : 'content_msg_changes_save_failed');
+        if (['HISTORY_TEXT_CONFLICT', 'HISTORY_RECORD_MISSING'].includes(error.code)) void conflict?.open();
+      }
     } finally {
       saving = false;
       if (!disposed) updateButtons();

@@ -5,6 +5,7 @@
   function createSession({ historyId, getText, getSavedText, setText, sendMessage,
     onChange, onRestore = () => {}, createOwnerId = () => root.crypto.randomUUID() }) {
     let destroyed = false;
+    let paused = false;
     let revision = 0;
     let loadGeneration = 0;
     let observed = { text: getText(), baseText: getSavedText() };
@@ -57,7 +58,7 @@
       }
     }
     function notifySourceChanged(force = false) {
-      if (destroyed || !historyId) return Promise.resolve();
+      if (destroyed || paused || !historyId) return Promise.resolve();
       const snapshot = { text: getText(), baseText: getSavedText() };
       if (!force && snapshot.text === observed.text && snapshot.baseText === observed.baseText) return Promise.resolve();
       // Updating the editor's saved baseline is a read-only operation. In
@@ -93,7 +94,7 @@
       });
     }
     function restore() {
-      if (destroyed || !state.draft || !['available', 'available-conflict'].includes(state.status)) return false;
+      if (destroyed || paused || !state.draft || !['available', 'available-conflict'].includes(state.status)) return false;
       const text = state.draft.text;
       setText(text);
       notifySourceChanged();
@@ -101,7 +102,7 @@
       return true;
     }
     async function discard() {
-      if (destroyed || !historyId || !storedDraft || ['saving', 'loading', 'discarding'].includes(state.status)) return false;
+      if (destroyed || paused || !historyId || !storedDraft || ['saving', 'loading', 'discarding'].includes(state.status)) return false;
       const draft = { ...storedDraft };
       const text = getText();
       const token = ++revision;
@@ -129,7 +130,7 @@
       }
     }
     async function retry() {
-      if (destroyed) return;
+      if (destroyed || paused) return;
       if (state.status === 'error' && getText() !== getSavedText()) {
         return notifySourceChanged(true);
       }
@@ -144,11 +145,16 @@
     }
     const ready = refresh();
     return { ready, refresh, retry, notifySourceChanged, restore, discard,
+      setPaused(value) {
+        const wasPaused = paused;
+        paused = Boolean(value);
+        if (wasPaused && !paused) void notifySourceChanged();
+      },
       getState: () => ({ ...state, draft: state.draft ? { ...state.draft } : null }),
       destroy() { destroyed = true; loadGeneration += 1; } };
   }
 
-  function mount({ container, sourceTextarea, historyId, getSavedText, onRestore = () => {},
+  function mount({ container, sourceTextarea, historyId, getSavedText, onRestore = () => {}, onConflict,
     announce = () => {}, transport }) {
     const documentApi = container.ownerDocument;
     const t = (key) => root.OCRI18n.t(key);
@@ -179,23 +185,29 @@
     const retry = documentApi.createElement('button');
     retry.type = 'button';
     retry.dataset.draft = 'retry';
-    panel.append(style, status, restore, discard, retry);
+    const compare = documentApi.createElement('button');
+    compare.type = 'button';
+    compare.dataset.draft = 'compare';
+    panel.append(style, status, restore, discard, retry, compare);
     container.replaceChildren(panel);
     let destroyed = false;
+    let paused = false;
     let lastAnnouncement = '';
     const render = (state) => {
       if (destroyed) return;
       panel.dataset.state = state.status;
-      const busy = ['loading', 'saving', 'discarding'].includes(state.status);
+      const busy = paused || ['loading', 'saving', 'discarding'].includes(state.status);
       panel.setAttribute('aria-busy', String(busy));
       status.textContent = t(`draft_${state.status.replaceAll('-', '_')}`);
       restore.textContent = t('draft_restore');
       discard.textContent = t('draft_discard');
       retry.textContent = t('draft_retry');
+      compare.textContent = t('conflict_compare');
       restore.hidden = !['available', 'available-conflict'].includes(state.status);
       discard.hidden = !['available', 'available-conflict', 'saved', 'discarding'].includes(state.status);
       retry.hidden = !['error', 'conflict'].includes(state.status);
-      for (const button of [restore, discard, retry]) button.disabled = busy;
+      compare.hidden = !onConflict || !['error', 'conflict', 'available-conflict'].includes(state.status);
+      for (const button of [restore, discard, retry, compare]) button.disabled = busy;
       if (!busy && status.textContent && lastAnnouncement !== status.textContent) {
         lastAnnouncement = status.textContent;
         announce(status.textContent);
@@ -215,10 +227,14 @@
       if (!event.isTrusted || retry.disabled || destroyed) return;
       session.retry();
     };
+    const onCompareClick = (event) => {
+      if (event.isTrusted && !compare.disabled && !destroyed) onConflict?.(session.getState());
+    };
     sourceTextarea.addEventListener('input', onInput);
     restore.addEventListener('click', onRestoreClick);
     discard.addEventListener('click', onDiscardClick);
     retry.addEventListener('click', onRetryClick);
+    compare.addEventListener('click', onCompareClick);
     const destroy = () => {
       if (destroyed) return;
       destroyed = true;
@@ -227,13 +243,15 @@
       restore.removeEventListener('click', onRestoreClick);
       discard.removeEventListener('click', onDiscardClick);
       retry.removeEventListener('click', onRetryClick);
+      compare.removeEventListener('click', onCompareClick);
       documentApi.defaultView?.removeEventListener('pagehide', destroy);
-      for (const button of [restore, discard, retry]) button.disabled = true;
+      for (const button of [restore, discard, retry, compare]) button.disabled = true;
     };
     documentApi.defaultView?.addEventListener('pagehide', destroy);
     render(session.getState());
     return { ready: session.ready, notifySourceChanged: session.notifySourceChanged,
       refresh: session.refresh, discard: session.discard, destroy,
+      setPaused(value) { paused = Boolean(value); session.setPaused(paused); render(session.getState()); },
       refreshLabels: () => render(session.getState()) };
   }
 

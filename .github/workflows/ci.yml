@@ -1,0 +1,69 @@
+name: Extension checks and packages
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extension-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+      PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report
+      PLAYWRIGHT_HTML_OPEN: never
+      PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/results.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install Chromium and system libraries
+        run: npx playwright install --with-deps chromium
+      - name: Lint and unit / contract tests
+        shell: bash
+        run: |
+          mkdir -p dist/ci-logs
+          set -o pipefail
+          npm run lint 2>&1 | tee dist/ci-logs/lint.log
+          npm test 2>&1 | tee dist/ci-logs/unit.log
+      - name: Chromium end-to-end tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:e2e -- --reporter=line,html,json 2>&1 | tee dist/ci-logs/e2e.log
+      - name: Build version-checked release artifacts
+        run: node scripts/release-artifacts.mjs
+      - name: Upload install package, source, metadata, and checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: ocr-release-${{ github.sha }}
+          path: dist/release-*/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload test reports and failure evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ocr-checks-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            dist/ci-logs/
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14

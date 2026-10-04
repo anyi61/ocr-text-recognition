@@ -43,6 +43,21 @@ function harness() {
   return { store, editor, beforeWrite(fn) { beforeWrite = fn; }, afterRead(fn) { afterRead = fn; } };
 }
 
+test('save-as-new pauses writes to the source draft and resumes retained input after a failed copy', async () => {
+  const h = harness();
+  const editor = h.editor('first');
+  await editor.session.ready;
+  await editor.input('Source draft snapshot');
+  const original = await h.store.get('record');
+  editor.session.setPaused(true);
+  await editor.input('Input belonging to the pending new record');
+  assert.deepEqual(await h.store.get('record'), original);
+  assert.equal(await editor.session.discard(), false);
+  editor.session.setPaused(false);
+  const restored = await h.store.get('record');
+  assert.equal(restored.draft.text, 'Input belonging to the pending new record');
+});
+
 test('input dispatched during discard survives immediate editor closure and is recoverable', async () => {
   const h = harness();
   const first = h.editor('first');

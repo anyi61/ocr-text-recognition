@@ -21,6 +21,7 @@
     'text-utils.js',
     'translation-ui.js',
     'draft-ui.js',
+    'conflict-ui.js',
     'content.js'
   ]);
 

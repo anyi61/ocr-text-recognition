@@ -1436,7 +1436,7 @@
     "message": "Discarding draft…"
   },
   "draft_conflict": {
-    "message": "The original or draft changed in another window. Your current text is still here. Copy it, then reopen this record to review the latest version."
+    "message": "The original or draft changed in another window. Your current text is still here. Compare the saved text before continuing, or save as a new record."
   },
   "draft_error": {
     "message": "Could not load or save the draft. Keep this window open and retry, or copy your edits before closing."
@@ -1562,9 +1562,168 @@
     "message": "This API domain is not authorized. Open settings to grant access, then retry the original image."
   },
   "content_msg_changes_conflict": {
-    "message": "The saved text changed in another window. Your edits are still here. Copy them, reopen this history record, and review before saving."
+    "message": "The saved text changed in another window. Your edits are still here. Compare the saved text below, then continue editing or save as a new record."
   },
   "msg_settings_save_failed": {
     "message": "Could not save settings. Your edits are still here; try again."
+  },
+  "history_restore": {
+    "message": "Restore history backup"
+  },
+  "history_cleanup": {
+    "message": "Clean up ordinary history"
+  },
+  "history_filter_label": {
+    "message": "Show records"
+  },
+  "history_filter_all": {
+    "message": "All"
+  },
+  "history_filter_favorites": {
+    "message": "Favorites"
+  },
+  "history_filter_drafts": {
+    "message": "Unfinished drafts"
+  },
+  "history_filter_favorites_empty": {
+    "message": "No favorite records yet."
+  },
+  "history_filter_drafts_empty": {
+    "message": "No unfinished drafts."
+  },
+  "history_restore_description": {
+    "message": "Merge a history backup without replacing existing records. Existing or repeated IDs are kept once. New ordinary records fill the remaining 50-record capacity; favorites and unfinished drafts are protected."
+  },
+  "history_cleanup_description": {
+    "message": "Delete all ordinary history, regardless of the current filter or search. Keep favorites and unfinished drafts. This cannot be undone."
+  },
+  "history_restore_total": {
+    "message": "Records in backup"
+  },
+  "history_restore_added": {
+    "message": "Records to add"
+  },
+  "history_restore_duplicates": {
+    "message": "Existing or repeated IDs kept"
+  },
+  "history_restore_capacity": {
+    "message": "Skipped at ordinary-history limit"
+  },
+  "history_restore_favorites": {
+    "message": "Favorites to add"
+  },
+  "history_restore_drafts": {
+    "message": "Unfinished drafts to add"
+  },
+  "history_cleanup_deleted": {
+    "message": "Ordinary records to delete"
+  },
+  "history_cleanup_kept": {
+    "message": "Protected records to keep"
+  },
+  "history_cleanup_favorites": {
+    "message": "Favorites to keep"
+  },
+  "history_cleanup_drafts": {
+    "message": "Unfinished drafts to keep"
+  },
+  "history_management_cancel": {
+    "message": "Cancel"
+  },
+  "history_management_close": {
+    "message": "Close"
+  },
+  "history_management_refresh": {
+    "message": "Refresh preview"
+  },
+  "history_restore_confirm": {
+    "message": "Confirm restore"
+  },
+  "history_cleanup_confirm": {
+    "message": "Delete ordinary history"
+  },
+  "history_management_loading": {
+    "message": "Preparing preview…"
+  },
+  "history_management_saving": {
+    "message": "Saving changes…"
+  },
+  "history_management_ready": {
+    "message": "Review these counts, then confirm to apply the changes."
+  },
+  "history_management_stale": {
+    "message": "History changed in another operation. Refresh the preview before confirming."
+  },
+  "history_management_expired": {
+    "message": "This preview expired. Refresh it before confirming."
+  },
+  "history_management_failed": {
+    "message": "Could not complete this operation. Your selection is retained. Refresh the preview to check the latest history and try again."
+  },
+  "history_restore_invalid": {
+    "message": "This is not a supported history backup. Choose a valid OCR history JSON file."
+  },
+  "history_restore_too_large": {
+    "message": "The backup exceeds the 20 MiB file limit or the 10,000-record limit. Choose a smaller backup."
+  },
+  "history_restore_read_failed": {
+    "message": "Could not read this file. Close this preview and choose the file again."
+  },
+  "history_restore_done": {
+    "message": "Restored {0} records. Existing records were preserved."
+  },
+  "history_cleanup_done": {
+    "message": "Deleted {0} ordinary records. Favorites and unfinished drafts were kept."
+  },
+  "conflict_title": {
+    "message": "Review saved and local text"
+  },
+  "conflict_local_preserved": {
+    "message": "Your local edits remain in the original editor above. Compare the saved text below; continuing keeps your local text and uses this saved version as the next save baseline."
+  },
+  "conflict_latest_label": {
+    "message": "Latest saved text (read only)"
+  },
+  "conflict_idle": {
+    "message": "Compare saved text while keeping your edits."
+  },
+  "conflict_loading": {
+    "message": "Loading the latest saved text…"
+  },
+  "conflict_ready": {
+    "message": "Review this saved version before continuing. Saving will check again for changes from other windows."
+  },
+  "conflict_missing": {
+    "message": "This record was deleted. Your local text is still here and can be saved as a new record."
+  },
+  "conflict_read_error": {
+    "message": "Could not refresh the saved text. Any text shown below may be outdated; refresh before continuing, or save your edits as a new record."
+  },
+  "conflict_save_error": {
+    "message": "Could not save the new record. Your edits are still here; try again."
+  },
+  "conflict_saving": {
+    "message": "Saving as a new record… Editing will resume when it is saved."
+  },
+  "conflict_compare": {
+    "message": "Compare saved text"
+  },
+  "conflict_refresh": {
+    "message": "Refresh saved text"
+  },
+  "conflict_rebase": {
+    "message": "Continue with this baseline"
+  },
+  "conflict_save_new": {
+    "message": "Save as a new record"
+  },
+  "conflict_close": {
+    "message": "Close comparison"
+  },
+  "conflict_rebased": {
+    "message": "Saved baseline updated. Your local edits are unchanged; save when ready."
+  },
+  "conflict_saved_new": {
+    "message": "Saved as a new record. Further edits belong to this new record."
   }
 }

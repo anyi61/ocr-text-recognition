@@ -90,6 +90,19 @@
         </div>
       </div>
       <p class="history-retention-hint" data-i18n="history_retention_hint">自动保留最近 50 条普通记录；收藏和未完成草稿不受此上限影响。</p>
+      <div class="history-management-actions">
+        <button id="restoreHistoryBtn" class="btn" type="button" data-i18n="history_restore">恢复历史备份</button>
+        <button id="cleanupHistoryBtn" class="btn hidden" type="button" data-i18n="history_cleanup">清理普通历史</button>
+        <input id="historyBackupFile" type="file" accept=".json,application/json" hidden>
+      </div>
+      <div id="historyFilterWrap" class="history-filter-wrap hidden">
+        <label for="historyFilter" data-i18n="history_filter_label">显示记录</label>
+        <select id="historyFilter" class="language-select">
+          <option value="all" data-i18n="history_filter_all">全部</option>
+          <option value="favorites" data-i18n="history_filter_favorites">收藏</option>
+          <option value="drafts" data-i18n="history_filter_drafts">未完成草稿</option>
+        </select>
+      </div>
       <div id="historySearchWrap" class="history-search-wrap hidden">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
           <circle cx="11" cy="11" r="8"></circle>
@@ -138,6 +151,7 @@
         <textarea id="historyPreviewText" data-i18n-aria="history_preview_aria" aria-label="历史记录详情" aria-describedby="historyEditHint"></textarea>
         <p id="historyEditHint" class="history-edit-hint" data-i18n="history_edit_hint">可修订文字；点击保存后更新历史记录。</p>
         <p id="historyPreviewStatus" class="history-preview-status" role="status" aria-live="polite"></p>
+        <div id="historyConflict"></div>
         <div class="history-preview-actions">
           <button id="previewRevertBtn" class="btn" type="button" disabled data-i18n="history_revert_changes">还原修改</button>
           <button id="previewSaveBtn" class="btn btn-primary" type="button" disabled data-i18n="content_btn_save_changes">保存修改</button>
@@ -160,11 +174,26 @@
     </footer>
   </div>
 
+  <dialog id="historyManagementDialog" class="history-management-dialog" aria-labelledby="historyManagementTitle" aria-describedby="historyManagementDescription">
+    <h3 id="historyManagementTitle"></h3>
+    <p id="historyManagementDescription"></p>
+    <p id="historyManagementFile" class="history-management-file"></p>
+    <dl id="historyManagementCounts" class="history-management-counts hidden"></dl>
+    <p id="historyManagementStatus" role="status" aria-live="polite"></p>
+    <div class="history-management-dialog-actions">
+      <button id="historyManagementCancel" class="btn" type="button" data-i18n="history_management_cancel">取消</button>
+      <button id="historyManagementRefresh" class="btn hidden" type="button" data-i18n="history_management_refresh">刷新预览</button>
+      <button id="historyManagementConfirm" class="btn btn-primary" type="button" disabled></button>
+    </div>
+  </dialog>
+
   <script src="i18n-runtime.js"></script>
   <script src="provider-config.js"></script>
   <script src="extension-runtime.js"></script>
   <script src="translation-ui.js"></script>
   <script src="draft-ui.js"></script>
+  <script src="conflict-ui.js"></script>
+  <script src="history-management-ui.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

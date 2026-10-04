@@ -40,7 +40,7 @@ const OptionsRuntime = (() => {
 
   function buildExportData(result, apiConfigs, exportDate = new Date().toISOString()) {
     return {
-      version: '1.2.2',
+      version: '1.3.0',
       exportDate,
       appName: 'OCR文字识别助手',
       config: {

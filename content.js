@@ -1844,6 +1844,7 @@
       <div class="ocr-result-content">
         <textarea class="ocr-result-textarea" id="ocr-result-text" placeholder="${OCRI18n.t('content_result_title')}" aria-label="${OCRI18n.t('content_aria_result')}"></textarea>
         <div id="ocr-draft-container"></div>
+        <div id="ocr-conflict-container"></div>
         <div class="ocr-text-tools">
           <button class="ocr-result-btn ocr-result-btn-secondary merge-lines-btn" type="button" title="${OCRI18n.t('content_merge_lines_hint')}">${OCRI18n.t('content_btn_merge_lines')}</button>
           <button class="ocr-result-btn ocr-result-btn-secondary undo-text-btn" type="button" disabled>${OCRI18n.t('content_btn_undo_text')}</button>
@@ -1876,13 +1877,9 @@
     // 安全赋值
     const textarea = popup.querySelector('#ocr-result-text');
     textarea.value = text || '';
-    const translation = globalThis.OCRTranslationUI.mount({
-      container: popup.querySelector('#ocr-translation-container'),
-      sourceTextarea: textarea,
-      historyId,
-      idPrefix: 'ocr-translation',
-      announce: announceA11y
-    });
+    let translation = null;
+    let draft = null;
+    let conflict = null;
 
     // 绑定事件
     const closeBtn = popup.querySelector('.ocr-close-btn');
@@ -1899,6 +1896,7 @@
     let formattingUndo = null;
     let isClosing = false;
     let isSaving = false;
+    let conflictSaving = false;
     let closeTimer = null;
     let copyGeneration = 0;
     const autoCopyStatus = popup.querySelector('#ocr-auto-copy-status');
@@ -1910,23 +1908,57 @@
       copyIcon.innerHTML = `<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>`;
     };
-    const draft = globalThis.OCRDraftUI.mount({
-      container: popup.querySelector('#ocr-draft-container'),
-      sourceTextarea: textarea,
-      historyId,
-      getSavedText: () => lastSavedText,
-      onRestore: () => {
-        invalidateCopyFeedback();
-        formattingUndo = null;
-        undoTextBtn.disabled = true;
-        updateSaveButtonState();
-        translation.notifySourceChanged();
+    function mountEditorSessions(resetTranslation = true) {
+      draft?.destroy();
+      if (resetTranslation) {
+        translation?.destroy();
+        translation = globalThis.OCRTranslationUI.mount({
+          container: popup.querySelector('#ocr-translation-container'), sourceTextarea: textarea,
+          historyId, idPrefix: 'ocr-translation', announce: announceA11y
+        });
+      }
+      draft = globalThis.OCRDraftUI.mount({
+        container: popup.querySelector('#ocr-draft-container'), sourceTextarea: textarea,
+        historyId, getSavedText: () => lastSavedText,
+        onConflict: () => conflict?.open(),
+        onRestore: () => {
+          invalidateCopyFeedback();
+          formattingUndo = null;
+          undoTextBtn.disabled = true;
+          updateSaveButtonState();
+          translation.notifySourceChanged();
+        },
+        announce: announceA11y
+      });
+    }
+    mountEditorSessions();
+    conflict = globalThis.OCRConflictUI?.mount({
+      container: popup.querySelector('#ocr-conflict-container'), sourceTextarea: textarea,
+      getHistoryId: () => historyId, announce: announceA11y,
+      onRebase(record) {
+        lastSavedText = record.text;
+        mountEditorSessions(false); updateSaveButtonState();
+        showNotification(OCRI18n.t('conflict_rebased'), 'info');
       },
-      announce: announceA11y
+      onSavedAsNew(record, submittedText) {
+        historyId = record.id; lastSavedText = record.text;
+        if (textarea.value === submittedText) textarea.value = record.text;
+        invalidateCopyFeedback();
+        mountEditorSessions();
+        const newDraft = draft;
+        void newDraft.ready?.then(() => {
+          if (popup.isConnected && !isClosing && draft === newDraft && textarea.value !== lastSavedText) {
+            void newDraft.notifySourceChanged(true);
+          }
+        });
+        updateSaveButtonState();
+        showNotification(OCRI18n.t('conflict_saved_new'), 'success');
+      },
+      onBusyChange(value) { conflictSaving = value; draft?.setPaused?.(value); updateSaveButtonState(); }
     });
     const refreshRepeatButton = () => {
       const state = getRepeatCaptureState();
-      repeatBtn.disabled = !state.available || isSaving;
+      repeatBtn.disabled = !state.available || isSaving || conflictSaving;
       repeatStatus.hidden = state.available;
       repeatStatus.textContent = state.available ? '' : repeatReasonMessage(state.reason);
     };
@@ -1955,6 +1987,7 @@
     const removeModalGuards = () => {
       translation.destroy();
       draft.destroy();
+      conflict?.destroy();
       if (updateRepeatButton === refreshRepeatButton) updateRepeatButton = null;
       document.removeEventListener('focusin', keepFocusInside, true);
       backdrop.remove();
@@ -1968,8 +2001,12 @@
 
     const updateSaveButtonState = () => {
       const currentText = textarea.value.trim();
-      saveChangesBtn.disabled = isSaving || !historyId || !currentText || currentText === lastSavedText;
+      saveChangesBtn.disabled = isSaving || conflictSaving || !historyId || !currentText || currentText === lastSavedText;
+      textarea.readOnly = conflictSaving;
+      mergeLinesBtn.disabled = conflictSaving;
+      undoTextBtn.disabled = conflictSaving || formattingUndo === null;
       refreshRepeatButton();
+      conflict?.setBusy(isSaving);
     };
 
     textarea.addEventListener('input', () => {
@@ -1983,6 +2020,7 @@
     });
 
     mergeLinesBtn.addEventListener('click', () => {
+      if (conflictSaving) return;
       const before = textarea.value;
       const merged = globalThis.OCRTextUtils.mergeWrappedLines(before);
       if (merged === before) return;
@@ -1997,7 +2035,7 @@
     });
 
     undoTextBtn.addEventListener('click', () => {
-      if (formattingUndo === null) return;
+      if (conflictSaving || formattingUndo === null) return;
       textarea.value = formattingUndo;
       invalidateCopyFeedback();
       formattingUndo = null;
@@ -2030,6 +2068,7 @@
       isClosing = true;
       translation.destroy();
       draft.destroy();
+      conflict?.destroy();
       if (options.immediate) {
         finishClose();
       } else {
@@ -2069,7 +2108,7 @@
     saveChangesBtn.addEventListener('click', async () => {
       const submittedText = textarea.value;
       const updatedText = textarea.value.trim();
-      if (isSaving || !historyId || !updatedText || updatedText === lastSavedText) return;
+      if (isSaving || conflictSaving || !historyId || !updatedText || updatedText === lastSavedText) return;
 
       isSaving = true;
       updateSaveButtonState();
@@ -2115,6 +2154,7 @@
           ? 'content_msg_changes_conflict' : 'content_msg_changes_save_failed';
         showNotification(OCRI18n.t(key), 'error');
         announceA11y(OCRI18n.t(key));
+        if (['HISTORY_TEXT_CONFLICT', 'HISTORY_RECORD_MISSING'].includes(error.code)) void conflict?.open();
       } finally {
         isSaving = false;
         if (popup.isConnected && !isClosing) updateSaveButtonState();

@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { startMockServer, configureExtension, uploadImage, readHistory } = require('./helpers');
 
-test('release ZIP installs with all runtime files and completes image retry, translation and protected history', async ({}, testInfo) => {
+test('release ZIP installs with all runtime files and completes retry, translation, conflict resolution and history restore', async ({}, testInfo) => {
   const { buildPackage } = await import('../../scripts/package-extension.mjs');
   const zipPath = buildPackage();
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ocr-package-smoke-'));
@@ -67,6 +67,40 @@ test('release ZIP installs with all runtime files and completes image retry, tra
     await expect(popup.locator('[data-translation="text"]')).toHaveValue('MOCK TRANSLATION RESULT');
     expect(mock.state.requests).toHaveLength(3);
     await popup.screenshot({ path: testInfo.outputPath('installed-protected-history.png'), fullPage: true });
+
+    const source = (await readHistory(worker))[0];
+    await workspace.evaluate((record) => chrome.runtime.sendMessage({
+      action: 'updateHistoryRecord', historyId: record.id,
+      expectedText: record.text, text: 'Changed in another editor'
+    }), source);
+    await popup.locator('#historyPreviewText').fill('Keep this separately');
+    await popup.locator('#previewSaveBtn').click();
+    await expect(popup.locator('[data-conflict="latest"]')).toHaveValue('Changed in another editor');
+    await popup.locator('[data-conflict="save-new"]').click();
+    await expect(popup.locator('[data-conflict="panel"]')).toBeHidden();
+    await expect.poll(async () => (await readHistory(worker)).length).toBe(2);
+    expect((await readHistory(worker)).find((record) => record.id === source.id).text).toBe('Changed in another editor');
+    await popup.locator('#closePreviewBtn').click();
+
+    await popup.locator('#historyBackupFile').setInputFiles({
+      name: 'package-backup.json', mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify({ version: 3, records: [
+        { id: 'package-restored', text: 'Imported ordinary record', timestamp: 1000 }
+      ] }))
+    });
+    await expect(popup.locator('#historyManagementCounts [data-count="importCount"]')).toHaveText('1');
+    await popup.locator('#historyManagementConfirm').click();
+    await expect(popup.locator('#historyManagementStatus')).toContainText('Restored 1');
+    await popup.locator('#historyManagementCancel').click();
+    await expect(popup.locator('.history-item[data-history-id="package-restored"]')).toBeVisible();
+    await popup.locator('#historyFilter').selectOption('favorites');
+    await expect(popup.locator('.history-item[data-history-id="package-restored"]')).toHaveCount(0);
+    await popup.locator('#cleanupHistoryBtn').click();
+    await expect(popup.locator('#historyManagementCounts [data-count="deleteCount"]')).toHaveText('2');
+    await popup.locator('#historyManagementConfirm').click();
+    await expect(popup.locator('#historyManagementStatus')).toContainText('Deleted 2');
+    expect((await readHistory(worker)).map((record) => record.id)).toEqual([source.id]);
+    await popup.screenshot({ path: testInfo.outputPath('installed-history-management.png'), fullPage: true });
   } finally {
     await context?.close();
     await mock.close();
