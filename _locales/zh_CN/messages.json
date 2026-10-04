@@ -11,7 +11,6 @@
     "message": "开始截图识别",
     "description": "Keyboard shortcut description"
   },
-
   "app_title": {
     "message": "OCR文字识别助手",
     "description": "App title in header"
@@ -36,7 +35,6 @@
     "message": "请先配置API密钥",
     "description": "API config tip"
   },
-
   "history_title": {
     "message": "最近识别记录",
     "description": "History section title"
@@ -101,7 +99,6 @@
     "message": "关闭预览",
     "description": "Close preview button"
   },
-
   "preview_title": {
     "message": "识别结果",
     "description": "Preview section title"
@@ -114,12 +111,10 @@
     "message": "已复制",
     "description": "Copied button state"
   },
-
   "footer_supported_apis": {
     "message": "支持 7 种 API：Claude / OpenAI / 智谱AI / 百度OCR / 阿里云 / 通用兼容 / 自定义",
     "description": "Footer text"
   },
-
   "theme_light": {
     "message": "浅色模式",
     "description": "Light theme option"
@@ -128,14 +123,11 @@
     "message": "深色模式",
     "description": "Dark theme option"
   },
-
   "confirm_clear_history": {
-    "message": "确定要清空所有历史记录吗？",
-    "description": "Confirm clear history"
+    "message": "清空全部历史记录，包括收藏、已保存译文和未完成草稿？此操作无法撤销。"
   },
   "confirm_delete_history": {
-    "message": "确定要删除这条历史记录吗？",
-    "description": "Confirm delete history item"
+    "message": "删除这条记录及其收藏、已保存译文和未完成草稿？"
   },
   "msg_history_action_failed": {
     "message": "历史记录操作失败，请重试",
@@ -149,7 +141,6 @@
     "message": "历史记录已导出",
     "description": "History exported announcement"
   },
-
   "msg_capture_failed": {
     "message": "启动截图失败，请刷新页面后重试",
     "description": "Capture failed message"
@@ -170,7 +161,6 @@
     "message": "请先配置API密钥",
     "description": "Please configure API first"
   },
-
   "options_title": {
     "message": "OCR文字识别助手 - 设置",
     "description": "Options page title"
@@ -179,7 +169,6 @@
     "message": "配置API密钥和识别偏好",
     "description": "Options header subtitle"
   },
-
   "section_api_provider": {
     "message": "API 提供商",
     "description": "API provider section"
@@ -192,7 +181,6 @@
     "message": "选择您想要使用的文字识别服务",
     "description": "Select provider help text"
   },
-
   "section_claude_config": {
     "message": "Claude 配置",
     "description": "Claude config section"
@@ -221,7 +209,6 @@
     "message": "自定义 API 配置",
     "description": "Custom API section"
   },
-
   "label_api_key": {
     "message": "API Key",
     "description": "API Key label"
@@ -246,7 +233,6 @@
     "message": "模型名称 (可选)",
     "description": "Model name optional label"
   },
-
   "help_claude_key": {
     "message": "从 Anthropic Console 获取API Key",
     "description": "Claude key help"
@@ -268,8 +254,8 @@
     "description": "Zhipu key help"
   },
   "help_compatible_endpoint": {
-    "message": "支持任何OpenAI格式的API，如硅基流动、DeepSeek、Azure等",
-    "description": "Compatible endpoint help"
+    "message": "需要支持图像输入、Bearer 认证和 Chat Completions 的完整接口地址。Azure api-key、无需认证或 Responses 接口请使用“自定义 API”。",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "help_custom_endpoint": {
     "message": "完整的 API 接口地址；仅支持 Chat Completions 或 Responses 请求格式。",
@@ -335,7 +321,6 @@
     "message": "阿里云DashScope提供的视觉语言模型",
     "description": "Aliyun models help"
   },
-
   "section_advanced": {
     "message": "高级设置",
     "description": "Advanced settings section"
@@ -364,7 +349,6 @@
     "message": "请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。",
     "description": "Default prompt text"
   },
-
   "btn_test_connection": {
     "message": "测试连接",
     "description": "Test connection button"
@@ -377,7 +361,6 @@
     "message": "导入配置",
     "description": "Import config button"
   },
-
   "section_config_management": {
     "message": "配置管理",
     "description": "Config management section"
@@ -398,7 +381,6 @@
     "message": "未授予访问所配置 API 端点的权限。",
     "description": "Optional endpoint permission denied"
   },
-
   "msg_saved": {
     "message": "设置已保存",
     "description": "Settings saved"
@@ -447,7 +429,6 @@
     "message": "正在应用配置...",
     "description": "Applying config"
   },
-
   "err_config_incomplete": {
     "message": "配置不完整",
     "description": "Config incomplete error"
@@ -480,7 +461,6 @@
     "message": "配置文件格式错误，请确保是有效的JSON",
     "description": "JSON parse error"
   },
-
   "card_usage_title": {
     "message": "使用说明",
     "description": "Usage card title"
@@ -490,10 +470,9 @@
     "description": "Shortcuts card title"
   },
   "card_recommended_api_title": {
-    "message": "推荐API",
-    "description": "Recommended API title"
+    "message": "服务与模型说明",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
-
   "usage_step1": {
     "message": "配置您选择的API提供商的密钥",
     "description": "Usage step 1"
@@ -514,7 +493,6 @@
     "message": "等待识别完成，复制结果即可",
     "description": "Usage step 5"
   },
-
   "shortcut_capture": {
     "message": "开始截图识别",
     "description": "Capture shortcut"
@@ -531,44 +509,42 @@
     "message": "提示：可以在 chrome://extensions/shortcuts 中自定义快捷键",
     "description": "Customize shortcut hint"
   },
-
   "api_claude_opus": {
-    "message": "识别准确率最高",
-    "description": "Claude Opus description"
+    "message": "通过 Anthropic Messages 接口识别图片文字。",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "api_gpt4o": {
-    "message": "速度快，准确率高",
-    "description": "GPT-4o description"
+    "message": "通过 Chat Completions 接口调用支持图像输入的模型。",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "api_glm4v": {
-    "message": "国产大模型，中文效果好",
-    "description": "GLM-4V description"
+    "message": "请在智谱开放平台确认视觉模型及账号权限。",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "api_baidu_title": {
     "message": "百度OCR",
     "description": "Baidu OCR title"
   },
   "api_baidu": {
-    "message": "中文识别效果好，性价比高",
-    "description": "Baidu description"
+    "message": "使用通用文字识别接口，需要 API Key 与 Secret。",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "api_aliyun_title": {
     "message": "阿里云OCR",
     "description": "Aliyun OCR title"
   },
   "api_aliyun": {
-    "message": "企业级服务，稳定可靠",
-    "description": "Aliyun description"
+    "message": "使用 dashscope.aliyuncs.com 端点；密钥需与该区域匹配。",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "api_compatible_title": {
     "message": "通用OpenAI接口",
     "description": "Compatible API title"
   },
   "api_compatible": {
-    "message": "灵活支持多种服务商",
-    "description": "Compatible API description"
+    "message": "服务商必须支持图片输入和匹配的请求格式。",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
-
   "modal_import_title": {
     "message": "导入配置确认",
     "description": "Import confirm dialog title"
@@ -597,7 +573,6 @@
     "message": "确认导入",
     "description": "Confirm import button"
   },
-
   "content_tooltip_start": {
     "message": "按住鼠标左键框选需要识别的文字区域（最小10×10像素），按ESC取消",
     "description": "Initial tooltip"
@@ -614,7 +589,6 @@
     "message": "松开鼠标后可调整选区",
     "description": "Selection size OK"
   },
-
   "content_btn_confirm": {
     "message": "确认识别",
     "description": "Confirm button"
@@ -631,7 +605,6 @@
     "message": "撤销",
     "description": "Undo button"
   },
-
   "content_aria_confirm": {
     "message": "确认识别选区内容",
     "description": "Confirm button aria"
@@ -660,7 +633,6 @@
     "message": "复制识别结果",
     "description": "Copy button aria"
   },
-
   "content_progress_capturing": {
     "message": "正在截图...",
     "description": "Capturing progress"
@@ -681,7 +653,6 @@
     "message": "秒",
     "description": "Seconds"
   },
-
   "content_msg_cancelled": {
     "message": "已取消截图",
     "description": "Capture cancelled"
@@ -710,7 +681,6 @@
     "message": "选区太小，请调整",
     "description": "Selection too small in edit mode"
   },
-
   "content_result_title": {
     "message": "识别结果...",
     "description": "Result placeholder"
@@ -739,7 +709,6 @@
     "message": "保存修改失败，请重试",
     "description": "Corrected OCR text save failed"
   },
-
   "content_a11y_capturing": {
     "message": "正在截图",
     "description": "A11y capturing"
@@ -756,7 +725,6 @@
     "message": "识别失败",
     "description": "A11y failed"
   },
-
   "model_claude_3_5_sonnet": {
     "message": "Claude 3.5 Sonnet (推荐)",
     "description": "Claude 3.5 Sonnet model"
@@ -770,16 +738,16 @@
     "description": "Claude Opus model"
   },
   "model_claude_sonnet_5": {
-    "message": "Claude Sonnet 5（推荐）",
-    "description": "当前均衡型 Claude 视觉模型"
+    "message": "Claude Sonnet 5",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "model_claude_haiku_4_5": {
-    "message": "Claude Haiku 4.5（经济）",
-    "description": "当前经济型 Claude 视觉模型"
+    "message": "Claude Haiku 4.5",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "model_claude_opus_4_8": {
-    "message": "Claude Opus 4.8（高质量）",
-    "description": "当前高质量 Claude 视觉模型"
+    "message": "Claude Opus 4.8",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "model_gpt4o": {
     "message": "GPT-4o (推荐)",
@@ -790,28 +758,28 @@
     "description": "GPT-4o Mini model"
   },
   "model_gpt5_mini": {
-    "message": "GPT-5 mini（推荐）",
-    "description": "当前经济型 OpenAI 视觉模型"
+    "message": "GPT-5 mini（计划于 2026-12-11 关闭）",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "model_gpt54_mini": {
-    "message": "GPT-5.4 mini（高质量）",
-    "description": "当前高质量 OpenAI 视觉模型"
+    "message": "GPT-5.4 mini",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "model_gpt4_turbo": {
     "message": "GPT-4 Turbo",
     "description": "GPT-4 Turbo model"
   },
   "model_qwen_max": {
-    "message": "qwen-vl-max (推荐)",
-    "description": "Qwen max model"
+    "message": "qwen-vl-max",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "model_qwen_plus": {
-    "message": "qwen-vl-plus (经济)",
-    "description": "Qwen plus model"
+    "message": "qwen-vl-plus",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "model_glm4v": {
-    "message": "GLM-4V (推荐)",
-    "description": "GLM-4V model"
+    "message": "GLM-4V",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "model_glm4v_plus": {
     "message": "GLM-4V-Plus",
@@ -921,42 +889,673 @@
     "message": "请先配置API密钥",
     "description": "Config missing announcement"
   },
-  "provider_claude": { "message": "Anthropic Claude（推荐）" },
-  "provider_openai": { "message": "OpenAI GPT-4 Vision" },
-  "provider_zhipu": { "message": "智谱AI GLM-4V" },
-  "provider_baidu": { "message": "百度智能云 OCR" },
-  "provider_aliyun": { "message": "阿里云 OCR" },
-  "provider_openai_compatible": { "message": "通用 OpenAI 兼容接口" },
-  "provider_custom": { "message": "自定义 API 接口" },
-  "history_preview_aria": { "message": "历史记录详情" },
-  "msg_capture_file_access": { "message": "未启用文件网址访问权限。请在扩展详情中开启“允许访问文件网址”后重试。" },
-  "msg_export_failed": { "message": "导出失败：{0}" },
-  "msg_import_failed": { "message": "导入失败：{0}" },
-  "field_api_key": { "message": "API Key" },
-  "field_secret_key": { "message": "Secret Key" },
-  "field_endpoint": { "message": "API 端点" },
-  "field_model_name": { "message": "模型名称" },
-  "field_header_name": { "message": "Header 名称" },
-  "err_config_incomplete_detail": { "message": "配置不完整：{0} 未填写或格式错误" },
-  "err_import_invalid_structure": { "message": "无效的配置文件结构" },
-  "err_import_missing_config": { "message": "配置文件缺少配置数据" },
-  "err_import_invalid_provider": { "message": "无效的 API 提供商：{0}" },
-  "err_import_invalid_api_configs": { "message": "apiConfigs 格式无效" },
-  "err_import_invalid_provider_config": { "message": "apiConfigs.{0} 格式无效" },
-  "err_import_invalid_prompt": { "message": "提示词格式无效" },
-  "err_import_invalid_language": { "message": "识别语言无效" },
-  "err_import_invalid_theme": { "message": "主题无效" },
-  "err_import_invalid_uiLanguage": { "message": "界面语言无效" },
-  "error_missing_api_key": { "message": "请先配置当前选择的 API，再开始识别。" },
-  "error_capture_tab_changed": { "message": "活动标签页已切换，请重新选择区域。" },
-  "error_request_timeout": { "message": "请求超时，请检查网络后重试。" },
-  "error_empty_ocr_result": { "message": "未识别到文字，请调整选区后重试。" },
-  "error_invalid_ocr_result": { "message": "服务商返回了无法识别的响应格式。" },
-  "error_ocr_result_truncated": { "message": "识别结果被截断，请缩小选区后重试。" },
-  "error_history_save_failed": { "message": "文字识别成功，但历史记录保存失败。" },
-  "error_network": { "message": "网络请求失败，请检查网络或代理设置。" },
-  "error_unknown_provider": { "message": "当前选择的 API 提供商不受支持。" },
-  "notification_config_required": { "message": "请先配置 API，再使用截图快捷键。" },
-  "notification_endpoint_permission_required": { "message": "请先在插件弹窗中授权访问自定义 API 域名。" },
-  "notification_capture_unavailable": { "message": "当前页面无法启动截图，请切换到普通网页后重试。" }
+  "provider_claude": {
+    "message": "Anthropic Claude",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "provider_openai": {
+    "message": "OpenAI GPT-4 Vision"
+  },
+  "provider_zhipu": {
+    "message": "智谱AI GLM-4V"
+  },
+  "provider_baidu": {
+    "message": "百度智能云 OCR"
+  },
+  "provider_aliyun": {
+    "message": "阿里云 OCR"
+  },
+  "provider_openai_compatible": {
+    "message": "通用 OpenAI 兼容接口"
+  },
+  "provider_custom": {
+    "message": "自定义 API 接口"
+  },
+  "history_preview_aria": {
+    "message": "历史记录详情"
+  },
+  "msg_capture_file_access": {
+    "message": "未启用文件网址访问权限。请在扩展详情中开启“允许访问文件网址”后重试。"
+  },
+  "msg_export_failed": {
+    "message": "导出失败：{0}"
+  },
+  "msg_import_failed": {
+    "message": "导入失败：{0}"
+  },
+  "field_api_key": {
+    "message": "API Key"
+  },
+  "field_secret_key": {
+    "message": "Secret Key"
+  },
+  "field_endpoint": {
+    "message": "API 端点"
+  },
+  "field_model_name": {
+    "message": "模型名称"
+  },
+  "field_header_name": {
+    "message": "Header 名称"
+  },
+  "err_config_incomplete_detail": {
+    "message": "配置不完整：{0} 未填写或格式错误"
+  },
+  "err_import_invalid_structure": {
+    "message": "无效的配置文件结构"
+  },
+  "err_import_missing_config": {
+    "message": "配置文件缺少配置数据"
+  },
+  "err_import_invalid_provider": {
+    "message": "无效的 API 提供商：{0}"
+  },
+  "err_import_invalid_api_configs": {
+    "message": "apiConfigs 格式无效"
+  },
+  "err_import_invalid_provider_config": {
+    "message": "apiConfigs.{0} 格式无效"
+  },
+  "err_import_invalid_prompt": {
+    "message": "提示词格式无效"
+  },
+  "err_import_invalid_language": {
+    "message": "识别语言无效"
+  },
+  "err_import_invalid_theme": {
+    "message": "主题无效"
+  },
+  "err_import_invalid_uiLanguage": {
+    "message": "界面语言无效"
+  },
+  "error_missing_api_key": {
+    "message": "请先配置当前选择的 API，再开始识别。"
+  },
+  "error_capture_tab_changed": {
+    "message": "活动标签页已切换，请重新选择区域。"
+  },
+  "error_request_timeout": {
+    "message": "请求超时，请检查网络后重试。"
+  },
+  "error_empty_ocr_result": {
+    "message": "未识别到文字，请调整选区后重试。"
+  },
+  "error_invalid_ocr_result": {
+    "message": "服务商返回了无法识别的响应格式。"
+  },
+  "error_ocr_result_truncated": {
+    "message": "识别结果被截断，请缩小选区后重试。"
+  },
+  "error_history_save_failed": {
+    "message": "文字识别成功，但历史记录保存失败。"
+  },
+  "error_network": {
+    "message": "网络请求失败，请检查网络或代理设置。"
+  },
+  "error_unknown_provider": {
+    "message": "当前选择的 API 提供商不受支持。"
+  },
+  "notification_config_required": {
+    "message": "请先配置 API，再使用截图快捷键。"
+  },
+  "notification_endpoint_permission_required": {
+    "message": "请先在插件弹窗中授权访问自定义 API 域名。"
+  },
+  "notification_capture_unavailable": {
+    "message": "当前页面无法启动截图，请切换到普通网页后重试。"
+  },
+  "content_btn_merge_lines": {
+    "message": "合并换行"
+  },
+  "content_btn_undo_text": {
+    "message": "撤销文本整理"
+  },
+  "content_merge_lines_hint": {
+    "message": "合并段内换行，保留空行分段；点击保存修改后才更新历史"
+  },
+  "content_msg_lines_merged": {
+    "message": "已合并段内换行，可撤销；尚未更新历史"
+  },
+  "content_msg_text_restored": {
+    "message": "已恢复整理前的文字；点击保存修改后才更新历史"
+  },
+  "content_confirm_discard_changes": {
+    "message": "关闭结果？已成功保存的草稿可从历史记录恢复，正式文字不会自动修改。"
+  },
+  "content_msg_copy_failed": {
+    "message": "复制失败，已选中文字。请按 Ctrl+C（Mac：⌘C）手动复制。"
+  },
+  "history_edit_hint": {
+    "message": "可修订文字；点击保存修改（Ctrl/⌘+S）后更新历史，导出使用已保存的内容。"
+  },
+  "history_revert_changes": {
+    "message": "还原修改"
+  },
+  "history_discard_changes": {
+    "message": "关闭编辑？已成功保存的草稿可从历史记录恢复，正式文字不会自动修改。"
+  },
+  "history_copy_failed": {
+    "message": "复制失败，已选中文字，请按 Ctrl+C（Mac：⌘C）手动复制。"
+  },
+  "link_official_models": {
+    "message": "官方模型目录",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "link_model_lifecycle_source": {
+    "message": "退役信息来源（2026-10-03 核对）",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "link_claude_model_source": {
+    "message": "Claude 型号来源",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "link_zhipu_docs": {
+    "message": "智谱官方文档",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "help_openai_model_shutdown": {
+    "message": "当前默认 gpt-5-mini 计划于 2026-12-11 关闭。请核对官方目录，手工选择账号可用的视觉模型并测试连接；已有模型不会被自动替换。",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "help_model_freshness": {
+    "message": "Claude/OpenAI 型号名称与退役信息核对于 2026-10-03，候选名称仅供输入参考。模型可用性、图像支持、区域及价格请以官方文档和当前账号为准；扩展不会自动替换已保存的模型。",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_invalid_request": {
+    "message": "接口不接受当前请求。请检查模型是否支持图片、请求格式及参数。",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_authentication_failed": {
+    "message": "API 认证失败。请检查密钥是否正确、有效，及所选认证方式是否匹配。",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_billing_required": {
+    "message": "接口要求有效的计费账户。请在服务商控制台检查余额或付款设置。",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_access_denied": {
+    "message": "接口拒绝访问。请检查账号、模型权限、区域和端点是否匹配。",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_not_found": {
+    "message": "未找到接口或模型。请核对完整端点地址与模型名称，并查看服务商的退役公告。",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_image_too_large": {
+    "message": "图片超过接口大小限制。请缩小识别区域后重试。",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_rate_limited": {
+    "message": "接口达到频率或配额限制。请稍后重试，并在服务商控制台检查用量及余额。",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_unavailable": {
+    "message": "服务商暂时无法处理请求。请稍后重试或查看服务商状态。",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_http": {
+    "message": "接口请求失败。请核对端点、账号配置和服务商状态。",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_invalid_api_response": {
+    "message": "接口返回的内容不是有效 JSON。请确认填写的是 API 地址而非网页地址。",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "warning_baidu_test_image": {
+    "message": "接口连接和认证成功，但测试图片未能识别；尚未通过识别验证。请尝试清晰的文字选区后再确认可用。",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_ocr_result_filtered": {
+    "message": "服务商因内容限制未返回完整识别结果，未保存不完整文字。请检查选区内容或改用其他服务商。"
+  },
+  "error_ocr_result_incomplete": {
+    "message": "服务商未完成识别，未保存不完整文字。请稍后重试或缩小选区。"
+  },
+  "error_translation_empty_text": {
+    "message": "请输入或识别需要翻译的文字。"
+  },
+  "error_translation_text_too_long": {
+    "message": "单次最多翻译 12,000 个字符，请缩短文字后重试。"
+  },
+  "error_translation_invalid_language": {
+    "message": "请选择支持的目标语言。"
+  },
+  "error_translation_provider_unsupported": {
+    "message": "此服务仅支持 OCR，无法翻译文字。请主动选择并配置一个 AI 翻译服务。"
+  },
+  "error_translation_provider_unconfigured": {
+    "message": "所选翻译服务尚未配置完整。请在设置中配置该服务后重试。"
+  },
+  "error_translation_permission_required": {
+    "message": "所选自定义服务尚未获得域名访问权限。请在设置中测试连接并授权后重试。"
+  },
+  "error_translation_invalid_request": {
+    "message": "翻译请求无效，请重新选择文字后重试。"
+  },
+  "error_translation_cancelled": {
+    "message": "翻译已取消，原文未修改。"
+  },
+  "error_translation_result_empty": {
+    "message": "服务未返回译文，请稍后重试或检查所选模型。"
+  },
+  "error_translation_result_invalid": {
+    "message": "无法读取译文，请检查接口请求格式及响应路径。"
+  },
+  "error_translation_result_truncated": {
+    "message": "译文被服务商截断，未显示为完整结果。请缩短原文后重试。"
+  },
+  "error_translation_result_filtered": {
+    "message": "服务商未能返回这段文字的译文。请检查内容或所选服务，原文未修改。"
+  },
+  "error_translation_result_incomplete": {
+    "message": "服务商未完成翻译，请稍后重试。原文未修改。"
+  },
+  "error_translation_request_too_large": {
+    "message": "翻译请求超过服务商大小限制，请缩短原文后重试。"
+  },
+  "error_translation_api_invalid_request": {
+    "message": "接口拒绝了翻译请求，请检查模型是否支持文字输入、请求格式及模型参数。"
+  },
+  "error_translation_settings_failed": {
+    "message": "无法打开设置，请从扩展菜单手动打开设置页。"
+  },
+  "error_translation_failed": {
+    "message": "翻译失败，请检查所选服务配置后重试。原文未修改。"
+  },
+  "translation_title": {
+    "message": "翻译"
+  },
+  "translation_source_label": {
+    "message": "原文（可编辑）"
+  },
+  "translation_notice": {
+    "message": "点击“翻译”才会将当前原文发送给所选服务商，可能产生 API 费用。译文保存到当前历史记录，不会覆盖原文。"
+  },
+  "translation_provider_label": {
+    "message": "翻译服务商"
+  },
+  "translation_target_label": {
+    "message": "目标语言"
+  },
+  "translation_output_label": {
+    "message": "译文"
+  },
+  "translation_start": {
+    "message": "翻译"
+  },
+  "translation_cancel": {
+    "message": "取消翻译"
+  },
+  "translation_settings": {
+    "message": "打开设置"
+  },
+  "translation_copy": {
+    "message": "复制译文"
+  },
+  "translation_provider_summary": {
+    "message": "服务商：{0} · 模型：{1}"
+  },
+  "translation_loading": {
+    "message": "正在读取翻译配置…"
+  },
+  "translation_capabilities_failed": {
+    "message": "无法读取翻译配置，请重新打开窗口或检查设置。"
+  },
+  "translation_provider_unsupported": {
+    "message": "当前服务商仅支持 OCR，不能翻译文字。请主动选择已配置的文本模型服务商。"
+  },
+  "translation_provider_unconfigured": {
+    "message": "此翻译服务商尚未配置，请先在设置中填写凭据和模型。"
+  },
+  "translation_permission_required": {
+    "message": "尚未授权访问此 API 地址。请在设置中选择该服务商并点击测试连接以授权。"
+  },
+  "translation_empty_source": {
+    "message": "原文为空，请先识别或输入文字。"
+  },
+  "translation_too_long": {
+    "message": "原文超过 {0} 个字符，请选取较短文字后翻译。"
+  },
+  "translation_choose_target": {
+    "message": "请选择目标语言。"
+  },
+  "translation_working": {
+    "message": "正在翻译…"
+  },
+  "translation_stale": {
+    "message": "原文或翻译选项已改变，旧译文已过期。请重新翻译后复制。"
+  },
+  "translation_cancelled": {
+    "message": "翻译已取消，可再次点击翻译。"
+  },
+  "translation_connection_lost": {
+    "message": "翻译连接已断开，请再次点击翻译重试。"
+  },
+  "translation_done": {
+    "message": "翻译完成，原文和识别历史均未改变。"
+  },
+  "translation_copied": {
+    "message": "译文已复制。"
+  },
+  "translation_copy_failed": {
+    "message": "复制失败，已选中译文。请按 Ctrl+C（Mac：⌘C）手动复制。"
+  },
+  "translation_settings_failed": {
+    "message": "无法打开设置，请从扩展菜单打开设置。"
+  },
+  "translation_language_zh_CN": {
+    "message": "简体中文"
+  },
+  "translation_language_zh_TW": {
+    "message": "繁體中文"
+  },
+  "translation_language_en": {
+    "message": "英语"
+  },
+  "translation_language_ja": {
+    "message": "日语"
+  },
+  "translation_language_ko": {
+    "message": "韩语"
+  },
+  "translation_language_fr": {
+    "message": "法语"
+  },
+  "translation_language_de": {
+    "message": "德语"
+  },
+  "translation_language_es": {
+    "message": "西班牙语"
+  },
+  "translation_language_pt": {
+    "message": "葡萄牙语"
+  },
+  "translation_language_ru": {
+    "message": "俄语"
+  },
+  "translation_language_ar": {
+    "message": "阿拉伯语"
+  },
+  "translation_output_summary": {
+    "message": "译文：{0} · {1}"
+  },
+  "translation_result_model": {
+    "message": "译文使用模型：{0}"
+  },
+  "popup_repeat_capture": {
+    "message": "再次识别此区域"
+  },
+  "popup_import_image": {
+    "message": "导入图片"
+  },
+  "popup_repeat_no_region": {
+    "message": "先在当前页面完成一次框选识别。"
+  },
+  "popup_repeat_ready": {
+    "message": "可使用上次选区重新截图识别。"
+  },
+  "popup_repeat_viewport_changed": {
+    "message": "页面已滚动、缩放或改变尺寸，请重新框选。"
+  },
+  "popup_repeat_page_changed": {
+    "message": "页面地址已改变，请重新框选。"
+  },
+  "popup_repeat_busy": {
+    "message": "正在选区或识别，请先完成或取消。"
+  },
+  "popup_import_failed": {
+    "message": "无法打开图片工作页，请重试。"
+  },
+  "image_import_title": {
+    "message": "图片文字识别"
+  },
+  "image_import_settings": {
+    "message": "设置"
+  },
+  "image_import_intro": {
+    "message": "粘贴、拖入或选择一张图片，点击“识别文字”后才会发送图片。"
+  },
+  "image_import_select": {
+    "message": "选择图片"
+  },
+  "image_import_choose": {
+    "message": "上传图片"
+  },
+  "image_import_help": {
+    "message": "拖入或粘贴一张 PNG、JPEG 或静态 WebP。最大 20 MiB、4000 万像素，单边不超过 32767 像素。暂不支持 SVG、PDF、动图及多图。"
+  },
+  "image_import_privacy": {
+    "message": "识别会将图片发送给已配置的服务商，可能产生费用。图片不会保存到历史中。"
+  },
+  "image_import_recognize": {
+    "message": "识别文字"
+  },
+  "image_import_cancel": {
+    "message": "取消识别"
+  },
+  "image_import_result": {
+    "message": "识别结果"
+  },
+  "image_import_preview": {
+    "message": "待识别图片预览"
+  },
+  "image_import_provider": {
+    "message": "识别服务：{0}"
+  },
+  "image_import_config_required": {
+    "message": "尚未配置 {0}，请打开设置填写 API 配置。"
+  },
+  "image_import_dimensions": {
+    "message": "{0} · 原图 {1} × {2} 像素 → 发送 {3} × {4} 像素（PNG）"
+  },
+  "image_import_cancelled": {
+    "message": "已取消识别，可使用当前图片重试。"
+  },
+  "image_import_single_only": {
+    "message": "请选择一张图片，暂不支持多图识别。"
+  },
+  "image_import_preparing": {
+    "message": "正在本地检查并处理图片…"
+  },
+  "image_import_clipboard_name": {
+    "message": "剪贴板图片"
+  },
+  "image_import_ready": {
+    "message": "图片已就绪，点击“识别文字”后发送给服务商。"
+  },
+  "image_import_invalid_type": {
+    "message": "请使用 PNG、JPEG 或静态 WebP 图片，暂不支持 SVG、PDF 等格式。"
+  },
+  "image_import_invalid_image": {
+    "message": "无法将此文件解码为有效图片，请选择其他图片。"
+  },
+  "image_import_too_large": {
+    "message": "图片文件过大，请选择不超过 20 MiB 的图片。"
+  },
+  "image_import_too_many_pixels": {
+    "message": "图片超过 4000 万像素，或单边超过 32767 像素，请先缩小图片。"
+  },
+  "image_import_animated": {
+    "message": "暂不支持动图，请将单帧导出为 PNG 或 JPEG。"
+  },
+  "image_import_history_saved": {
+    "message": "文字已保存到历史，可继续编辑、翻译或复制。"
+  },
+  "image_import_working": {
+    "message": "正在识别图片…"
+  },
+  "image_import_permission_denied": {
+    "message": "尚未获得配置的 API 地址访问权限，请再次点击识别并允许访问，或前往设置修改配置。"
+  },
+  "image_import_config_changed": {
+    "message": "服务配置已变更，请确认当前服务后重新点击识别。"
+  },
+  "image_import_done": {
+    "message": "识别完成。"
+  },
+  "image_import_connection_lost": {
+    "message": "连接中断，请重新点击识别，或重新打开此页面。"
+  },
+  "translation_notice_temporary": {
+    "message": "点击“翻译”才会将当前原文发送给所选服务商，可能产生 API 费用。此结果没有对应的历史记录，译文仅保留在当前窗口。"
+  },
+  "translation_saved": {
+    "message": "已保存到历史"
+  },
+  "translation_done_saved": {
+    "message": "译文已保存到当前历史记录，重新打开不会再次请求翻译。"
+  },
+  "translation_done_unsaved": {
+    "message": "翻译完成，但未能保存到历史。请在关闭窗口前复制译文。"
+  },
+  "translation_history_failed": {
+    "message": "无法读取已保存的译文，请重新打开该记录重试。"
+  },
+  "draft_idle": {
+    "message": "编辑会自动保存为草稿；点击“保存修改”才会更新原文。"
+  },
+  "draft_unavailable": {
+    "message": "此结果没有对应的历史记录，关闭后无法恢复编辑。"
+  },
+  "draft_loading": {
+    "message": "正在检查已保存的草稿…"
+  },
+  "draft_available": {
+    "message": "发现已保存的草稿。可恢复后继续编辑，或丢弃草稿。"
+  },
+  "draft_available_conflict": {
+    "message": "此草稿基于较早的原文。可恢复查看，请在保存前核对修改。"
+  },
+  "draft_saving": {
+    "message": "正在保存草稿…"
+  },
+  "draft_saved": {
+    "message": "草稿已保存，重新打开该记录即可恢复编辑。"
+  },
+  "draft_discarding": {
+    "message": "正在丢弃草稿…"
+  },
+  "draft_conflict": {
+    "message": "原文或草稿已在其他窗口变更，当前文字仍保留在此。请先复制，再重新打开该记录核对最新内容。"
+  },
+  "draft_error": {
+    "message": "无法读取或保存草稿。请保持窗口打开后重试，或在关闭前复制修改内容。"
+  },
+  "draft_restore": {
+    "message": "恢复草稿"
+  },
+  "draft_discard": {
+    "message": "丢弃草稿"
+  },
+  "draft_retry": {
+    "message": "重试"
+  },
+  "content_btn_repeat_capture": {
+    "message": "再次识别此区域"
+  },
+  "content_repeat_busy": {
+    "message": "请等待当前截图识别完成后再试。"
+  },
+  "content_repeat_no_region": {
+    "message": "请先在当前页面框选识别区域。"
+  },
+  "content_repeat_invalid": {
+    "message": "页面位置、尺寸或地址已变化，请重新框选区域。"
+  },
+  "content_confirm_close_draft": {
+    "message": "关闭当前结果？已成功保存的草稿可从历史记录中恢复。"
+  },
+  "label_auto_copy": {
+    "message": "识别成功后自动复制文字"
+  },
+  "help_auto_copy": {
+    "message": "默认关闭。仅复制新识别成功的文字；复制失败时仍保留结果和手动复制按钮。"
+  },
+  "msg_auto_copy_save_failed": {
+    "message": "无法保存自动复制偏好，请重试。"
+  },
+  "err_import_invalid_autoCopy": {
+    "message": "自动复制偏好无效。"
+  },
+  "err_import_invalid_translationProvider": {
+    "message": "翻译服务偏好无效。"
+  },
+  "err_import_invalid_translationTargetLanguage": {
+    "message": "翻译目标语言偏好无效。"
+  },
+  "recovery_title": {
+    "message": "识别失败"
+  },
+  "recovery_preview": {
+    "message": "保留用于重试的原图"
+  },
+  "recovery_retry_original": {
+    "message": "重试原图"
+  },
+  "recovery_settings": {
+    "message": "打开设置"
+  },
+  "recovery_reselect": {
+    "message": "重新框选截图"
+  },
+  "recovery_retained": {
+    "message": "原截图仅保留在本页面。重试会使用当前设置识别这张原图；重新框选会重新截图。"
+  },
+  "recovery_no_image": {
+    "message": "未获得可识别的截图，请重新框选截图。"
+  },
+  "recovery_settings_failed": {
+    "message": "无法打开设置，请从扩展菜单打开设置。"
+  },
+  "image_recovery_retained": {
+    "message": "原图仍保留在此标签页中。重试会使用当前设置识别同一张原图。"
+  },
+  "image_recovery_choose_new": {
+    "message": "选择新图片"
+  },
+  "auto_copy_success": {
+    "message": "已自动复制新识别的文字。"
+  },
+  "auto_copy_failed": {
+    "message": "自动复制失败，识别结果已保留，可点击“复制”重试。"
+  },
+  "history_retention_hint": {
+    "message": "自动保留最近 50 条普通记录；收藏和未完成草稿不受此上限影响。"
+  },
+  "history_favorite": {
+    "message": "收藏"
+  },
+  "history_unfavorite": {
+    "message": "取消收藏"
+  },
+  "history_name_label": {
+    "message": "记录名称"
+  },
+  "history_name_placeholder": {
+    "message": "添加名称（可选）"
+  },
+  "history_name_save": {
+    "message": "保存名称"
+  },
+  "history_name_cancel": {
+    "message": "取消命名"
+  },
+  "history_discard_name_changes": {
+    "message": "放弃尚未保存的名称修改？"
+  },
+  "history_metadata_saved": {
+    "message": "历史信息已保存。"
+  },
+  "history_unfinished_draft": {
+    "message": "未完成草稿"
+  },
+  "translation_preferences_load_failed": {
+    "message": "无法读取已保存的翻译偏好。仍可使用当前选择，请重试读取。"
+  },
+  "translation_preferences_save_failed": {
+    "message": "翻译偏好未能保存。当前选择仍可使用，请重试保存以便下次使用。"
+  },
+  "translation_preferences_retry": {
+    "message": "重试翻译偏好"
+  }
 }

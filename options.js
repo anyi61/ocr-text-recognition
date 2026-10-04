@@ -25,9 +25,22 @@ const OptionsRuntime = (() => {
     };
   }
 
+  function connectionTestStatus(response, i18n) {
+    if (response?.success && response.warningCode) {
+      return { type: 'warning', message: i18n.errorMessage({ errorCode: response.warningCode }) };
+    }
+    if (response?.success) {
+      return { type: 'success', message: i18n.t('msg_test_success') };
+    }
+    return {
+      type: 'error',
+      message: `${i18n.t('msg_test_failed')}: ${i18n.errorMessage(response)}`
+    };
+  }
+
   function buildExportData(result, apiConfigs, exportDate = new Date().toISOString()) {
     return {
-      version: '1.1.0',
+      version: '1.2.0',
       exportDate,
       appName: 'OCR文字识别助手',
       config: {
@@ -36,7 +49,10 @@ const OptionsRuntime = (() => {
         prompt: result.prompt || '',
         language: result.language || 'auto',
         theme: result.theme || 'light',
-        uiLanguage: result.uiLanguage || 'auto'
+        uiLanguage: result.uiLanguage || 'auto',
+        autoCopy: result.autoCopy === true,
+        translationProvider: result.translationProvider || 'claude',
+        translationTargetLanguage: result.translationTargetLanguage || 'zh_CN'
       }
     };
   }
@@ -50,6 +66,15 @@ const OptionsRuntime = (() => {
   }
 
   function validateImportPreferences(config) {
+    if (config.autoCopy !== undefined && typeof config.autoCopy !== 'boolean') return 'autoCopy';
+    if (config.translationProvider !== undefined
+      && !['claude', 'openai', 'baidu', 'aliyun', 'zhipu', 'openai-compatible', 'custom'].includes(config.translationProvider)) {
+      return 'translationProvider';
+    }
+    if (config.translationTargetLanguage !== undefined
+      && !['zh_CN', 'zh_TW', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'pt', 'ru', 'ar'].includes(config.translationTargetLanguage)) {
+      return 'translationTargetLanguage';
+    }
     if (config.theme !== undefined && !['light', 'dark'].includes(config.theme)) {
       return 'theme';
     }
@@ -60,6 +85,71 @@ const OptionsRuntime = (() => {
       return 'language';
     }
     return null;
+  }
+
+  function applyImportedBehavior(config) {
+    // Omitted fields must not write stale snapshots over independent changes.
+    return Object.fromEntries(['autoCopy', 'translationProvider', 'translationTargetLanguage']
+      .filter((key) => config[key] !== undefined).map((key) => [key, config[key]]));
+  }
+
+  function createAutoCopyPreferences({ storage, onChange, onSaved = () => {}, onError = () => {} }) {
+    let queue = Promise.resolve();
+    let revision = 0;
+    let confirmed = false;
+    return {
+      async load() {
+        const token = revision;
+        await queue;
+        const result = await storage.get(['autoCopy']);
+        if (token !== revision) return;
+        confirmed = result.autoCopy === true;
+        onChange(confirmed);
+      },
+      save(value, { silent = false } = {}) {
+        const token = ++revision;
+        onChange(value);
+        const operation = queue.then(async () => {
+          try {
+            await storage.set({ autoCopy: value });
+            confirmed = value;
+            if (token === revision) {
+              onChange(value);
+              if (!silent) onSaved();
+            }
+            return true;
+          } catch {
+            // A previous toggle may also have failed. Reconcile with storage,
+            // retaining the last acknowledged value if it is unavailable too.
+            try { confirmed = (await storage.get(['autoCopy'])).autoCopy === true; }
+            catch { /* Keep the last confirmed value. */ }
+            if (token === revision) {
+              onChange(confirmed);
+              if (!silent) onError();
+            }
+            return false;
+          }
+        });
+        queue = operation.catch(() => {});
+        return operation;
+      },
+      settled: () => queue
+    };
+  }
+
+  async function persistImportedBehavior(config, { saveAutoCopy, sendMessage }) {
+    const behavior = applyImportedBehavior(config);
+    if ('autoCopy' in behavior && !await saveAutoCopy(behavior.autoCopy, { silent: true })) {
+      throw Object.assign(new Error('Automatic copy preference was not saved'), { code: 'AUTO_COPY_SAVE_FAILED' });
+    }
+    const preferences = {};
+    if ('translationProvider' in behavior) preferences.provider = behavior.translationProvider;
+    if ('translationTargetLanguage' in behavior) preferences.targetLanguage = behavior.translationTargetLanguage;
+    if (!Object.keys(preferences).length) return;
+    const response = await sendMessage({ action: 'saveTranslationPreferences', preferences });
+    if (!response?.success) {
+      throw Object.assign(new Error('Translation preferences were not saved'), { code: 'TRANSLATION_PREFERENCES_WRITE_FAILED' });
+    }
   }
 
   function createModalLifecycle(documentApi, overlay, resolve, timerApi = globalThis) {
@@ -83,8 +173,12 @@ const OptionsRuntime = (() => {
 
   return {
     createStatusPresenter,
+    connectionTestStatus,
     buildExportData,
     applyImportedAppearance,
+    applyImportedBehavior,
+    createAutoCopyPreferences,
+    persistImportedBehavior,
     validateImportPreferences,
     createModalLifecycle
   };
@@ -149,6 +243,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const language = document.getElementById('language');
   const themeSelect = document.getElementById('theme');
   const uiLanguageSelect = document.getElementById('uiLanguage');
+  const autoCopyInput = document.getElementById('autoCopy');
 
   // 按钮
   const testBtn = document.getElementById('testBtn');
@@ -235,18 +330,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Claude 配置
     const claudeConfig = OCRProviderConfig.getProviderConfig(configs, 'claude');
     claudeApiKey.value = claudeConfig.apiKey || result.apiKey || '';
-    claudeModel.value = OCRProviderConfig.migrateRetiredModel(
-      'claude',
-      claudeConfig.model || result.model || 'claude-sonnet-5'
-    );
+    claudeModel.value = claudeConfig.model || result.model || OCRProviderConfig.DEFAULT_MODELS.claude;
 
     // OpenAI 配置
     const openaiConfig = OCRProviderConfig.getProviderConfig(configs, 'openai');
     openaiApiKey.value = openaiConfig.apiKey || result.openaiApiKey || '';
-    openaiModel.value = OCRProviderConfig.migrateRetiredModel(
-      'openai',
-      openaiConfig.model || result.openaiModel || 'gpt-5-mini'
-    );
+    openaiModel.value = openaiConfig.model || result.openaiModel || OCRProviderConfig.DEFAULT_MODELS.openai;
 
     // 百度配置
     const baiduConfig = OCRProviderConfig.getProviderConfig(configs, 'baidu');
@@ -256,12 +345,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 阿里云配置
     const aliyunCfg = OCRProviderConfig.getProviderConfig(configs, 'aliyun');
     aliyunApiKey.value = aliyunCfg.apiKey || result.aliyunApiKey || '';
-    aliyunModel.value = aliyunCfg.model || result.aliyunModel || 'qwen-vl-max';
+    aliyunModel.value = aliyunCfg.model || result.aliyunModel || OCRProviderConfig.DEFAULT_MODELS.aliyun;
 
     // 智谱AI配置
     const zhipuCfg = OCRProviderConfig.getProviderConfig(configs, 'zhipu');
     zhipuApiKey.value = zhipuCfg.apiKey || result.zhipuApiKey || '';
-    zhipuModel.value = zhipuCfg.model || result.zhipuModel || 'glm-4v';
+    zhipuModel.value = zhipuCfg.model || result.zhipuModel || OCRProviderConfig.DEFAULT_MODELS.zhipu;
 
     // 通用OpenAI兼容接口配置
     const compatibleCfg = OCRProviderConfig.getProviderConfig(configs, 'openai-compatible');
@@ -287,6 +376,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (result.language) {
       language.value = result.language;
     }
+    await autoCopyPreferences.load();
     // 主题在单独的 loadTheme 函数中处理
   }
 
@@ -416,6 +506,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function setupAutoSave() {
     const allInputs = document.querySelectorAll('input, select, textarea');
     allInputs.forEach(input => {
+      if (input === autoCopyInput) return;
       input.addEventListener('blur', async () => {
         // 当输入框失去焦点时自动保存
         const ok = await saveSettings();
@@ -669,7 +760,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         break;
       case 'openai':
         config.apiKey = openaiApiKey.value;
-        config.model = openaiModel.value || 'gpt-5-mini';
+        config.model = openaiModel.value || OCRProviderConfig.DEFAULT_MODELS.openai;
         break;
       case 'baidu':
         config.apiKey = baiduApiKey.value;
@@ -708,11 +799,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         config: config
       });
 
-      if (response.success) {
-        showStatus(OCRI18n.t('msg_test_success'), 'success');
-      } else {
-        showStatus(`${OCRI18n.t('msg_test_failed')}: ${OCRI18n.errorMessage(response)}`, 'error');
-      }
+      const status = OptionsRuntime.connectionTestStatus(response, OCRI18n);
+      showStatus(status.message, status.type);
     } catch (error) {
       showStatus(`${OCRI18n.t('msg_test_failed')}: ${OCRI18n.errorMessage(error)}`, 'error');
     }
@@ -816,10 +904,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function exportConfig() {
     try {
       showStatus(OCRI18n.t('msg_exporting'), 'loading');
+      await autoCopyPreferences.settled();
 
       // 获取当前配置（仅导出配置数据，不包含历史记录）
       const result = await chrome.storage.local.get([
-        'apiProvider', 'apiConfigs', 'prompt', 'language', 'theme', 'uiLanguage'
+        'apiProvider', 'apiConfigs', 'prompt', 'language', 'theme', 'uiLanguage',
+        'autoCopy', 'translationProvider', 'translationTargetLanguage'
       ]);
 
       const apiConfigs = result.apiConfigs || {};
@@ -1079,6 +1169,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // 保存到chrome.storage
       await chrome.storage.local.set(settingsToSave);
+      // Independent behavior settings use the same queues as direct UI edits.
+      // In particular, an older translation selection must not run after this
+      // import and overwrite its explicit provider or target language.
+      await OptionsRuntime.persistImportedBehavior(validation.config, {
+        saveAutoCopy: (value, options) => autoCopyPreferences.save(value, options),
+        sendMessage: (message) => chrome.runtime.sendMessage(message)
+      });
 
       // 重新加载页面设置
       await loadSettings();
@@ -1089,7 +1186,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       showStatus(OCRI18n.t('msg_import_success'), 'success');
     } catch (error) {
       console.error('导入配置失败:', error);
-      showStatus(OCRI18n.t('msg_import_failed', [error.message]), 'error');
+      const detail = error.code === 'AUTO_COPY_SAVE_FAILED' ? OCRI18n.t('msg_auto_copy_save_failed')
+        : error.code === 'TRANSLATION_PREFERENCES_WRITE_FAILED' ? OCRI18n.t('translation_preferences_save_failed') : error.message;
+      showStatus(OCRI18n.t('msg_import_failed', [detail]), 'error');
     }
   }
 
@@ -1110,6 +1209,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     await chrome.storage.local.set({ theme });
     setFieldStatus(themeSelect, 'success', OCRI18n.t('msg_field_saved'));
     setTimeout(() => clearFieldStatus(themeSelect), 3000);
+  });
+
+  const autoCopyPreferences = OptionsRuntime.createAutoCopyPreferences({
+    storage: chrome.storage.local,
+    onChange: (value) => { autoCopyInput.checked = value; },
+    onSaved: () => showStatus(OCRI18n.t('msg_saved'), 'success'),
+    onError: () => showStatus(OCRI18n.t('msg_auto_copy_save_failed'), 'error')
+  });
+  autoCopyInput.addEventListener('change', () => {
+    void autoCopyPreferences.save(autoCopyInput.checked);
   });
 
   // 界面语言切换

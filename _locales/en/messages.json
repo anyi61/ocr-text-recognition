@@ -11,7 +11,6 @@
     "message": "Start screenshot recognition",
     "description": "Keyboard shortcut description"
   },
-
   "app_title": {
     "message": "OCR Text Recognition Assistant",
     "description": "App title in header"
@@ -36,7 +35,6 @@
     "message": "Please configure API key first",
     "description": "API config tip"
   },
-
   "history_title": {
     "message": "Recent Recognition Records",
     "description": "History section title"
@@ -101,7 +99,6 @@
     "message": "Close preview",
     "description": "Close preview button"
   },
-
   "preview_title": {
     "message": "Recognition Result",
     "description": "Preview section title"
@@ -114,12 +111,10 @@
     "message": "Copied",
     "description": "Copied button state"
   },
-
   "footer_supported_apis": {
     "message": "Supports 7 APIs: Claude / OpenAI / Zhipu AI / Baidu OCR / Aliyun / Compatible / Custom",
     "description": "Footer text"
   },
-
   "theme_light": {
     "message": "Light Mode",
     "description": "Light theme option"
@@ -128,14 +123,11 @@
     "message": "Dark Mode",
     "description": "Dark theme option"
   },
-
   "confirm_clear_history": {
-    "message": "Are you sure you want to clear all history records?",
-    "description": "Confirm clear history"
+    "message": "Clear all history, including favorites, saved translations and unfinished drafts? This cannot be undone."
   },
   "confirm_delete_history": {
-    "message": "Are you sure you want to delete this history record?",
-    "description": "Confirm delete history item"
+    "message": "Delete this record, including its favorite status, saved translation and unfinished draft?"
   },
   "msg_history_action_failed": {
     "message": "History action failed. Please try again.",
@@ -149,7 +141,6 @@
     "message": "History records exported",
     "description": "History exported announcement"
   },
-
   "msg_capture_failed": {
     "message": "Failed to start capture, please refresh the page and try again",
     "description": "Capture failed message"
@@ -170,7 +161,6 @@
     "message": "Please configure API key first",
     "description": "Please configure API first"
   },
-
   "options_title": {
     "message": "OCR Text Recognition Assistant - Settings",
     "description": "Options page title"
@@ -179,7 +169,6 @@
     "message": "Configure API keys and recognition preferences",
     "description": "Options header subtitle"
   },
-
   "section_api_provider": {
     "message": "API Provider",
     "description": "API provider section"
@@ -192,7 +181,6 @@
     "message": "Select the text recognition service you want to use",
     "description": "Select provider help text"
   },
-
   "section_claude_config": {
     "message": "Claude Configuration",
     "description": "Claude config section"
@@ -221,7 +209,6 @@
     "message": "Custom API Configuration",
     "description": "Custom API section"
   },
-
   "label_api_key": {
     "message": "API Key",
     "description": "API Key label"
@@ -246,7 +233,6 @@
     "message": "Model Name (Optional)",
     "description": "Model name optional label"
   },
-
   "help_claude_key": {
     "message": "Get API Key from Anthropic Console",
     "description": "Claude key help"
@@ -268,8 +254,8 @@
     "description": "Zhipu key help"
   },
   "help_compatible_endpoint": {
-    "message": "Supports any OpenAI-format API, such as SiliconFlow, DeepSeek, Azure, etc.",
-    "description": "Compatible endpoint help"
+    "message": "Use a complete Chat Completions endpoint that supports image input and Bearer authentication. For Azure api-key authentication, no authentication, or the Responses API, choose Custom API.",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "help_custom_endpoint": {
     "message": "Complete API endpoint URL; supports Chat Completions and Responses request formats.",
@@ -335,7 +321,6 @@
     "message": "Vision language models provided by Aliyun DashScope",
     "description": "Aliyun models help"
   },
-
   "section_advanced": {
     "message": "Advanced Settings",
     "description": "Advanced settings section"
@@ -364,7 +349,6 @@
     "message": "Please recognize the text content in the image, return only the recognized text without any explanation or additional notes.",
     "description": "Default prompt text"
   },
-
   "btn_test_connection": {
     "message": "Test Connection",
     "description": "Test connection button"
@@ -377,7 +361,6 @@
     "message": "Import Config",
     "description": "Import config button"
   },
-
   "section_config_management": {
     "message": "Configuration Management",
     "description": "Config management section"
@@ -398,7 +381,6 @@
     "message": "Access to the configured API endpoint was not granted.",
     "description": "Optional endpoint permission denied"
   },
-
   "msg_saved": {
     "message": "Settings saved",
     "description": "Settings saved"
@@ -447,7 +429,6 @@
     "message": "Applying configuration...",
     "description": "Applying config"
   },
-
   "err_config_incomplete": {
     "message": "Configuration incomplete",
     "description": "Config incomplete error"
@@ -480,7 +461,6 @@
     "message": "Configuration file format error, please ensure it is valid JSON",
     "description": "JSON parse error"
   },
-
   "card_usage_title": {
     "message": "Usage Instructions",
     "description": "Usage card title"
@@ -490,10 +470,9 @@
     "description": "Shortcuts card title"
   },
   "card_recommended_api_title": {
-    "message": "Recommended APIs",
-    "description": "Recommended API title"
+    "message": "Services and model guidance",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
-
   "usage_step1": {
     "message": "Configure your chosen API provider's key",
     "description": "Usage step 1"
@@ -514,7 +493,6 @@
     "message": "Wait for recognition to complete, then copy the result",
     "description": "Usage step 5"
   },
-
   "shortcut_capture": {
     "message": "Start screenshot recognition",
     "description": "Capture shortcut"
@@ -531,44 +509,42 @@
     "message": "Tip: You can customize shortcuts in chrome://extensions/shortcuts",
     "description": "Customize shortcut hint"
   },
-
   "api_claude_opus": {
-    "message": "Highest recognition accuracy",
-    "description": "Claude Opus description"
+    "message": "Recognizes image text through Anthropic Messages.",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "api_gpt4o": {
-    "message": "Fast, high accuracy",
-    "description": "GPT-4o description"
+    "message": "Uses an image-capable model through Chat Completions.",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "api_glm4v": {
-    "message": "Domestic LLM, great for Chinese",
-    "description": "GLM-4V description"
+    "message": "Check Zhipu for vision models and account access.",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "api_baidu_title": {
     "message": "Baidu OCR",
     "description": "Baidu OCR title"
   },
   "api_baidu": {
-    "message": "Great Chinese recognition, cost-effective",
-    "description": "Baidu description"
+    "message": "Uses general text recognition with an API Key and Secret.",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "api_aliyun_title": {
     "message": "Aliyun OCR",
     "description": "Aliyun OCR title"
   },
   "api_aliyun": {
-    "message": "Enterprise-grade service, stable and reliable",
-    "description": "Aliyun description"
+    "message": "Uses dashscope.aliyuncs.com; your key must match that endpoint region.",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "api_compatible_title": {
     "message": "Universal OpenAI API",
     "description": "Compatible API title"
   },
   "api_compatible": {
-    "message": "Flexible support for multiple providers",
-    "description": "Compatible API description"
+    "message": "The provider must support image input and the selected request format.",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
-
   "modal_import_title": {
     "message": "Import Configuration Confirmation",
     "description": "Import confirm dialog title"
@@ -597,7 +573,6 @@
     "message": "Confirm Import",
     "description": "Confirm import button"
   },
-
   "content_tooltip_start": {
     "message": "Hold left mouse button to select text area (minimum 10×10 pixels), press ESC to cancel",
     "description": "Initial tooltip"
@@ -614,7 +589,6 @@
     "message": "Release mouse to adjust selection",
     "description": "Selection size OK"
   },
-
   "content_btn_confirm": {
     "message": "Confirm",
     "description": "Confirm button"
@@ -631,7 +605,6 @@
     "message": "Undo",
     "description": "Undo button"
   },
-
   "content_aria_confirm": {
     "message": "Confirm recognition of selected area",
     "description": "Confirm button aria"
@@ -660,7 +633,6 @@
     "message": "Copy recognition result",
     "description": "Copy button aria"
   },
-
   "content_progress_capturing": {
     "message": "Capturing screenshot...",
     "description": "Capturing progress"
@@ -681,7 +653,6 @@
     "message": "seconds",
     "description": "Seconds"
   },
-
   "content_msg_cancelled": {
     "message": "Screenshot cancelled",
     "description": "Capture cancelled"
@@ -710,7 +681,6 @@
     "message": "Selection too small, please adjust",
     "description": "Selection too small in edit mode"
   },
-
   "content_result_title": {
     "message": "Recognition result...",
     "description": "Result placeholder"
@@ -739,7 +709,6 @@
     "message": "Could not save changes. Please try again.",
     "description": "Corrected OCR text save failed"
   },
-
   "content_a11y_capturing": {
     "message": "Capturing screenshot",
     "description": "A11y capturing"
@@ -756,7 +725,6 @@
     "message": "Recognition failed",
     "description": "A11y failed"
   },
-
   "model_claude_3_5_sonnet": {
     "message": "Claude 3.5 Sonnet (Recommended)",
     "description": "Claude 3.5 Sonnet model"
@@ -770,16 +738,16 @@
     "description": "Claude Opus model"
   },
   "model_claude_sonnet_5": {
-    "message": "Claude Sonnet 5 (Recommended)",
-    "description": "Current balanced Claude vision model"
+    "message": "Claude Sonnet 5",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "model_claude_haiku_4_5": {
-    "message": "Claude Haiku 4.5 (Economical)",
-    "description": "Current economical Claude vision model"
+    "message": "Claude Haiku 4.5",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "model_claude_opus_4_8": {
-    "message": "Claude Opus 4.8 (High quality)",
-    "description": "Current high quality Claude vision model"
+    "message": "Claude Opus 4.8",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "model_gpt4o": {
     "message": "GPT-4o (Recommended)",
@@ -790,28 +758,28 @@
     "description": "GPT-4o Mini model"
   },
   "model_gpt5_mini": {
-    "message": "GPT-5 mini (Recommended)",
-    "description": "Current economical OpenAI vision model"
+    "message": "GPT-5 mini (scheduled shutdown: 2026-12-11)",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "model_gpt54_mini": {
-    "message": "GPT-5.4 mini (High quality)",
-    "description": "Current high quality OpenAI vision model"
+    "message": "GPT-5.4 mini",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "model_gpt4_turbo": {
     "message": "GPT-4 Turbo",
     "description": "GPT-4 Turbo model"
   },
   "model_qwen_max": {
-    "message": "qwen-vl-max (Recommended)",
-    "description": "Qwen max model"
+    "message": "qwen-vl-max",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "model_qwen_plus": {
-    "message": "qwen-vl-plus (Economical)",
-    "description": "Qwen plus model"
+    "message": "qwen-vl-plus",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "model_glm4v": {
-    "message": "GLM-4V (Recommended)",
-    "description": "GLM-4V model"
+    "message": "GLM-4V",
+    "description": "Provider configuration, compatibility, or service guidance"
   },
   "model_glm4v_plus": {
     "message": "GLM-4V-Plus",
@@ -921,42 +889,673 @@
     "message": "Please configure API key first",
     "description": "Config missing announcement"
   },
-  "provider_claude": { "message": "Anthropic Claude (Recommended)" },
-  "provider_openai": { "message": "OpenAI GPT-4 Vision" },
-  "provider_zhipu": { "message": "Zhipu AI GLM-4V" },
-  "provider_baidu": { "message": "Baidu Cloud OCR" },
-  "provider_aliyun": { "message": "Aliyun OCR" },
-  "provider_openai_compatible": { "message": "OpenAI-Compatible API" },
-  "provider_custom": { "message": "Custom API" },
-  "history_preview_aria": { "message": "History record details" },
-  "msg_capture_file_access": { "message": "File URL access is disabled. Enable Allow access to file URLs in this extension's details, then try again." },
-  "msg_export_failed": { "message": "Export failed: {0}" },
-  "msg_import_failed": { "message": "Import failed: {0}" },
-  "field_api_key": { "message": "API Key" },
-  "field_secret_key": { "message": "Secret Key" },
-  "field_endpoint": { "message": "API endpoint" },
-  "field_model_name": { "message": "Model name" },
-  "field_header_name": { "message": "Header name" },
-  "err_config_incomplete_detail": { "message": "Configuration incomplete: {0} is missing or invalid" },
-  "err_import_invalid_structure": { "message": "Invalid configuration file structure" },
-  "err_import_missing_config": { "message": "Configuration file is missing configuration data" },
-  "err_import_invalid_provider": { "message": "Invalid API provider: {0}" },
-  "err_import_invalid_api_configs": { "message": "Invalid apiConfigs format" },
-  "err_import_invalid_provider_config": { "message": "Invalid apiConfigs.{0} format" },
-  "err_import_invalid_prompt": { "message": "Invalid prompt format" },
-  "err_import_invalid_language": { "message": "Invalid recognition language" },
-  "err_import_invalid_theme": { "message": "Invalid theme" },
-  "err_import_invalid_uiLanguage": { "message": "Invalid interface language" },
-  "error_missing_api_key": { "message": "Configure the selected API before starting recognition." },
-  "error_capture_tab_changed": { "message": "The active tab changed. Select the area again." },
-  "error_request_timeout": { "message": "The request timed out. Check your network and try again." },
-  "error_empty_ocr_result": { "message": "No text was recognized. Adjust the selection and try again." },
-  "error_invalid_ocr_result": { "message": "The provider returned an unsupported response format." },
-  "error_ocr_result_truncated": { "message": "The recognition result was truncated. Reduce the selected area and try again." },
-  "error_history_save_failed": { "message": "Text was recognized, but the history record could not be saved." },
-  "error_network": { "message": "The network request failed. Check your connection or proxy." },
-  "error_unknown_provider": { "message": "The selected API provider is unsupported." },
-  "notification_config_required": { "message": "Configure an API before using the screenshot shortcut." },
-  "notification_endpoint_permission_required": { "message": "Authorize the custom API domain in the extension popup first." },
-  "notification_capture_unavailable": { "message": "Screenshot capture is unavailable on this page. Switch to a regular webpage and try again." }
+  "provider_claude": {
+    "message": "Anthropic Claude",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "provider_openai": {
+    "message": "OpenAI GPT-4 Vision"
+  },
+  "provider_zhipu": {
+    "message": "Zhipu AI GLM-4V"
+  },
+  "provider_baidu": {
+    "message": "Baidu Cloud OCR"
+  },
+  "provider_aliyun": {
+    "message": "Aliyun OCR"
+  },
+  "provider_openai_compatible": {
+    "message": "OpenAI-Compatible API"
+  },
+  "provider_custom": {
+    "message": "Custom API"
+  },
+  "history_preview_aria": {
+    "message": "History record details"
+  },
+  "msg_capture_file_access": {
+    "message": "File URL access is disabled. Enable Allow access to file URLs in this extension's details, then try again."
+  },
+  "msg_export_failed": {
+    "message": "Export failed: {0}"
+  },
+  "msg_import_failed": {
+    "message": "Import failed: {0}"
+  },
+  "field_api_key": {
+    "message": "API Key"
+  },
+  "field_secret_key": {
+    "message": "Secret Key"
+  },
+  "field_endpoint": {
+    "message": "API endpoint"
+  },
+  "field_model_name": {
+    "message": "Model name"
+  },
+  "field_header_name": {
+    "message": "Header name"
+  },
+  "err_config_incomplete_detail": {
+    "message": "Configuration incomplete: {0} is missing or invalid"
+  },
+  "err_import_invalid_structure": {
+    "message": "Invalid configuration file structure"
+  },
+  "err_import_missing_config": {
+    "message": "Configuration file is missing configuration data"
+  },
+  "err_import_invalid_provider": {
+    "message": "Invalid API provider: {0}"
+  },
+  "err_import_invalid_api_configs": {
+    "message": "Invalid apiConfigs format"
+  },
+  "err_import_invalid_provider_config": {
+    "message": "Invalid apiConfigs.{0} format"
+  },
+  "err_import_invalid_prompt": {
+    "message": "Invalid prompt format"
+  },
+  "err_import_invalid_language": {
+    "message": "Invalid recognition language"
+  },
+  "err_import_invalid_theme": {
+    "message": "Invalid theme"
+  },
+  "err_import_invalid_uiLanguage": {
+    "message": "Invalid interface language"
+  },
+  "error_missing_api_key": {
+    "message": "Configure the selected API before starting recognition."
+  },
+  "error_capture_tab_changed": {
+    "message": "The active tab changed. Select the area again."
+  },
+  "error_request_timeout": {
+    "message": "The request timed out. Check your network and try again."
+  },
+  "error_empty_ocr_result": {
+    "message": "No text was recognized. Adjust the selection and try again."
+  },
+  "error_invalid_ocr_result": {
+    "message": "The provider returned an unsupported response format."
+  },
+  "error_ocr_result_truncated": {
+    "message": "The recognition result was truncated. Reduce the selected area and try again."
+  },
+  "error_history_save_failed": {
+    "message": "Text was recognized, but the history record could not be saved."
+  },
+  "error_network": {
+    "message": "The network request failed. Check your connection or proxy."
+  },
+  "error_unknown_provider": {
+    "message": "The selected API provider is unsupported."
+  },
+  "notification_config_required": {
+    "message": "Configure an API before using the screenshot shortcut."
+  },
+  "notification_endpoint_permission_required": {
+    "message": "Authorize the custom API domain in the extension popup first."
+  },
+  "notification_capture_unavailable": {
+    "message": "Screenshot capture is unavailable on this page. Switch to a regular webpage and try again."
+  },
+  "content_btn_merge_lines": {
+    "message": "Merge lines"
+  },
+  "content_btn_undo_text": {
+    "message": "Undo cleanup"
+  },
+  "content_merge_lines_hint": {
+    "message": "Join wrapped lines and keep paragraph breaks. History changes only when you save."
+  },
+  "content_msg_lines_merged": {
+    "message": "Wrapped lines merged. You can undo this; history is unchanged."
+  },
+  "content_msg_text_restored": {
+    "message": "Text restored to before cleanup. Save changes to update history."
+  },
+  "content_confirm_discard_changes": {
+    "message": "Close the result? Successfully saved drafts can be restored from history. Saved text will not change automatically."
+  },
+  "content_msg_copy_failed": {
+    "message": "Copy failed. Text is selected; press Ctrl+C (⌘C on Mac) to copy manually."
+  },
+  "history_edit_hint": {
+    "message": "Edit text, then Save changes (Ctrl/⌘+S) to update history. Exports use saved text."
+  },
+  "history_revert_changes": {
+    "message": "Revert edits"
+  },
+  "history_discard_changes": {
+    "message": "Close the editor? Successfully saved drafts can be restored from history. Saved text will not change automatically."
+  },
+  "history_copy_failed": {
+    "message": "Copy failed. Text is selected; press Ctrl+C (⌘C on Mac) to copy manually."
+  },
+  "link_official_models": {
+    "message": "Official model catalog",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "link_model_lifecycle_source": {
+    "message": "Shutdown source (checked 2026-10-03)",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "link_claude_model_source": {
+    "message": "Claude model source",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "link_zhipu_docs": {
+    "message": "Official Zhipu documentation",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "help_openai_model_shutdown": {
+    "message": "The current default, gpt-5-mini, is scheduled to shut down on 2026-12-11. Check the official catalog, choose a vision model available to your account, and test the connection. Saved models are never replaced automatically.",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "help_model_freshness": {
+    "message": "Claude/OpenAI model names and shutdown notices were checked on 2026-10-03. Suggestions are examples, not availability guarantees. Check official documentation and your account for image support, regions, and pricing. Saved models are never replaced automatically.",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_invalid_request": {
+    "message": "The API rejected the request. Check image support, request format, and model parameters.",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_authentication_failed": {
+    "message": "API authentication failed. Check that your key is valid and the authentication method is correct.",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_billing_required": {
+    "message": "The API requires an active billing account. Check your balance or payment settings with the provider.",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_access_denied": {
+    "message": "API access was denied. Check your account, model permissions, region, and endpoint.",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_not_found": {
+    "message": "The endpoint or model was not found. Check the full endpoint URL, model name, and provider shutdown notices.",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_image_too_large": {
+    "message": "The image exceeds the API size limit. Select a smaller area and try again.",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_rate_limited": {
+    "message": "The API rate or quota limit was reached. Try again later and check usage and balance with the provider.",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_unavailable": {
+    "message": "The provider is temporarily unavailable. Try again later or check the provider status.",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_api_http": {
+    "message": "The API request failed. Check the endpoint, account configuration, and provider status.",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_invalid_api_response": {
+    "message": "The API returned invalid JSON. Make sure the endpoint is an API URL rather than a web page.",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "warning_baidu_test_image": {
+    "message": "Connection and authentication succeeded, but the test image could not be recognized. OCR is not yet verified. Try a clear text selection before relying on this configuration.",
+    "description": "Provider configuration, compatibility, or service guidance"
+  },
+  "error_ocr_result_filtered": {
+    "message": "The provider blocked part or all of the response. No incomplete text was saved. Review the selected content or use another provider."
+  },
+  "error_ocr_result_incomplete": {
+    "message": "The provider did not complete recognition. No incomplete text was saved. Try again later or select a smaller area."
+  },
+  "error_translation_empty_text": {
+    "message": "Enter or recognize some text before translating."
+  },
+  "error_translation_text_too_long": {
+    "message": "Translate up to 12,000 characters at a time. Shorten the text and try again."
+  },
+  "error_translation_invalid_language": {
+    "message": "Choose a supported target language."
+  },
+  "error_translation_provider_unsupported": {
+    "message": "This provider only supports OCR and cannot translate text. Select and configure an AI provider for translation."
+  },
+  "error_translation_provider_unconfigured": {
+    "message": "The selected translation provider is not fully configured. Complete its configuration in Settings and try again."
+  },
+  "error_translation_permission_required": {
+    "message": "The selected endpoint has not been granted access. Test its connection in Settings, grant the domain permission, and try again."
+  },
+  "error_translation_invalid_request": {
+    "message": "The translation request is invalid. Select the text again and retry."
+  },
+  "error_translation_cancelled": {
+    "message": "Translation cancelled. The source text is unchanged."
+  },
+  "error_translation_result_empty": {
+    "message": "The provider returned no translation. Try again or check the selected model."
+  },
+  "error_translation_result_invalid": {
+    "message": "The translation could not be read. Check the request format and response text path."
+  },
+  "error_translation_result_truncated": {
+    "message": "The translation was truncated and was not accepted as complete. Shorten the source text and try again."
+  },
+  "error_translation_result_filtered": {
+    "message": "The provider did not return a translation for this text. Check the content or selected service. The source is unchanged."
+  },
+  "error_translation_result_incomplete": {
+    "message": "The provider did not complete the translation. Try again later. The source text is unchanged."
+  },
+  "error_translation_request_too_large": {
+    "message": "The translation request exceeds the provider size limit. Shorten the source text and try again."
+  },
+  "error_translation_api_invalid_request": {
+    "message": "The API rejected the translation request. Check text input support, request format, and model parameters."
+  },
+  "error_translation_settings_failed": {
+    "message": "Settings could not be opened. Open the extension settings from the browser extension menu."
+  },
+  "error_translation_failed": {
+    "message": "Translation failed. Check the selected provider configuration and try again. The source text is unchanged."
+  },
+  "translation_title": {
+    "message": "Translate"
+  },
+  "translation_source_label": {
+    "message": "Source text (editable)"
+  },
+  "translation_notice": {
+    "message": "Only Translate sends the current source text to the selected provider; API charges may apply. Results are saved with this history record and do not replace the source text."
+  },
+  "translation_provider_label": {
+    "message": "Translation provider"
+  },
+  "translation_target_label": {
+    "message": "Target language"
+  },
+  "translation_output_label": {
+    "message": "Translation"
+  },
+  "translation_start": {
+    "message": "Translate"
+  },
+  "translation_cancel": {
+    "message": "Cancel translation"
+  },
+  "translation_settings": {
+    "message": "Open settings"
+  },
+  "translation_copy": {
+    "message": "Copy translation"
+  },
+  "translation_provider_summary": {
+    "message": "Provider: {0} · Model: {1}"
+  },
+  "translation_loading": {
+    "message": "Loading translation configuration…"
+  },
+  "translation_capabilities_failed": {
+    "message": "Could not load translation configuration. Reopen this window or check settings."
+  },
+  "translation_provider_unsupported": {
+    "message": "This provider supports OCR only. Select a configured text-model provider to translate."
+  },
+  "translation_provider_unconfigured": {
+    "message": "This translation provider is not configured. Add its credentials and model in settings."
+  },
+  "translation_permission_required": {
+    "message": "This API origin is not authorized. Select this provider in settings and use Test connection to grant access."
+  },
+  "translation_empty_source": {
+    "message": "Source text is empty. Recognize or enter text first."
+  },
+  "translation_too_long": {
+    "message": "Source text exceeds {0} characters. Use a shorter text to translate."
+  },
+  "translation_choose_target": {
+    "message": "Choose a target language."
+  },
+  "translation_working": {
+    "message": "Translating…"
+  },
+  "translation_stale": {
+    "message": "The source or translation options changed. The previous translation is out of date; translate again before copying."
+  },
+  "translation_cancelled": {
+    "message": "Translation cancelled. You can translate again."
+  },
+  "translation_connection_lost": {
+    "message": "Translation connection lost. Click Translate to retry."
+  },
+  "translation_done": {
+    "message": "Translation complete. Source text and OCR history are unchanged."
+  },
+  "translation_copied": {
+    "message": "Translation copied."
+  },
+  "translation_copy_failed": {
+    "message": "Copy failed. Translation selected; press Ctrl+C (⌘C on Mac) to copy manually."
+  },
+  "translation_settings_failed": {
+    "message": "Could not open settings. Open them from the extension menu."
+  },
+  "translation_language_zh_CN": {
+    "message": "Chinese (Simplified)"
+  },
+  "translation_language_zh_TW": {
+    "message": "Chinese (Traditional)"
+  },
+  "translation_language_en": {
+    "message": "English"
+  },
+  "translation_language_ja": {
+    "message": "Japanese"
+  },
+  "translation_language_ko": {
+    "message": "Korean"
+  },
+  "translation_language_fr": {
+    "message": "French"
+  },
+  "translation_language_de": {
+    "message": "German"
+  },
+  "translation_language_es": {
+    "message": "Spanish"
+  },
+  "translation_language_pt": {
+    "message": "Portuguese"
+  },
+  "translation_language_ru": {
+    "message": "Russian"
+  },
+  "translation_language_ar": {
+    "message": "Arabic"
+  },
+  "translation_output_summary": {
+    "message": "Translation: {0} · {1}"
+  },
+  "translation_result_model": {
+    "message": "Translation model: {0}"
+  },
+  "popup_repeat_capture": {
+    "message": "Recognize area again"
+  },
+  "popup_import_image": {
+    "message": "Import image"
+  },
+  "popup_repeat_no_region": {
+    "message": "Select and recognize an area on this page first."
+  },
+  "popup_repeat_ready": {
+    "message": "Ready to capture the last selected area again."
+  },
+  "popup_repeat_viewport_changed": {
+    "message": "The page was scrolled, zoomed, or resized. Select an area again."
+  },
+  "popup_repeat_page_changed": {
+    "message": "The page address changed. Select an area again."
+  },
+  "popup_repeat_busy": {
+    "message": "Finish or cancel the current selection or recognition first."
+  },
+  "popup_import_failed": {
+    "message": "The image workspace could not be opened. Try again."
+  },
+  "image_import_title": {
+    "message": "Image OCR"
+  },
+  "image_import_settings": {
+    "message": "Settings"
+  },
+  "image_import_intro": {
+    "message": "Paste, drop, or choose one image. Recognition starts only when you choose Recognize."
+  },
+  "image_import_select": {
+    "message": "Choose an image"
+  },
+  "image_import_choose": {
+    "message": "Choose image"
+  },
+  "image_import_help": {
+    "message": "Drop or paste one PNG, JPEG, or static WebP. Up to 20 MiB and 40 million pixels; maximum edge 32,767 px. SVG, PDF, animation, and multiple images are not supported."
+  },
+  "image_import_privacy": {
+    "message": "Recognition sends this image to your configured service and may incur charges. Images are not saved in history."
+  },
+  "image_import_recognize": {
+    "message": "Recognize"
+  },
+  "image_import_cancel": {
+    "message": "Cancel recognition"
+  },
+  "image_import_result": {
+    "message": "Recognized text"
+  },
+  "image_import_preview": {
+    "message": "Image prepared for recognition"
+  },
+  "image_import_provider": {
+    "message": "Recognition service: {0}"
+  },
+  "image_import_config_required": {
+    "message": "{0} is not configured. Open Settings to add your API configuration."
+  },
+  "image_import_dimensions": {
+    "message": "{0} · Original {1} × {2} px → Sent {3} × {4} px (PNG)"
+  },
+  "image_import_cancelled": {
+    "message": "Recognition cancelled. You can retry with the same image."
+  },
+  "image_import_single_only": {
+    "message": "Choose exactly one image. Multiple images are not supported yet."
+  },
+  "image_import_preparing": {
+    "message": "Checking and preparing the image locally…"
+  },
+  "image_import_clipboard_name": {
+    "message": "Clipboard image"
+  },
+  "image_import_ready": {
+    "message": "Image ready. Choose Recognize to send it to your service."
+  },
+  "image_import_invalid_type": {
+    "message": "Use a PNG, JPEG, or static WebP image. SVG, PDF, and other formats are not supported."
+  },
+  "image_import_invalid_image": {
+    "message": "This file could not be decoded as a valid image. Choose another image."
+  },
+  "image_import_too_large": {
+    "message": "The image is too large. Choose a file no larger than 20 MiB."
+  },
+  "image_import_too_many_pixels": {
+    "message": "The image exceeds 40 million pixels or an edge exceeds 32,767 px. Resize it before importing."
+  },
+  "image_import_animated": {
+    "message": "Animated images are not supported. Export a still frame as PNG or JPEG."
+  },
+  "image_import_history_saved": {
+    "message": "Text saved to history. You can edit, translate, or copy it below."
+  },
+  "image_import_working": {
+    "message": "Recognizing image…"
+  },
+  "image_import_permission_denied": {
+    "message": "Access to the configured API address was not granted. Choose Recognize again and allow access, or update Settings."
+  },
+  "image_import_config_changed": {
+    "message": "The service configuration changed. Check the selected service and choose Recognize again."
+  },
+  "image_import_done": {
+    "message": "Recognition complete."
+  },
+  "image_import_connection_lost": {
+    "message": "Connection lost. Choose Recognize to retry, or reopen this page."
+  },
+  "translation_notice_temporary": {
+    "message": "Only Translate sends the current source text to the selected provider; API charges may apply. This result has no saved history record, so its translation stays in this window."
+  },
+  "translation_saved": {
+    "message": "Saved to history"
+  },
+  "translation_done_saved": {
+    "message": "Translation saved with this history record. Reopening it does not send another translation request."
+  },
+  "translation_done_unsaved": {
+    "message": "Translation complete, but it could not be saved to history. Copy it before closing this window."
+  },
+  "translation_history_failed": {
+    "message": "Could not load the saved translation. Reopen this record to try again."
+  },
+  "draft_idle": {
+    "message": "Edits are saved automatically as a draft; Save changes updates the original."
+  },
+  "draft_unavailable": {
+    "message": "This result has no saved history record. Edits cannot be recovered after closing."
+  },
+  "draft_loading": {
+    "message": "Checking for a saved draft…"
+  },
+  "draft_available": {
+    "message": "A saved draft is available. Restore it to continue editing, or discard it."
+  },
+  "draft_available_conflict": {
+    "message": "This draft was based on an earlier version of the original. Restore it only if you want to review those edits."
+  },
+  "draft_saving": {
+    "message": "Saving draft…"
+  },
+  "draft_saved": {
+    "message": "Draft saved. Reopen this record to resume editing."
+  },
+  "draft_discarding": {
+    "message": "Discarding draft…"
+  },
+  "draft_conflict": {
+    "message": "The original or draft changed in another window. Your current text is still here. Copy it, then reopen this record to review the latest version."
+  },
+  "draft_error": {
+    "message": "Could not load or save the draft. Keep this window open and retry, or copy your edits before closing."
+  },
+  "draft_restore": {
+    "message": "Restore draft"
+  },
+  "draft_discard": {
+    "message": "Discard draft"
+  },
+  "draft_retry": {
+    "message": "Retry"
+  },
+  "content_btn_repeat_capture": {
+    "message": "Recognize this region again"
+  },
+  "content_repeat_busy": {
+    "message": "Wait for the current capture to finish before repeating."
+  },
+  "content_repeat_no_region": {
+    "message": "Select a region on this page first."
+  },
+  "content_repeat_invalid": {
+    "message": "The page position, size or address changed. Select a new region."
+  },
+  "content_confirm_close_draft": {
+    "message": "Close this result? Successfully saved drafts can be recovered from history."
+  },
+  "label_auto_copy": {
+    "message": "Automatically copy successful OCR text"
+  },
+  "help_auto_copy": {
+    "message": "Off by default. Copies only newly recognized text. If copying fails, the result and manual Copy button remain available."
+  },
+  "msg_auto_copy_save_failed": {
+    "message": "Could not save the automatic copy preference. Try again."
+  },
+  "err_import_invalid_autoCopy": {
+    "message": "Invalid automatic copy preference."
+  },
+  "err_import_invalid_translationProvider": {
+    "message": "Invalid translation provider preference."
+  },
+  "err_import_invalid_translationTargetLanguage": {
+    "message": "Invalid translation target language preference."
+  },
+  "recovery_title": {
+    "message": "Recognition failed"
+  },
+  "recovery_preview": {
+    "message": "Original image retained for retry"
+  },
+  "recovery_retry_original": {
+    "message": "Retry original image"
+  },
+  "recovery_settings": {
+    "message": "Open settings"
+  },
+  "recovery_reselect": {
+    "message": "Select a new region"
+  },
+  "recovery_retained": {
+    "message": "The original capture is kept only in this page. Retry sends this same image using your current settings. Selecting a new region takes a new screenshot."
+  },
+  "recovery_no_image": {
+    "message": "No image was captured. Select a new region to take a new screenshot."
+  },
+  "recovery_settings_failed": {
+    "message": "Could not open settings. Please open settings from the extension menu."
+  },
+  "image_recovery_retained": {
+    "message": "The original image is still available in this tab. Retry sends the same image using your current settings."
+  },
+  "image_recovery_choose_new": {
+    "message": "Choose a new image"
+  },
+  "auto_copy_success": {
+    "message": "Recognized text copied automatically."
+  },
+  "auto_copy_failed": {
+    "message": "Automatic copy failed. Your result is kept; use Copy to try again."
+  },
+  "history_retention_hint": {
+    "message": "Keep the latest 50 ordinary records. Favorites and unfinished drafts are exempt from this limit."
+  },
+  "history_favorite": {
+    "message": "Add to favorites"
+  },
+  "history_unfavorite": {
+    "message": "Remove favorite"
+  },
+  "history_name_label": {
+    "message": "Record name"
+  },
+  "history_name_placeholder": {
+    "message": "Add a name (optional)"
+  },
+  "history_name_save": {
+    "message": "Save name"
+  },
+  "history_name_cancel": {
+    "message": "Cancel naming"
+  },
+  "history_discard_name_changes": {
+    "message": "Discard the unsaved name change?"
+  },
+  "history_metadata_saved": {
+    "message": "History details saved."
+  },
+  "history_unfinished_draft": {
+    "message": "Unfinished draft"
+  },
+  "translation_preferences_load_failed": {
+    "message": "Saved translation preferences could not be loaded. Your current choices are still available; retry to load them."
+  },
+  "translation_preferences_save_failed": {
+    "message": "Translation preferences were not saved. Your choices still apply here; retry to remember them for next time."
+  },
+  "translation_preferences_retry": {
+    "message": "Retry preferences"
+  }
 }

@@ -123,10 +123,22 @@
     return { left, top, width: right - left, height: bottom - top };
   }
 
+  /** A remembered screen region is safe only in the exact viewport that created it. */
+  function repeatCaptureInvalidationReason(previous, current) {
+    if (!previous || !current) return 'no-region';
+    if (previous.url !== current.url) return 'page-changed';
+    const keys = ['scrollX', 'scrollY', 'width', 'height', 'devicePixelRatio',
+      'visualScale', 'visualOffsetLeft', 'visualOffsetTop'];
+    return keys.some((key) => !Number.isFinite(previous[key])
+      || !Number.isFinite(current[key]) || previous[key] !== current[key])
+      ? 'viewport-changed' : null;
+  }
+
   return {
     createRequestId,
     computeCropScale,
     fitImageWithinLimits,
-    resizeSelectionRect
+    resizeSelectionRect,
+    repeatCaptureInvalidationReason
   };
 });

@@ -10,7 +10,7 @@ const child = spawn(
   [
     cli,
     'test',
-    'tests/e2e/extension.spec.js',
+    'tests/e2e',
     '--workers=1',
     '--reporter=line',
     ...process.argv.slice(2)

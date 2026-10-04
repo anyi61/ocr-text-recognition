@@ -27,7 +27,7 @@
         <div class="form-group">
           <label for="apiProvider" data-i18n="label_select_provider">选择OCR服务提供商</label>
           <select id="apiProvider" class="select">
-            <option value="claude" data-i18n="provider_claude">Anthropic Claude (推荐)</option>
+            <option value="claude" data-i18n="provider_claude">Anthropic Claude</option>
             <option value="openai" data-i18n="provider_openai">OpenAI GPT-4 Vision</option>
             <option value="zhipu" data-i18n="provider_zhipu">智谱AI GLM-4V</option>
             <option value="baidu" data-i18n="provider_baidu">百度智能云OCR</option>
@@ -55,12 +55,13 @@
           <div class="input-wrapper">
             <input id="claudeModel" class="input" list="claudeModels" placeholder="例如: claude-sonnet-5">
             <datalist id="claudeModels">
-              <option value="claude-sonnet-5" data-i18n="model_claude_sonnet_5">Claude Sonnet 5 (推荐)</option>
-              <option value="claude-haiku-4-5-20251001" data-i18n="model_claude_haiku_4_5">Claude Haiku 4.5 (经济)</option>
-              <option value="claude-opus-4-8" data-i18n="model_claude_opus_4_8">Claude Opus 4.8 (高质量)</option>
+              <option value="claude-sonnet-5" data-i18n="model_claude_sonnet_5">Claude Sonnet 5</option>
+              <option value="claude-haiku-4-5-20251001" data-i18n="model_claude_haiku_4_5">Claude Haiku 4.5</option>
+              <option value="claude-opus-4-8" data-i18n="model_claude_opus_4_8">Claude Opus 4.8</option>
             </datalist>
             <span class="field-status" aria-live="polite"></span>
           </div>
+          <p class="help-text"><a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener noreferrer" data-i18n="link_official_models">官方模型目录</a></p>
         </div>
       </section>
 
@@ -80,11 +81,13 @@
           <div class="input-wrapper">
             <input id="openaiModel" class="input" list="openaiModels" placeholder="例如: gpt-5-mini">
             <datalist id="openaiModels">
-              <option value="gpt-5-mini" data-i18n="model_gpt5_mini">GPT-5 mini (推荐)</option>
-              <option value="gpt-5.4-mini" data-i18n="model_gpt54_mini">GPT-5.4 mini (高质量)</option>
+              <option value="gpt-5-mini" data-i18n="model_gpt5_mini">GPT-5 mini（计划于 2026-12-11 关闭）</option>
+              <option value="gpt-5.4-mini" data-i18n="model_gpt54_mini">GPT-5.4 mini</option>
             </datalist>
             <span class="field-status" aria-live="polite"></span>
           </div>
+          <p class="help-text" id="openaiModelNotice"><strong data-i18n="help_openai_model_shutdown">当前默认 gpt-5-mini 计划于 2026-12-11 关闭。请核对官方目录，手工选择账号可用的视觉模型并测试连接；已有模型不会被自动替换。</strong></p>
+          <p class="help-text"><a href="https://developers.openai.com/api/docs/models" target="_blank" rel="noopener noreferrer" data-i18n="link_official_models">官方模型目录</a> · <a href="https://github.com/openai/openai-python/blob/becc1d20eed83c1b8d85e15dc131a372d9dc7813/src/openai/types/shared/chat_model.py#L110" target="_blank" rel="noopener noreferrer" data-i18n="link_model_lifecycle_source">退役信息来源（2026-10-03 核对）</a></p>
         </div>
       </section>
 
@@ -124,14 +127,15 @@
           <div class="input-wrapper">
             <input id="aliyunModel" class="input" list="aliyunModels" placeholder="例如: qwen-vl-max">
             <datalist id="aliyunModels">
-              <option value="qwen-vl-max" data-i18n="model_qwen_max">qwen-vl-max (推荐)</option>
-              <option value="qwen-vl-plus" data-i18n="model_qwen_plus">qwen-vl-plus (经济)</option>
+              <option value="qwen-vl-max" data-i18n="model_qwen_max">qwen-vl-max</option>
+              <option value="qwen-vl-plus" data-i18n="model_qwen_plus">qwen-vl-plus</option>
               <option value="qwen2-vl-72b-instruct">qwen2-vl-72b-instruct</option>
               <option value="qwen2-vl-7b-instruct">qwen2-vl-7b-instruct</option>
             </datalist>
             <span class="field-status" aria-live="polite"></span>
           </div>
           <p class="help-text" data-i18n="help_aliyun_models">阿里云DashScope提供的视觉语言模型</p>
+          <p class="help-text"><a href="https://help.aliyun.com/zh/model-studio/vision" target="_blank" rel="noopener noreferrer" data-i18n="link_official_models">官方模型目录</a></p>
         </div>
       </section>
 
@@ -151,7 +155,7 @@
           <div class="input-wrapper">
             <input id="zhipuModel" class="input" list="zhipuModels" placeholder="例如: glm-4v">
             <datalist id="zhipuModels">
-              <option value="glm-4v" data-i18n="model_glm4v">GLM-4V (推荐)</option>
+              <option value="glm-4v" data-i18n="model_glm4v">GLM-4V</option>
               <option value="glm-4v-plus" data-i18n="model_glm4v_plus">GLM-4V-Plus</option>
             </datalist>
             <span class="field-status" aria-live="polite"></span>
@@ -168,7 +172,7 @@
             <input type="text" id="compatibleEndpoint" class="input" placeholder="https://api.siliconflow.cn/v1/chat/completions">
             <span class="field-status" aria-live="polite"></span>
           </div>
-          <p class="help-text" data-i18n="help_compatible_endpoint">支持任何OpenAI格式的API，如硅基流动、DeepSeek、Azure等</p>
+          <p class="help-text" data-i18n="help_compatible_endpoint">需要支持图像输入、Bearer 认证和 Chat Completions 的完整接口地址。Azure api-key、无需认证或 Responses 接口请使用“自定义 API”。</p>
         </div>
         <div class="form-group">
           <label for="compatibleApiKey" data-i18n="label_api_key">API Key</label>
@@ -247,7 +251,7 @@
         <div class="form-group">
           <label for="customModel" data-i18n="label_model_name_optional">模型名称 (可选)</label>
           <div class="input-wrapper">
-            <input type="text" id="customModel" class="input" placeholder="例如: gpt-4-vision-preview">
+            <input type="text" id="customModel" class="input" placeholder="例如: vision-model">
             <span class="field-status" aria-live="polite"></span>
           </div>
         </div>
@@ -278,6 +282,13 @@
             <span class="field-status" aria-live="polite"></span>
           </div>
           <p class="help-text" data-i18n="help_theme">选择界面主题风格</p>
+        </div>
+        <div class="form-group">
+          <label for="autoCopy">
+            <input type="checkbox" id="autoCopy" aria-describedby="autoCopyHelp">
+            <span data-i18n="label_auto_copy">识别成功后自动复制文字</span>
+          </label>
+          <p id="autoCopyHelp" class="help-text" data-i18n="help_auto_copy">默认关闭。仅复制新识别的文字，失败后仍可手动复制。</p>
         </div>
         <div class="form-group">
           <label for="prompt" data-i18n="label_prompt">自定义识别提示词</label>
@@ -373,15 +384,17 @@
       </section>
 
       <section class="info-card">
-        <h3 data-i18n="card_recommended_api_title">推荐API</h3>
+        <h3 data-i18n="card_recommended_api_title">服务与模型说明</h3>
+        <p class="help-text" data-i18n="help_model_freshness">Claude/OpenAI 型号名称与退役信息核对于 2026-10-03，候选名称仅供输入参考。模型可用性、图像支持、区域及价格请以官方文档和当前账号为准；扩展不会自动替换已保存的模型。</p>
         <ul>
-          <li><strong data-i18n="model_claude_sonnet_5">Claude Sonnet 5</strong> - <span data-i18n="api_claude_opus">识别准确率高</span></li>
-          <li><strong data-i18n="model_gpt5_mini">GPT-5 mini</strong> - <span data-i18n="api_gpt4o">速度快，性价比高</span></li>
-          <li><strong data-i18n="model_glm4v">GLM-4V</strong> - <span data-i18n="api_glm4v">国产大模型，中文效果好</span></li>
-          <li><strong data-i18n="api_baidu_title">百度OCR</strong> - <span data-i18n="api_baidu">中文识别效果好，性价比高</span></li>
-          <li><strong data-i18n="api_aliyun_title">阿里云OCR</strong> - <span data-i18n="api_aliyun">企业级服务，稳定可靠</span></li>
-          <li><strong data-i18n="api_compatible_title">通用OpenAI接口</strong> - <span data-i18n="api_compatible">灵活支持多种服务商</span></li>
+          <li><strong>Claude</strong> - <span data-i18n="api_claude_opus">通过 Anthropic Messages 接口识别图片文字。</span></li>
+          <li><strong>OpenAI</strong> - <span data-i18n="api_gpt4o">通过 Chat Completions 接口调用支持图像输入的模型。</span></li>
+          <li><strong data-i18n="provider_zhipu">智谱AI</strong> - <span data-i18n="api_glm4v">请在智谱开放平台确认视觉模型及账号权限。</span></li>
+          <li><strong data-i18n="api_baidu_title">百度OCR</strong> - <span data-i18n="api_baidu">使用通用文字识别接口，需要 API Key 与 Secret。</span></li>
+          <li><strong data-i18n="api_aliyun_title">阿里云OCR</strong> - <span data-i18n="api_aliyun">使用 dashscope.aliyuncs.com 端点；密钥需与该区域匹配。</span></li>
+          <li><strong data-i18n="api_compatible_title">通用OpenAI接口</strong> - <span data-i18n="api_compatible">服务商必须支持图片输入和匹配的请求格式。</span></li>
         </ul>
+        <p class="help-text"><a href="https://docs.bigmodel.cn/cn/api/introduction" target="_blank" rel="noopener noreferrer" data-i18n="link_zhipu_docs">智谱官方文档</a> · <a href="https://github.com/anthropics/anthropic-sdk-python/blob/18f25547f20cf5f01da69ac611e700e3bc9ebf21/src/anthropic/types/model.py#L12" target="_blank" rel="noopener noreferrer" data-i18n="link_claude_model_source">Claude 型号来源</a></p>
       </section>
     </aside>
   </div>

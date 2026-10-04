@@ -67,12 +67,102 @@
   let activeRequestId = null;
   let captureSessionId = null;
   let isProcessing = false;
+  let captureReturnFocus = null;
+  let closeResultPopup = null;
+  let cleanupResultModal = null;
+  let rememberedRegion = null;
+  let updateRepeatButton = null;
+  // Retry owns only this session's cropped image. Never write image bytes to storage.
+  let failedImage = null;
+  let recoveryPanel = null;
 
   // Shadow DOM 相关变量
   let shadowHost = null;      // Shadow DOM 宿主元素
   let shadowRoot = null;      // Shadow DOM 根节点
   let styleEl = null;         // shadowRoot 内的样式元素
   let themeListenerBound = false;
+
+  function viewportSnapshot() {
+    return {
+      url: window.location.href,
+      scrollX: window.scrollX,
+      scrollY: window.scrollY,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      devicePixelRatio: window.devicePixelRatio,
+      visualScale: window.visualViewport?.scale ?? 1,
+      visualOffsetLeft: window.visualViewport?.offsetLeft ?? 0,
+      visualOffsetTop: window.visualViewport?.offsetTop ?? 0
+    };
+  }
+
+  function invalidateRememberedRegion(reason) {
+    if (!rememberedRegion || rememberedRegion.reason) return;
+    rememberedRegion.reason = reason;
+    updateRepeatButton?.();
+  }
+
+  function onViewportChanged(event) {
+    // Scrolling the extension's editor/translation must not invalidate the page.
+    if (event?.composedPath?.().includes(shadowHost)) return;
+    invalidateRememberedRegion('viewport-changed');
+  }
+
+  function onPageLocationChanged() {
+    if (rememberedRegion && rememberedRegion.snapshot.url !== window.location.href) {
+      invalidateRememberedRegion('page-changed');
+    }
+  }
+
+  function getRepeatCaptureState() {
+    if (rememberedRegion && !rememberedRegion.reason) {
+      const reason = OCRCaptureUtils.repeatCaptureInvalidationReason(
+        rememberedRegion.snapshot, viewportSnapshot()
+      );
+      if (reason) invalidateRememberedRegion(reason);
+    }
+    const reason = isCapturing || isProcessing || activeRequestId ? 'busy'
+      : !rememberedRegion ? 'no-region' : rememberedRegion.reason;
+    return { success: true, available: !reason, reason: reason || null };
+  }
+
+  function repeatReasonMessage(reason) {
+    if (reason === 'busy') return OCRI18n.t('content_repeat_busy');
+    if (reason === 'no-region') return OCRI18n.t('content_repeat_no_region');
+    return OCRI18n.t('content_repeat_invalid');
+  }
+
+  function captureSnapshotInvalid(snapshot) {
+    const reason = OCRCaptureUtils.repeatCaptureInvalidationReason(snapshot, viewportSnapshot());
+    if (reason) invalidateRememberedRegion(reason);
+    return Boolean(reason || (rememberedRegion?.snapshot === snapshot && rememberedRegion.reason));
+  }
+
+  function repeatCapture() {
+    const state = getRepeatCaptureState();
+    if (!state.available) {
+      showNotification(repeatReasonMessage(state.reason), 'warning');
+      return { ...state, success: false };
+    }
+    if (closeResultPopup && !closeResultPopup({ immediate: true })) {
+      return { success: false, available: true, reason: 'cancelled' };
+    }
+    // Closing restores page focus and can scroll the document. Validate again.
+    const afterClose = getRepeatCaptureState();
+    if (!afterClose.available) return { ...afterClose, success: false };
+    const { rect, snapshot } = rememberedRegion;
+    clearRecovery();
+    isCancelled = false;
+    isProcessing = true;
+    captureSessionId = OCRCaptureUtils.createRequestId();
+    cleanup();
+    hideProgressNotification();
+    shadowRoot?.getElementById('ocr-notification')?.remove();
+    const sessionId = captureSessionId;
+    // Let the calling popup close before capturing the active page.
+    setTimeout(() => { void captureAndRecognize({ ...rect }, sessionId, snapshot); }, 0);
+    return { success: true };
+  }
 
   /**
    * 应用主题到 Shadow Host
@@ -150,6 +240,7 @@
     /* 进度通知样式 */
     #ocr-progress-notification {
       position: fixed;
+      pointer-events: auto;
       top: 32px;
       left: 50%;
       transform: translateX(-50%);
@@ -1147,13 +1238,15 @@
 
     // 清理UI（保留选区信息）
     const rect = { ...currentRect };
+    const snapshot = viewportSnapshot();
+    rememberedRegion = { rect, snapshot, reason: null };
     const sessionId = captureSessionId;
     isProcessing = true;
     currentRect = null;
     cleanup();
 
     // 执行截图
-    await captureAndRecognize(rect, sessionId);
+    await captureAndRecognize(rect, sessionId, snapshot);
   }
 
   /**
@@ -1202,6 +1295,7 @@
     isProcessing = false;
     isCancelled = true;
     cleanup();
+    if (captureReturnFocus?.isConnected) captureReturnFocus.focus({ preventScroll: true });
     showNotification(OCRI18n.t('content_msg_cancelled'), 'info');
   }
 
@@ -1221,8 +1315,20 @@
     cleanup();
     cleanupEditMode();
     hideProgressNotification();
+    cleanupResultModal?.();
+    clearRecovery();
     // 销毁 Shadow DOM（彻底清理）
     destroyShadowDOM();
+    closeResultPopup = null;
+    rememberedRegion = null;
+    updateRepeatButton = null;
+    window.removeEventListener('scroll', onViewportChanged, true);
+    window.removeEventListener('resize', onViewportChanged);
+    window.visualViewport?.removeEventListener('scroll', onViewportChanged);
+    window.visualViewport?.removeEventListener('resize', onViewportChanged);
+    window.removeEventListener('popstate', onPageLocationChanged);
+    window.removeEventListener('hashchange', onPageLocationChanged);
+    window.navigation?.removeEventListener('navigatesuccess', onPageLocationChanged);
     // 移除运行时消息监听器
     chrome.runtime.onMessage.removeListener(messageListener);
     // 标记为未初始化
@@ -1288,14 +1394,14 @@
   function onKeyDown(e) {
     if (!e?.isTrusted) return;
     if (e.key === 'Escape') {
-      if (isEditMode) {
-        // 编辑模式下ESC取消
-        cancelCapture();
-      } else {
-        cleanup();
-      }
+      e.preventDefault();
+      e.stopPropagation();
+      cancelCapture(e);
     } else if (e.key === 'Enter' && isEditMode) {
-      // 编辑模式下Enter确认
+      // Closed Shadow DOM retargets events to the host. Inspect its active
+      // element so Enter on Cancel/Reselect keeps the button's native action.
+      const activeElement = shadowRoot?.activeElement;
+      if (activeElement?.matches?.('button, input, textarea, select, [contenteditable="true"], [role="button"]')) return;
       e.preventDefault();
       confirmSelection(e);
     } else if (e.key === 'z' && isEditMode && (e.ctrlKey || e.metaKey)) {
@@ -1305,89 +1411,167 @@
     }
   }
 
-  // 截取并识别
-  async function captureAndRecognize(rect, sessionId) {
-    let requestId = null;
+  function clearRecovery() {
+    failedImage = null;
+    recoveryPanel?.remove();
+    recoveryPanel = null;
+  }
 
-    try {
-      announceA11y(OCRI18n.t('content_a11y_capturing'));
-
-      // cleanup() 刚移除了遮罩、选区和工具栏。等待浏览器提交一帧，
-      // 避免 captureVisibleTab 捕获到已删除但尚未重绘的扩展 UI。
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      if (isCancelled || captureSessionId !== sessionId) return;
-
-      // 发送消息给background进行截图（因为content script无法直接调用chrome.tabs.captureVisibleTab）
-      const response = await chrome.runtime.sendMessage({
-        action: 'captureVisibleTab'
-      });
-
-      // 检查是否被取消
-      if (isCancelled || captureSessionId !== sessionId) return;
-
-      if (!response || !response.dataUrl) {
-        hideProgressNotification();
-        showNotification(OCRI18n.errorMessage(response, 'content_msg_capture_failed'), 'error');
-        return;
+  function showRecovery(error, imageData = null) {
+    clearRecovery();
+    failedImage = imageData;
+    const root = initShadowDOM();
+    const panel = document.createElement('section');
+    recoveryPanel = panel;
+    panel.id = 'ocr-recovery-panel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-labelledby', 'ocr-recovery-title');
+    panel.style.cssText = `position: fixed; top: 32px; right: 32px;
+      width: min(420px, calc(100vw - 32px)); max-height: calc(100vh - 64px);
+      overflow: auto; padding: 24px; box-sizing: border-box; pointer-events: auto;
+      z-index: ${Z.RESULT_POPUP}; background: var(--bg-main); color: var(--text-primary);
+      border: 1px solid var(--border); border-radius: var(--radius-md);
+      box-shadow: 0 8px 30px rgba(0,0,0,.15); font: 14px/1.5 system-ui, sans-serif;`;
+    panel.innerHTML = `
+      <h2 id="ocr-recovery-title" style="font-size:18px;margin:0 0 12px">${OCRI18n.t('recovery_title')}</h2>
+      <p id="ocr-recovery-error" role="alert" style="overflow-wrap:anywhere"></p>
+      <img id="ocr-recovery-preview" style="width:100%;max-height:200px;object-fit:contain" alt="${OCRI18n.t('recovery_preview')}">
+      <p id="ocr-recovery-help"></p>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        <button id="ocr-retry-original" class="ocr-btn ocr-btn-primary" type="button">${OCRI18n.t('recovery_retry_original')}</button>
+        <button id="ocr-recovery-settings" class="ocr-btn ocr-btn-secondary" type="button">${OCRI18n.t('recovery_settings')}</button>
+        <button id="ocr-reselect-region" class="ocr-btn ocr-btn-secondary" type="button">${OCRI18n.t('recovery_reselect')}</button>
+        <button id="ocr-dismiss-recovery" class="ocr-btn ocr-btn-cancel" type="button">${OCRI18n.t('btn_close')}</button>
+      </div>`;
+    panel.querySelector('#ocr-recovery-error').textContent = OCRI18n.errorMessage(error, 'content_msg_capture_failed');
+    const preview = panel.querySelector('#ocr-recovery-preview');
+    preview.hidden = !imageData;
+    if (imageData) preview.src = imageData;
+    panel.querySelector('#ocr-recovery-help').textContent = OCRI18n.t(imageData ? 'recovery_retained' : 'recovery_no_image');
+    const retry = panel.querySelector('#ocr-retry-original');
+    retry.disabled = !imageData;
+    retry.addEventListener('click', (event) => {
+      if (!event.isTrusted || !failedImage || isCapturing || isProcessing || activeRequestId) return;
+      const originalImage = failedImage;
+      clearRecovery();
+      isCancelled = false;
+      isProcessing = true;
+      const sessionId = OCRCaptureUtils.createRequestId();
+      captureSessionId = sessionId;
+      void recognizeCapturedImage(originalImage, sessionId);
+    });
+    panel.querySelector('#ocr-recovery-settings').addEventListener('click', async (event) => {
+      if (!event.isTrusted) return;
+      try {
+        const result = await chrome.runtime.sendMessage({ action: 'openSettings' });
+        if (!result?.success) throw new Error('Unable to open settings');
+      } catch {
+        if (recoveryPanel === panel) showNotification(OCRI18n.t('recovery_settings_failed'), 'error');
       }
+    });
+    panel.querySelector('#ocr-reselect-region').addEventListener('click', (event) => {
+      if (event.isTrusted) startCapture();
+    });
+    const dismiss = () => {
+      clearRecovery();
+      if (captureReturnFocus?.isConnected) captureReturnFocus.focus({ preventScroll: true });
+    };
+    panel.querySelector('#ocr-dismiss-recovery').addEventListener('click', (event) => {
+      if (event.isTrusted) dismiss();
+    });
+    panel.addEventListener('keydown', (event) => {
+      if (event.isTrusted && event.key === 'Escape') {
+        event.preventDefault(); event.stopPropagation(); dismiss();
+      }
+    });
+    root.appendChild(panel);
+    (imageData ? retry : panel.querySelector('#ocr-reselect-region')).focus({ preventScroll: true });
+    announceA11y(OCRI18n.t('content_a11y_failed'));
+  }
 
-      // 裁剪选区
-      const croppedImage = await cropImage(response.dataUrl, rect);
+  function finishRecognitionSession(sessionId, requestId = null) {
+    if (requestId && activeRequestId === requestId) activeRequestId = null;
+    if (captureSessionId === sessionId) {
+      captureSessionId = null;
+      isProcessing = false;
+    }
+    updateRepeatButton?.();
+  }
 
-      // 检查是否被取消
-      if (isCancelled || captureSessionId !== sessionId) return;
-
-      // 更新为识别阶段，显示取消按钮
-      showProgressNotification(OCRI18n.t('content_progress_recognizing'), true);
-      announceA11y(OCRI18n.t('content_a11y_recognizing'));
-
-      requestId = OCRCaptureUtils.createRequestId();
-      activeRequestId = requestId;
-
-      // 发送给background进行OCR识别
-      const ocrResponse = await chrome.runtime.sendMessage({
-        action: 'performOCR',
-        requestId,
-        imageData: croppedImage
-      });
-
-      // 检查是否被取消
-      if (isCancelled || captureSessionId !== sessionId || activeRequestId !== requestId) return;
-      activeRequestId = null;
-
-      // 计算识别用时
+  // This path intentionally never takes a screenshot or checks the viewport:
+  // retries submit the exact failed image while background reads current settings.
+  async function recognizeCapturedImage(imageData, sessionId) {
+    const requestId = OCRCaptureUtils.createRequestId();
+    activeRequestId = requestId;
+    showProgressNotification(OCRI18n.t('content_progress_recognizing'), true);
+    announceA11y(OCRI18n.t('content_a11y_recognizing'));
+    const isCurrent = () => !isCancelled && captureSessionId === sessionId && activeRequestId === requestId;
+    try {
+      const response = await chrome.runtime.sendMessage({ action: 'performOCR', requestId, imageData });
+      if (!isCurrent()) return;
       const elapsed = progressStartTime ? Math.floor((Date.now() - progressStartTime) / 1000) : 0;
       hideProgressNotification();
-
-      if (ocrResponse && ocrResponse.success) {
-        showResultPopup(ocrResponse.text, ocrResponse.historyId);
+      if (response?.success) {
+        clearRecovery();
+        showResultPopup(response.text, response.historyId, response.autoCopy === true);
         showNotification(
-          ocrResponse.warningCode
-            ? OCRI18n.errorMessage({ errorCode: ocrResponse.warningCode })
+          response.warningCode ? OCRI18n.errorMessage({ errorCode: response.warningCode })
             : OCRI18n.t('content_msg_done', [String(elapsed)]),
-          ocrResponse.warningCode ? 'warning' : 'success'
+          response.warningCode ? 'warning' : 'success'
         );
         announceA11y(OCRI18n.t('content_a11y_done', [String(elapsed)]));
+      } else if (response?.cancelled) {
+        clearRecovery();
+        showNotification(OCRI18n.t('content_msg_recognition_cancelled'), 'warning');
       } else {
-        showNotification(OCRI18n.errorMessage(ocrResponse), 'error');
-        announceA11y(OCRI18n.t('content_a11y_failed'));
+        showRecovery(response, imageData);
       }
     } catch (error) {
-      hideProgressNotification();
-      if (!isCancelled) {
-        console.error('截图识别失败:', error);
-        const message = OCRI18n.errorMessage(error);
-        showNotification(message, 'error');
-        announceA11y(`${OCRI18n.t('content_a11y_failed')}: ${message}`);
+      // A superseded or cancelled rejection must not remove a newer progress UI.
+      if (isCurrent()) {
+        hideProgressNotification();
+        showRecovery(error, imageData);
       }
     } finally {
-      if (requestId && activeRequestId === requestId) {
-        activeRequestId = null;
+      finishRecognitionSession(sessionId, requestId);
+    }
+  }
+
+  // Capture once; all recognition failures preserve the resulting crop in memory.
+  async function captureAndRecognize(rect, sessionId, snapshot) {
+    try {
+      announceA11y(OCRI18n.t('content_a11y_capturing'));
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      if (isCancelled || captureSessionId !== sessionId) return;
+      if (captureSnapshotInvalid(snapshot)) {
+        showNotification(OCRI18n.t('content_repeat_invalid'), 'warning');
+        return;
       }
-      if (captureSessionId === sessionId) {
-        captureSessionId = null;
-        isProcessing = false;
+      const response = await chrome.runtime.sendMessage({ action: 'captureVisibleTab' });
+      if (isCancelled || captureSessionId !== sessionId) return;
+      if (captureSnapshotInvalid(snapshot)) {
+        showNotification(OCRI18n.t('content_repeat_invalid'), 'warning');
+        return;
       }
+      if (!response?.dataUrl) {
+        hideProgressNotification();
+        showRecovery(response);
+        return;
+      }
+      const croppedImage = await cropImage(response.dataUrl, rect);
+      if (isCancelled || captureSessionId !== sessionId) return;
+      if (captureSnapshotInvalid(snapshot)) {
+        showNotification(OCRI18n.t('content_repeat_invalid'), 'warning');
+        return;
+      }
+      await recognizeCapturedImage(croppedImage, sessionId);
+    } catch (error) {
+      if (!isCancelled && captureSessionId === sessionId) {
+        hideProgressNotification();
+        showRecovery(error);
+      }
+    } finally {
+      finishRecognitionSession(sessionId);
     }
   }
 
@@ -1471,13 +1655,14 @@
    * @param {string|number} historyId - 对应的历史记录 ID
    * @description 在页面右上角显示识别结果弹窗，支持修订、保存和复制
    */
-  function showResultPopup(text, historyId) {
+  function showResultPopup(text, historyId, autoCopy = false) {
     // 确保 Shadow DOM 已初始化
     if (!shadowRoot) {
       initShadowDOM();
     }
 
     // 移除已有的结果弹窗（在 Shadow DOM 范围内查找）
+    cleanupResultModal?.();
     const existingPopup = shadowRoot.getElementById('ocr-result-popup');
     if (existingPopup) {
       existingPopup.remove();
@@ -1485,11 +1670,15 @@
 
     const popup = document.createElement('div');
     popup.id = 'ocr-result-popup';
+    popup.setAttribute('role', 'dialog');
+    popup.setAttribute('aria-modal', 'true');
+    popup.setAttribute('aria-labelledby', 'ocr-result-title');
+    popup.tabIndex = -1;
     popup.style.cssText = `
       position: fixed;
       top: 32px;
       right: 32px;
-      width: 420px;
+      width: min(420px, calc(100vw - 32px));
       max-height: 80vh;
       background: var(--bg-main);
       border-radius: var(--radius-xl);
@@ -1551,10 +1740,14 @@
           flex: 1;
           display: flex;
           flex-direction: column;
+          min-height: 0;
+          overflow-y: auto;
         }
         .ocr-result-textarea {
           width: 100%;
           height: 240px;
+          min-height: 120px;
+          flex-shrink: 0;
           padding: 14px;
           background: var(--bg-sub);
           border: 1px solid transparent;
@@ -1570,6 +1763,21 @@
         }
         .ocr-result-textarea:focus {
           border-color: var(--accent);
+        }
+        .ocr-result-btn:focus-visible, .ocr-close-btn:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
+        }
+        .ocr-text-tools {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 12px;
+        }
+        .ocr-text-tools .ocr-result-btn {
+          padding: 8px 10px;
+          font-size: 12px;
+          min-width: 0;
         }
         .ocr-result-actions {
           display: flex;
@@ -1617,9 +1825,15 @@
           background: var(--status-success) !important;
           color: white !important;
         }
+        #ocr-repeat-status {
+          margin: 10px 0 0;
+          color: var(--text-secondary);
+          font-size: 12px;
+          line-height: 1.5;
+        }
       </style>
       <div class="ocr-result-header">
-        <span class="ocr-result-title">${OCRI18n.t('preview_title')}</span>
+        <span class="ocr-result-title" id="ocr-result-title">${OCRI18n.t('preview_title')}</span>
         <button class="ocr-close-btn" title="${OCRI18n.t('btn_close')}" aria-label="${OCRI18n.t('content_aria_close')}">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -1629,6 +1843,11 @@
       </div>
       <div class="ocr-result-content">
         <textarea class="ocr-result-textarea" id="ocr-result-text" placeholder="${OCRI18n.t('content_result_title')}" aria-label="${OCRI18n.t('content_aria_result')}"></textarea>
+        <div id="ocr-draft-container"></div>
+        <div class="ocr-text-tools">
+          <button class="ocr-result-btn ocr-result-btn-secondary merge-lines-btn" type="button" title="${OCRI18n.t('content_merge_lines_hint')}">${OCRI18n.t('content_btn_merge_lines')}</button>
+          <button class="ocr-result-btn ocr-result-btn-secondary undo-text-btn" type="button" disabled>${OCRI18n.t('content_btn_undo_text')}</button>
+        </div>
         <div class="ocr-result-actions">
           <button class="ocr-result-btn ocr-result-btn-primary copy-btn" aria-label="${OCRI18n.t('content_aria_copy')}">
             <svg class="copy-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -1638,48 +1857,223 @@
             <span class="btn-text">${OCRI18n.t('content_btn_copy')}</span>
           </button>
           <button class="ocr-result-btn ocr-result-btn-secondary save-changes-btn" type="button" disabled>${OCRI18n.t('content_btn_save_changes')}</button>
+          <button class="ocr-result-btn ocr-result-btn-secondary repeat-capture-btn" type="button">${OCRI18n.t('content_btn_repeat_capture')}</button>
           <button class="ocr-result-btn ocr-result-btn-secondary close-popup-btn" aria-label="${OCRI18n.t('btn_close')}">${OCRI18n.t('btn_close')}</button>
         </div>
+        <p id="ocr-auto-copy-status" role="status" aria-live="polite" hidden></p>
+        <p id="ocr-repeat-status" role="status" hidden></p>
+        <div id="ocr-translation-container"></div>
       </div>
     `;
 
-    if (shadowRoot) {
-      shadowRoot.appendChild(popup);
-    }
+    const backdrop = document.createElement('div');
+    backdrop.id = 'ocr-result-backdrop';
+    backdrop.setAttribute('aria-hidden', 'true');
+    backdrop.style.cssText = `position: fixed; inset: 0; pointer-events: auto;
+      background: rgba(0, 0, 0, 0.12); z-index: ${Z.RESULT_POPUP - 1};`;
+    shadowRoot.append(backdrop, popup);
 
     // 安全赋值
     const textarea = popup.querySelector('#ocr-result-text');
     textarea.value = text || '';
+    const translation = globalThis.OCRTranslationUI.mount({
+      container: popup.querySelector('#ocr-translation-container'),
+      sourceTextarea: textarea,
+      historyId,
+      idPrefix: 'ocr-translation',
+      announce: announceA11y
+    });
 
     // 绑定事件
     const closeBtn = popup.querySelector('.ocr-close-btn');
     const closePopupBtn = popup.querySelector('.close-popup-btn');
     const copyBtn = popup.querySelector('.copy-btn');
     const saveChangesBtn = popup.querySelector('.save-changes-btn');
+    const mergeLinesBtn = popup.querySelector('.merge-lines-btn');
+    const undoTextBtn = popup.querySelector('.undo-text-btn');
+    const repeatBtn = popup.querySelector('.repeat-capture-btn');
+    const repeatStatus = popup.querySelector('#ocr-repeat-status');
     const btnText = copyBtn.querySelector('.btn-text');
     const copyIcon = copyBtn.querySelector('.copy-icon');
     let lastSavedText = textarea.value.trim();
+    let formattingUndo = null;
+    let isClosing = false;
+    let isSaving = false;
+    let closeTimer = null;
+    let copyGeneration = 0;
+    const autoCopyStatus = popup.querySelector('#ocr-auto-copy-status');
+    const invalidateCopyFeedback = () => {
+      copyGeneration += 1;
+      autoCopyStatus.hidden = true;
+      copyBtn.classList.remove('copied');
+      btnText.textContent = OCRI18n.t('content_btn_copy');
+      copyIcon.innerHTML = `<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>`;
+    };
+    const draft = globalThis.OCRDraftUI.mount({
+      container: popup.querySelector('#ocr-draft-container'),
+      sourceTextarea: textarea,
+      historyId,
+      getSavedText: () => lastSavedText,
+      onRestore: () => {
+        invalidateCopyFeedback();
+        formattingUndo = null;
+        undoTextBtn.disabled = true;
+        updateSaveButtonState();
+        translation.notifySourceChanged();
+      },
+      announce: announceA11y
+    });
+    const refreshRepeatButton = () => {
+      const state = getRepeatCaptureState();
+      repeatBtn.disabled = !state.available || isSaving;
+      repeatStatus.hidden = state.available;
+      repeatStatus.textContent = state.available ? '' : repeatReasonMessage(state.reason);
+    };
+    updateRepeatButton = refreshRepeatButton;
+    refreshRepeatButton();
+    repeatBtn.addEventListener('click', (event) => {
+      if (!event.isTrusted) return;
+      repeatCapture();
+    });
+
+    const keepFocusInside = () => {
+      if (!popup.isConnected || popup.contains(shadowRoot?.activeElement)) return;
+      textarea.focus({ preventScroll: true });
+    };
+    const blockBackgroundPointer = (event) => {
+      // A pointer press on the modal backdrop must not blur the editor or
+      // activate the page underneath it. Keep the currently focused control.
+      event.preventDefault();
+      event.stopPropagation();
+      keepFocusInside();
+    };
+    backdrop.addEventListener('pointerdown', blockBackgroundPointer);
+    backdrop.addEventListener('mousedown', blockBackgroundPointer);
+    backdrop.addEventListener('click', blockBackgroundPointer);
+    document.addEventListener('focusin', keepFocusInside, true);
+    const removeModalGuards = () => {
+      translation.destroy();
+      draft.destroy();
+      if (updateRepeatButton === refreshRepeatButton) updateRepeatButton = null;
+      document.removeEventListener('focusin', keepFocusInside, true);
+      backdrop.remove();
+      if (closeTimer !== null) {
+        clearTimeout(closeTimer);
+        closeTimer = null;
+      }
+      if (cleanupResultModal === removeModalGuards) cleanupResultModal = null;
+    };
+    cleanupResultModal = removeModalGuards;
 
     const updateSaveButtonState = () => {
       const currentText = textarea.value.trim();
-      saveChangesBtn.disabled = !historyId || !currentText || currentText === lastSavedText;
+      saveChangesBtn.disabled = isSaving || !historyId || !currentText || currentText === lastSavedText;
+      refreshRepeatButton();
     };
 
-    textarea.addEventListener('input', updateSaveButtonState);
+    textarea.addEventListener('input', () => {
+      invalidateCopyFeedback();
+      // A cleanup snapshot predates these manual edits. Reapplying it would
+      // silently erase the newer draft, so only immediate cleanup is undoable.
+      formattingUndo = null;
+      undoTextBtn.disabled = true;
+      updateSaveButtonState();
+      translation.notifySourceChanged();
+    });
 
-    const close = () => {
-      popup.classList.add('closing');
-      setTimeout(() => popup.remove(), 300);
+    mergeLinesBtn.addEventListener('click', () => {
+      const before = textarea.value;
+      const merged = globalThis.OCRTextUtils.mergeWrappedLines(before);
+      if (merged === before) return;
+      formattingUndo = before;
+      textarea.value = merged;
+      invalidateCopyFeedback();
+      undoTextBtn.disabled = false;
+      updateSaveButtonState();
+      translation.notifySourceChanged();
+      void draft.notifySourceChanged();
+      announceA11y(OCRI18n.t('content_msg_lines_merged'));
+    });
+
+    undoTextBtn.addEventListener('click', () => {
+      if (formattingUndo === null) return;
+      textarea.value = formattingUndo;
+      invalidateCopyFeedback();
+      formattingUndo = null;
+      undoTextBtn.disabled = true;
+      updateSaveButtonState();
+      translation.notifySourceChanged();
+      void draft.notifySourceChanged();
+      announceA11y(OCRI18n.t('content_msg_text_restored'));
+      textarea.focus({ preventScroll: true });
+    });
+
+    const finishClose = () => {
+      removeModalGuards();
+      if (!popup.isConnected) return;
+      popup.remove();
+      if (closeResultPopup === close) closeResultPopup = null;
+      if (captureReturnFocus?.isConnected) captureReturnFocus.focus({ preventScroll: true });
     };
+
+    const close = (options = {}) => {
+      if (isClosing) {
+        if (options.immediate) finishClose();
+        return true;
+      }
+      if (textarea.value.trim() !== lastSavedText
+        && !confirm(OCRI18n.t('content_confirm_close_draft'))) {
+        textarea.focus({ preventScroll: true });
+        return false;
+      }
+      isClosing = true;
+      translation.destroy();
+      draft.destroy();
+      if (options.immediate) {
+        finishClose();
+      } else {
+        popup.classList.add('closing');
+        closeTimer = setTimeout(finishClose, 300);
+      }
+      return true;
+    };
+    closeResultPopup = close;
 
     closeBtn.addEventListener('click', close);
     closePopupBtn.addEventListener('click', close);
 
-    saveChangesBtn.addEventListener('click', async () => {
-      const updatedText = textarea.value.trim();
-      if (!historyId || !updatedText || updatedText === lastSavedText) return;
+    popup.addEventListener('keydown', (event) => {
+      if (!event.isTrusted) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+      } else if (event.key === 'Tab') {
+        const focusable = [...popup.querySelectorAll('button:not(:disabled), textarea:not(:disabled), select:not(:disabled)')]
+          .filter((element) => !element.closest('[hidden]') && element.getClientRects().length > 0);
+        const first = focusable[0];
+        const last = focusable.at(-1);
+        const active = shadowRoot.activeElement;
+        if (event.shiftKey && (active === first || active === popup)) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (active === last || active === popup)) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    });
+    textarea.focus({ preventScroll: true });
 
-      saveChangesBtn.disabled = true;
+    saveChangesBtn.addEventListener('click', async () => {
+      const submittedText = textarea.value;
+      const updatedText = textarea.value.trim();
+      if (isSaving || !historyId || !updatedText || updatedText === lastSavedText) return;
+
+      isSaving = true;
+      updateSaveButtonState();
+      textarea.focus({ preventScroll: true });
       try {
         const response = await chrome.runtime.sendMessage({
           action: 'updateHistoryRecord',
@@ -1690,9 +2084,17 @@
           throw new Error(response?.error || OCRI18n.t('content_msg_changes_save_failed'));
         }
 
-        textarea.value = updatedText;
+        // Edits/cleanup made while storage is saving must remain in the editor.
+        if (textarea.value === submittedText) {
+          textarea.value = updatedText;
+          translation.notifySourceChanged();
+        }
         lastSavedText = updatedText;
-        saveChangesBtn.textContent = OCRI18n.t('content_btn_saved');
+        await draft.refresh();
+        if (textarea.value.trim() !== lastSavedText) void draft.notifySourceChanged(true);
+        saveChangesBtn.textContent = OCRI18n.t(
+          textarea.value.trim() === lastSavedText ? 'content_btn_saved' : 'content_btn_save_changes'
+        );
         showNotification(OCRI18n.t('content_msg_changes_saved'), 'success');
         announceA11y(OCRI18n.t('content_msg_changes_saved'));
         setTimeout(() => {
@@ -1705,18 +2107,25 @@
         console.error('保存识别结果修改失败:', error);
         showNotification(OCRI18n.t('content_msg_changes_save_failed'), 'error');
         announceA11y(OCRI18n.t('content_msg_changes_save_failed'));
+      } finally {
+        isSaving = false;
         updateSaveButtonState();
       }
     });
 
     copyBtn.addEventListener('click', async () => {
+      const copyToken = ++copyGeneration;
+      autoCopyStatus.hidden = true;
       try {
         await navigator.clipboard.writeText(textarea.value);
+        if (!popup.isConnected || isClosing || copyToken !== copyGeneration) return;
+        announceA11y(OCRI18n.t('a11y_copy_success'));
         copyBtn.classList.add('copied');
         btnText.textContent = OCRI18n.t('btn_copied');
         copyIcon.innerHTML = `<polyline points="20 6 9 17 4 12"></polyline>`;
         
         setTimeout(() => {
+          if (!popup.isConnected || isClosing || copyToken !== copyGeneration) return;
           copyBtn.classList.remove('copied');
           btnText.textContent = OCRI18n.t('content_btn_copy');
           copyIcon.innerHTML = `
@@ -1725,9 +2134,30 @@
           `;
         }, 2000);
       } catch (err) {
+        if (!popup.isConnected || isClosing || copyToken !== copyGeneration) return;
         console.error('复制失败:', err);
+        textarea.focus({ preventScroll: true });
+        textarea.select();
+        showNotification(OCRI18n.t('content_msg_copy_failed'), 'error');
+        announceA11y(OCRI18n.t('content_msg_copy_failed'));
       }
     });
+
+    if (autoCopy) {
+      const copyToken = ++copyGeneration;
+      const originalText = text || '';
+      // Only this newly accepted OCR response reaches here. Restoring drafts,
+      // editing, saving, or translating never triggers another automatic copy.
+      void (async () => {
+        let statusKey = 'auto_copy_success';
+        try { await navigator.clipboard.writeText(originalText); }
+        catch { statusKey = 'auto_copy_failed'; }
+        if (!popup.isConnected || isClosing || copyToken !== copyGeneration || textarea.value !== originalText) return;
+        autoCopyStatus.textContent = OCRI18n.t(statusKey);
+        autoCopyStatus.hidden = false;
+        announceA11y(OCRI18n.t(statusKey));
+      })();
+    }
   }
 
   /**
@@ -1858,7 +2288,7 @@
     if (showCancel) {
       const cancelBtn = notification.querySelector('.ocr-progress-cancel');
       if (cancelBtn) {
-        cancelBtn.addEventListener('click', (event) => {
+        const cancelRecognition = (event) => {
           if (!event?.isTrusted) return;
           const requestId = activeRequestId;
           isCancelled = true;
@@ -1866,7 +2296,9 @@
           isProcessing = false;
           activeRequestId = null;
           hideProgressNotification();
+          if (captureReturnFocus?.isConnected) captureReturnFocus.focus({ preventScroll: true });
           showNotification(OCRI18n.t('content_msg_recognition_cancelled'), 'warning');
+          announceA11y(OCRI18n.t('content_msg_recognition_cancelled'));
 
           if (requestId) {
             chrome.runtime.sendMessage({
@@ -1876,7 +2308,14 @@
               console.debug('取消 OCR 请求消息发送失败:', error);
             });
           }
+        };
+        cancelBtn.addEventListener('click', cancelRecognition);
+        notification.addEventListener('keydown', (event) => {
+          if (event.isTrusted && event.key === 'Escape') {
+            event.preventDefault(); event.stopPropagation(); cancelRecognition(event);
+          }
         });
+        cancelBtn.focus({ preventScroll: true });
       }
     }
 
@@ -1922,8 +2361,14 @@
       showNotification(OCRI18n.t('content_progress_recognizing'), 'warning');
       return;
     }
+    if (closeResultPopup && !closeResultPopup({ immediate: true })) return;
 
+    clearRecovery();
+    shadowRoot?.getElementById('ocr-notification')?.remove();
     isCancelled = false;
+    if (document.activeElement !== shadowHost) {
+      captureReturnFocus = document.activeElement;
+    }
     captureSessionId = OCRCaptureUtils.createRequestId();
     syncThemeFromStorage();
     isCapturing = true;
@@ -1951,8 +2396,19 @@
       }).catch((error) => {
         sendResponse({ success: false, error: error.message });
       });
+      return true;
     }
-    return true;
+    if (request.action === 'getRepeatCaptureState') {
+      sendResponse(getRepeatCaptureState());
+      return false;
+    }
+    if (request.action === 'repeatCapture') {
+      i18nReady.then(() => sendResponse(repeatCapture())).catch((error) => {
+        sendResponse({ success: false, error: error.message });
+      });
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -1968,6 +2424,13 @@
    */
   window.addEventListener('beforeunload', fullCleanup);
   window.addEventListener('pagehide', fullCleanup);
+  window.addEventListener('scroll', onViewportChanged, true);
+  window.addEventListener('resize', onViewportChanged);
+  window.visualViewport?.addEventListener('scroll', onViewportChanged);
+  window.visualViewport?.addEventListener('resize', onViewportChanged);
+  window.addEventListener('popstate', onPageLocationChanged);
+  window.addEventListener('hashchange', onPageLocationChanged);
+  window.navigation?.addEventListener('navigatesuccess', onPageLocationChanged);
 
   console.log('OCR文字识别助手已加载');
 })();

@@ -14,6 +14,69 @@
   'use strict';
 
   const DEFAULT_LIMIT = 50;
+  const MAX_DRAFT_CHARACTERS = 100000;
+  const MAX_NAME_CHARACTERS = 120;
+
+  function codedError(code) {
+    const error = new Error(code);
+    error.code = code;
+    return error;
+  }
+
+  function copyRecord(record) {
+    return {
+      ...record,
+      ...(record.translation ? { translation: { ...record.translation } } : {}),
+      ...(record.draft ? { draft: { ...record.draft } } : {}),
+      ...(record.draftMeta ? { draftMeta: { ...record.draftMeta } } : {})
+    };
+  }
+
+  function validateDraft(draft) {
+    if (!draft || typeof draft.text !== 'string' || typeof draft.baseText !== 'string'
+      || Array.from(draft.text).length > MAX_DRAFT_CHARACTERS
+      || Array.from(draft.baseText).length > MAX_DRAFT_CHARACTERS) {
+      throw codedError('HISTORY_DRAFT_INVALID');
+    }
+  }
+
+  function metadataPatch(patch) {
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch)
+      || !Object.keys(patch).length
+      || Object.keys(patch).some((key) => !['favorite', 'name'].includes(key))
+      || ('favorite' in patch && typeof patch.favorite !== 'boolean')
+      || ('name' in patch && (typeof patch.name !== 'string'
+        || Array.from(patch.name.trim()).length > MAX_NAME_CHARACTERS))) {
+      throw codedError('HISTORY_METADATA_INVALID');
+    }
+    return {
+      ...('favorite' in patch ? { favorite: patch.favorite } : {}),
+      ...('name' in patch ? { name: patch.name.trim() } : {})
+    };
+  }
+
+  function isProtected(record) {
+    // Empty text is a valid unfinished draft: deleting all recognized text
+    // must not make the source record eligible for automatic removal.
+    return record?.favorite === true || (typeof record?.draft?.text === 'string'
+      && record.draft.text !== record.text);
+  }
+
+  function translationSnapshot(value) {
+    if (!value || typeof value.sourceText !== 'string' || !value.sourceText.trim()
+      || typeof value.text !== 'string' || !value.text.trim()
+      || ['provider', 'model', 'targetLanguage'].some((field) => typeof value[field] !== 'string')) {
+      throw codedError('HISTORY_TRANSLATION_INVALID');
+    }
+    return {
+      sourceText: value.sourceText,
+      text: value.text,
+      provider: value.provider,
+      model: value.model,
+      targetLanguage: value.targetLanguage,
+      timestamp: Number.isFinite(value.timestamp) ? value.timestamp : Date.now()
+    };
+  }
 
   function throwIfAborted(signal) {
     if (signal?.aborted) {
@@ -58,11 +121,22 @@
       return Array.isArray(result.ocrHistory) ? result.ocrHistory : [];
     }
 
+    async function writeCancellable(nextHistory, previousHistory, signal) {
+      throwIfAborted(signal);
+      await storage.set({ ocrHistory: nextHistory });
+      // This rollback is still inside the operation queue. No queued delete,
+      // edit, or newer translation can run until the pre-image is restored.
+      if (signal?.aborted) {
+        await storage.set({ ocrHistory: previousHistory });
+        throwIfAborted(signal);
+      }
+    }
+
     async function append(record, signal) {
       return enqueue(async () => {
         throwIfAborted(signal);
         const history = await readHistory();
-        const previousHistory = history.map((item) => ({ ...item }));
+        const previousHistory = history.map(copyRecord);
         throwIfAborted(signal);
 
         const timestamp = Number.isFinite(record?.timestamp)
@@ -77,20 +151,15 @@
           sourceUrl: String(record?.sourceUrl || ''),
           sourceTitle: String(record?.sourceTitle || '')
         };
+        let ordinaryCount = 0;
         const nextHistory = [
           newRecord,
           ...history.filter((item) => item?.id !== newRecord.id)
         ]
           .sort((left, right) => Number(right.timestamp || 0) - Number(left.timestamp || 0))
-          .slice(0, limit);
+          .filter((item) => isProtected(item) || ++ordinaryCount <= limit);
 
-        throwIfAborted(signal);
-        await storage.set({ ocrHistory: nextHistory });
-
-        if (signal?.aborted) {
-          await storage.set({ ocrHistory: previousHistory });
-          throwIfAborted(signal);
-        }
+        await writeCancellable(nextHistory, previousHistory, signal);
 
         return { ...newRecord };
       });
@@ -102,13 +171,116 @@
         const index = history.findIndex((item) => item?.id === id);
         if (index < 0) return false;
 
-        const nextHistory = history.map((item, itemIndex) => (
-          itemIndex === index
-            ? { ...item, text: normalizeText(text) }
-            : item
-        ));
+        const updated = { ...history[index], text: normalizeText(text) };
+        // A concurrent editor may have saved a different draft. Only the draft
+        // that was just committed is consumed by this formal save.
+        if (typeof updated.draft?.text === 'string' && updated.draft.text.trim() === updated.text) delete updated.draft;
+        const nextHistory = history.map((item, itemIndex) => itemIndex === index ? updated : item);
         await storage.set({ ocrHistory: nextHistory });
         return true;
+      });
+    }
+
+    async function get(id) {
+      return enqueue(async () => {
+        const record = (await readHistory()).find((item) => item?.id === id);
+        return record ? copyRecord(record) : null;
+      });
+    }
+
+    async function patchMetadata(id, patch, signal) {
+      // Snapshot only the requested fields before enqueueing. A caller cannot
+      // mutate the queued patch, and unrelated concurrent writes are merged
+      // from storage inside the same queue as drafts and translations.
+      const normalized = metadataPatch(patch);
+      return enqueue(async () => {
+        throwIfAborted(signal);
+        const history = await readHistory();
+        throwIfAborted(signal);
+        const index = history.findIndex((item) => item?.id === id);
+        if (index < 0) return null;
+        const updated = { ...history[index], ...normalized };
+        const nextHistory = history.map((item, itemIndex) => itemIndex === index ? updated : item);
+        await writeCancellable(nextHistory, history.map(copyRecord), signal);
+        return copyRecord(updated);
+      });
+    }
+
+    async function saveTranslation(id, translation, signal) {
+      return enqueue(async () => {
+        throwIfAborted(signal);
+        const snapshot = translationSnapshot(translation);
+        const history = await readHistory();
+        throwIfAborted(signal);
+        const index = history.findIndex((item) => item?.id === id);
+        if (index < 0) return false;
+        const nextHistory = history.map((item, itemIndex) => (
+          itemIndex === index ? { ...item, translation: snapshot } : item
+        ));
+        await writeCancellable(nextHistory, history.map(copyRecord), signal);
+        return true;
+      });
+    }
+
+    async function saveDraft(id, draft, options = {}) {
+      return enqueue(async () => {
+        validateDraft(draft);
+        const managed = options.ownerId !== undefined;
+        if (managed && (typeof options.ownerId !== 'string' || !options.ownerId || options.ownerId.length > 128
+          || !(options.expectedUpdatedAt === null || Number.isFinite(options.expectedUpdatedAt)))) {
+          throw codedError('HISTORY_DRAFT_INVALID');
+        }
+        const history = await readHistory();
+        const index = history.findIndex((item) => item?.id === id);
+        if (index < 0) return { success: false, errorCode: 'HISTORY_RECORD_MISSING' };
+        if (history[index].text !== draft.baseText) {
+          return { success: false, errorCode: 'HISTORY_DRAFT_CONFLICT' };
+        }
+        const updated = { ...history[index] };
+        const revision = updated.draftMeta?.updatedAt ?? updated.draft?.updatedAt ?? null;
+        const sameOwner = managed && updated.draftMeta?.ownerId === options.ownerId;
+        // Each editor sends immediately so its final input survives closing
+        // the popup. Same-owner writes can advance without waiting for earlier
+        // acknowledgements; taking ownership requires the revision it read.
+        if ((managed && !sameOwner && options.expectedUpdatedAt !== revision)
+          || (!managed && updated.draftMeta)) {
+          return { success: false, errorCode: 'HISTORY_DRAFT_CONFLICT' };
+        }
+        const updatedAt = Math.max(Date.now(), Number(revision || 0) + 1);
+        if (managed) updated.draftMeta = { ownerId: options.ownerId, updatedAt };
+        if (draft.text === updated.text) delete updated.draft;
+        else updated.draft = {
+          text: draft.text,
+          baseText: draft.baseText,
+          updatedAt
+        };
+        await storage.set({
+          ocrHistory: history.map((item, itemIndex) => itemIndex === index ? updated : item)
+        });
+        return {
+          success: true,
+          draft: updated.draft ? { ...updated.draft } : null,
+          ...(managed ? { draftUpdatedAt: updatedAt } : {})
+        };
+      });
+    }
+
+    async function discardDraft(id, expectedUpdatedAt) {
+      return enqueue(async () => {
+        const history = await readHistory();
+        const index = history.findIndex((item) => item?.id === id);
+        if (index < 0) return false;
+        if (!history[index].draft) return { success: true, draftUpdatedAt: history[index].draftMeta?.updatedAt ?? null };
+        if (expectedUpdatedAt !== undefined && history[index].draft.updatedAt !== expectedUpdatedAt) {
+          throw codedError('HISTORY_DRAFT_CONFLICT');
+        }
+        const updated = { ...history[index] };
+        delete updated.draft;
+        if (updated.draftMeta) {
+          updated.draftMeta = { ownerId: '', updatedAt: Math.max(Date.now(), updated.draftMeta.updatedAt + 1) };
+        }
+        await storage.set({ ocrHistory: history.map((item, itemIndex) => itemIndex === index ? updated : item) });
+        return { success: true, draftUpdatedAt: updated.draftMeta?.updatedAt ?? null };
       });
     }
 
@@ -129,8 +301,7 @@
     }
 
     async function list() {
-      await operationQueue;
-      return (await readHistory()).map((item) => ({ ...item }));
+      return enqueue(async () => (await readHistory()).map(copyRecord));
     }
 
     async function search(query) {
@@ -139,6 +310,7 @@
       if (!normalizedQuery) return history;
 
       const searchableFields = [
+        'name',
         'text',
         'provider',
         'language',
@@ -147,12 +319,19 @@
       ];
       return history.filter((item) => searchableFields.some((field) => (
         String(item?.[field] || '').toLocaleLowerCase().includes(normalizedQuery)
+      )) || ['text', 'sourceText', 'provider', 'targetLanguage'].some((field) => (
+        String(item?.translation?.[field] || '').toLocaleLowerCase().includes(normalizedQuery)
       )));
     }
 
     return Object.freeze({
       append,
+      get,
+      patchMetadata,
       updateText,
+      saveTranslation,
+      saveDraft,
+      discardDraft,
       delete: deleteRecord,
       clear,
       list,
@@ -162,6 +341,8 @@
 
   return Object.freeze({
     DEFAULT_LIMIT,
+    MAX_DRAFT_CHARACTERS,
+    MAX_NAME_CHARACTERS,
     create
   });
 }));

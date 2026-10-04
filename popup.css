@@ -98,6 +98,17 @@ body {
   border-radius: var(--radius-xl);
 }
 
+.secondary-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.secondary-actions .btn {
+  flex: 1;
+  min-width: 0;
+}
+
 /* === 头部 (Header) === */
 .header {
   display: flex;
@@ -304,6 +315,13 @@ body {
   letter-spacing: 0.05em;
 }
 
+.history-retention-hint {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .history-header-actions,
 .history-item-actions {
   display: flex;
@@ -385,6 +403,13 @@ body {
   word-break: break-word;
 }
 
+.history-item-name {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
 .history-item-meta {
   display: flex;
   justify-content: space-between;
@@ -427,7 +452,8 @@ body {
 
 .history-copy-btn,
 .history-copy,
-.history-delete-btn {
+.history-delete-btn,
+.history-favorite-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -442,6 +468,24 @@ body {
   transition: all var(--duration-normal) var(--ease-smooth);
 }
 
+.history-favorite-btn {
+  opacity: 1;
+  flex-shrink: 0;
+}
+
+.history-favorite-btn[aria-pressed="true"] {
+  color: var(--accent);
+}
+
+.history-favorite-btn[aria-pressed="true"] svg {
+  fill: currentColor;
+}
+
+.history-favorite-btn:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+
 /* 渐进披露逻辑 */
 .history-item:hover .history-copy-btn,
 .history-item:hover .history-copy,
@@ -454,7 +498,8 @@ body {
 
 .history-copy-btn:hover,
 .history-copy:hover,
-.history-delete-btn:hover {
+.history-delete-btn:hover,
+.history-favorite-btn:hover {
   background: var(--bg-main);
   color: var(--text-primary);
 }
@@ -512,6 +557,45 @@ body {
   overflow-wrap: anywhere;
 }
 
+.history-protection-controls {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.history-protection-controls label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+#previewFavoriteBtn {
+  justify-self: start;
+}
+
+#previewFavoriteBtn[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: currentColor;
+}
+
+#historyName {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  background: var(--bg-sub);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.history-name-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 #historyPreviewText {
   width: 100%;
   height: 120px;
@@ -534,7 +618,25 @@ body {
 .history-preview-actions {
   margin-top: 12px;
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: flex-end;
+}
+
+.history-edit-hint,
+.history-preview-status {
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.history-preview-status:empty { display: none; }
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* 通用按钮类 */
@@ -572,6 +674,9 @@ body {
 }
 
 .config-tip {
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
   background: var(--status-warning-bg);
   border: 1px solid var(--status-warning-border);
   color: var(--status-warning-text);
@@ -670,7 +775,8 @@ body {
 @media (hover: none) and (pointer: coarse) {
   .history-copy-btn,
   .history-copy,
-  .history-delete-btn {
+  .history-delete-btn,
+  .history-favorite-btn {
     opacity: 1; /* 始终显示 */
     background: var(--bg-main);
     width: 32px;

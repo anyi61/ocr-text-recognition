@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="image_import_title">Image OCR</title>
+  <link rel="stylesheet" href="workspace.css">
+</head>
+<body>
+  <main>
+    <header><div><p class="eyebrow">OCR</p><h1 data-i18n="image_import_title">Image OCR</h1></div><button id="importSettings" type="button" data-i18n="image_import_settings">Settings</button></header>
+    <p class="intro" data-i18n="image_import_intro">Paste, drop, or choose one image. Recognition starts only when you choose Recognize.</p>
+    <section class="card" aria-labelledby="importHeading">
+      <h2 id="importHeading" data-i18n="image_import_select">Choose an image</h2>
+      <div id="imageDropZone" tabindex="0" role="group" aria-labelledby="importHeading" aria-describedby="importHelp">
+        <label for="imageFile" data-i18n="image_import_choose">Choose image</label>
+        <input id="imageFile" type="file" accept="image/png,image/jpeg,image/webp">
+        <p id="importHelp" data-i18n="image_import_help">Drop or paste one PNG, JPEG, or static WebP. Up to 20 MiB and 40 million pixels.</p>
+      </div>
+      <div id="imagePreviewWrap" hidden><img id="imagePreview" alt=""><p id="imageMetadata"></p></div>
+      <p id="importProvider" class="muted"></p>
+      <p class="muted" data-i18n="image_import_privacy">Recognition sends this image to your configured service and may incur charges. Images are not saved in history.</p>
+      <div class="actions"><button id="recognizeImage" type="button" class="primary" disabled data-i18n="image_import_recognize">Recognize</button><button id="cancelImageOCR" type="button" hidden data-i18n="image_import_cancel">Cancel recognition</button></div>
+      <div id="imageRecoveryActions" hidden>
+        <p class="muted" data-i18n="image_recovery_retained">The original image is still available in this tab. Retry sends the same image using your current settings.</p>
+        <div class="actions"><button id="retryImageOCR" type="button" class="primary" data-i18n="recovery_retry_original">Retry original image</button><button id="imageRecoverySettings" type="button" data-i18n="recovery_settings">Open settings</button><button id="chooseNewImage" type="button" data-i18n="image_recovery_choose_new">Choose a new image</button></div>
+      </div>
+      <p id="imageImportStatus" role="status" aria-live="polite"></p>
+    </section>
+    <section id="imageResultSection" class="card" hidden aria-labelledby="importResultHeading">
+      <h2 id="importResultHeading" data-i18n="image_import_result">Recognized text</h2>
+      <div id="imageDraft"></div>
+      <textarea id="imageResultText" aria-labelledby="importResultHeading" dir="auto"></textarea>
+      <div class="actions"><button id="copyImageResult" type="button" data-i18n="content_btn_copy">Copy</button><button id="saveImageResult" type="button" disabled data-i18n="content_btn_save_changes">Save changes</button></div>
+      <p id="imageAutoCopyStatus" role="status" aria-live="polite" hidden></p>
+      <p id="imageResultStatus" role="status" aria-live="polite"></p>
+      <div id="imageTranslation"></div>
+    </section>
+  </main>
+  <script src="i18n-runtime.js"></script>
+  <script src="provider-config.js"></script>
+  <script src="extension-runtime.js"></script>
+  <script src="capture-utils.js"></script>
+  <script src="image-utils.js"></script>
+  <script src="translation-ui.js"></script>
+  <script src="draft-ui.js"></script>
+  <script src="workspace.js"></script>
+</body>
+</html>

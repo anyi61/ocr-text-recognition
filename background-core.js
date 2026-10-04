@@ -108,12 +108,30 @@
   }
 
   function assertOcrResponseComplete(provider, data) {
+    const choices = Array.isArray(data?.choices) ? data.choices : [];
+    const filtered = choices.some((choice) => choice?.finish_reason === 'content_filter')
+      || data?.incomplete_details?.reason === 'content_filter'
+      || (provider === 'claude' && data?.stop_reason === 'refusal');
+    if (filtered) {
+      throw createCodedError('OCR_RESULT_FILTERED', 'OCR response was blocked by the provider');
+    }
+
     const claudeTruncated = provider === 'claude' && data?.stop_reason === 'max_tokens';
-    const chatTruncated = data?.choices?.some((choice) => choice?.finish_reason === 'length');
+    const chatTruncated = choices.some((choice) => choice?.finish_reason === 'length');
     const responsesTruncated = data?.status === 'incomplete'
       && data?.incomplete_details?.reason === 'max_output_tokens';
     if (claudeTruncated || chatTruncated || responsesTruncated) {
       throw createCodedError('OCR_RESULT_TRUNCATED', 'OCR response was truncated');
+    }
+
+    // A non-empty partial output is not evidence of a completed OCR response.
+    // Leave unknown/custom schemas alone, but honor explicit lifecycle states.
+    const unfinishedStates = new Set(['incomplete', 'failed', 'cancelled', 'queued', 'in_progress']);
+    const incompleteMessage = Array.isArray(data?.output) && data.output.some((item) =>
+      item?.type === 'message' && unfinishedStates.has(item.status)
+    );
+    if (unfinishedStates.has(data?.status) || incompleteMessage) {
+      throw createCodedError('OCR_RESULT_INCOMPLETE', 'The provider did not complete the OCR response');
     }
   }
 

@@ -8,12 +8,15 @@ importScripts(
   'extension-runtime.js',
   'background-core.js',
   'request-runtime.js',
-  'history-store.js'
+  'history-store.js',
+  'translation-runtime.js',
+  'translation-preferences.js'
 );
 
 const ocrRequestRegistry = OCRBackgroundCore.createRequestRegistry();
 const baiduTokenCache = new Map();
 const historyStore = OCRHistoryStore.create(chrome.storage.local, { limit: 50 });
+const translationPreferences = globalThis.OCRTranslationPreferences.create(chrome.storage.local);
 const backgroundMessage = (key, fallback) => chrome.i18n?.getMessage(key) || fallback;
 
 if (typeof chrome.storage.local.setAccessLevel === 'function') {
@@ -62,7 +65,7 @@ chrome.runtime.onInstalled.addListener(() => {
     if (!result.apiProvider) {
       chrome.storage.local.set({
         apiProvider: 'claude',
-        model: 'claude-sonnet-5',
+        model: OCRProviderConfig.DEFAULT_MODELS.claude,
         language: 'auto',
         prompt: '请识别图片中的文字内容，只返回识别到的纯文字，不要添加任何解释或额外说明。'
       });
@@ -100,27 +103,266 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.action === 'getTranslationCapabilities') {
+    getTranslationCapabilities()
+      .then(sendResponse)
+      .catch(() => sendResponse({ success: false, errorCode: 'TRANSLATION_FAILED' }));
+    return true;
+  }
+
+  if (request.action === 'getTranslationPreferences' || request.action === 'saveTranslationPreferences') {
+    const saving = request.action === 'saveTranslationPreferences';
+    Promise.resolve().then(() => saving
+      ? translationPreferences.save(request.preferences)
+      : translationPreferences.get())
+      .then(sendResponse)
+      .catch(() => sendResponse({ success: false, errorCode: saving
+        ? 'TRANSLATION_PREFERENCES_WRITE_FAILED' : 'TRANSLATION_PREFERENCES_READ_FAILED' }));
+    return true;
+  }
+
+  if (request.action === 'openTranslationSettings' || request.action === 'openSettings') {
+    Promise.resolve().then(() => chrome.runtime.openOptionsPage())
+      .then(() => sendResponse({ success: true }))
+      .catch(() => sendResponse({ success: false, errorCode: 'TRANSLATION_SETTINGS_FAILED' }));
+    return true;
+  }
+
+  if (request.action === 'openImageWorkspace') {
+    Promise.resolve().then(() => chrome.tabs.create({ url: chrome.runtime.getURL('workspace.html') }))
+      .then(() => sendResponse({ success: true }))
+      .catch(() => sendResponse({ success: false, errorCode: 'IMAGE_WORKSPACE_OPEN_FAILED' }));
+    return true;
+  }
+
+  if (request.action === 'getHistoryRecord') {
+    historyStore.get(request.historyId)
+      .then((record) => sendResponse(record
+        ? { success: true, record }
+        : { success: false, errorCode: 'HISTORY_RECORD_MISSING' }))
+      .catch(() => sendResponse({ success: false, errorCode: 'HISTORY_READ_FAILED' }));
+    return true;
+  }
+
+  if (request.action === 'saveHistoryDraft') {
+    historyStore.saveDraft(request.historyId, { text: request.text, baseText: request.baseText }, {
+      ownerId: request.ownerId, expectedUpdatedAt: request.expectedUpdatedAt
+    })
+      .then(sendResponse)
+      .catch((error) => sendResponse({
+        success: false,
+        errorCode: error.code === 'HISTORY_DRAFT_INVALID' ? error.code : 'HISTORY_WRITE_FAILED'
+      }));
+    return true;
+  }
+
+  if (request.action === 'discardHistoryDraft') {
+    historyStore.discardDraft(request.historyId, request.expectedUpdatedAt)
+      .then((discarded) => sendResponse(discarded
+        ? discarded
+        : { success: false, errorCode: 'HISTORY_RECORD_MISSING' }))
+      .catch((error) => sendResponse({
+        success: false,
+        errorCode: error.code === 'HISTORY_DRAFT_CONFLICT' ? error.code : 'HISTORY_WRITE_FAILED'
+      }));
+    return true;
+  }
+
   if (request.action === 'updateHistoryRecord') {
     historyStore.updateText(request.historyId, request.text)
-      .then((updated) => sendResponse({ success: updated }))
-      .catch((error) => sendResponse({ success: false, error: error.message }));
+      .then((updated) => sendResponse(updated
+        ? { success: true }
+        : { success: false, errorCode: 'HISTORY_RECORD_MISSING' }))
+      .catch(() => sendResponse({ success: false, errorCode: 'HISTORY_WRITE_FAILED' }));
+    return true;
+  }
+
+  if (request.action === 'updateHistoryMetadata') {
+    historyStore.patchMetadata(request.historyId, request.patch)
+      .then((record) => sendResponse(record
+        ? { success: true, record }
+        : { success: false, errorCode: 'HISTORY_RECORD_MISSING' }))
+      .catch((error) => sendResponse({ success: false, errorCode:
+        error.code === 'HISTORY_METADATA_INVALID' ? error.code : 'HISTORY_WRITE_FAILED' }));
     return true;
   }
 
   if (request.action === 'deleteHistoryRecord') {
     historyStore.delete(request.historyId)
       .then((deleted) => sendResponse({ success: deleted }))
-      .catch((error) => sendResponse({ success: false, error: error.message }));
+      .catch(() => sendResponse({ success: false, errorCode: 'HISTORY_WRITE_FAILED' }));
     return true;
   }
 
   if (request.action === 'clearHistory') {
     historyStore.clear()
       .then(() => sendResponse({ success: true }))
-      .catch((error) => sendResponse({ success: false, error: error.message }));
+      .catch(() => sendResponse({ success: false, errorCode: 'HISTORY_WRITE_FAILED' }));
     return true;
   }
 });
+
+async function hasTranslationPermission(provider, config) {
+  if (provider !== 'custom' && provider !== 'openai-compatible') return true;
+  const origin = OCRProviderConfig.getEndpointOriginPattern(config.endpoint);
+  if (!origin || typeof chrome.permissions?.contains !== 'function') return false;
+  return Boolean(await chrome.permissions.contains({ origins: [origin] }));
+}
+
+async function getTranslationCapabilities() {
+  const translation = globalThis.OCRTranslationRuntime;
+  const settings = await chrome.storage.local.get(translation.STORAGE_KEYS);
+  const providers = await Promise.all(translation.PROVIDERS.map(async (id) => {
+    const config = translation.resolveConfig(settings, id);
+    return {
+      id,
+      supported: translation.supported(id),
+      configured: translation.isConfigured(id, config),
+      permissionGranted: await hasTranslationPermission(id, config).catch(() => false),
+      model: typeof config.model === 'string' ? config.model : ''
+    };
+  }));
+  return {
+    success: true, providers,
+    activeProvider: translation.PROVIDERS.includes(settings.apiProvider) ? settings.apiProvider : 'claude',
+    maxCharacters: translation.MAX_CHARACTERS,
+    languages: Object.keys(translation.LANGUAGES)
+  };
+}
+
+async function performTranslation(request, signal) {
+  const translation = globalThis.OCRTranslationRuntime;
+  OCRBackgroundCore.throwIfAborted(signal);
+  translation.validateRequest(request);
+  // Credentials are read again for every explicit translation, never copied
+  // into content scripts, port messages, or translation history.
+  const settings = await chrome.storage.local.get(translation.STORAGE_KEYS);
+  OCRBackgroundCore.throwIfAborted(signal);
+  const config = translation.resolveConfig(settings, request.provider);
+  if (!translation.isConfigured(request.provider, config)) {
+    throw OCRBackgroundCore.createCodedError('TRANSLATION_PROVIDER_UNCONFIGURED');
+  }
+  if (!await hasTranslationPermission(request.provider, config)) {
+    throw OCRBackgroundCore.createCodedError('TRANSLATION_PERMISSION_REQUIRED');
+  }
+  OCRBackgroundCore.throwIfAborted(signal);
+  const { endpoint, headers, body } = translation.buildRequest(
+    request.provider, config, request.text, request.targetLanguage
+  );
+  const data = await apiRequest(endpoint, headers, body, 'Translation API error', signal);
+  OCRBackgroundCore.throwIfAborted(signal);
+  const text = translation.extractText(request.provider, data, config);
+  const snapshot = {
+    sourceText: request.text, text, provider: request.provider,
+    model: config.model || '', targetLanguage: request.targetLanguage, timestamp: Date.now()
+  };
+  const historyId = (typeof request.historyId === 'string' && request.historyId.length <= 128)
+    || (typeof request.historyId === 'number' && Number.isFinite(request.historyId))
+    ? request.historyId : null;
+  let persisted = false;
+  let warningCode;
+  if (historyId !== null) {
+    try {
+      persisted = await historyStore.saveTranslation(historyId, snapshot, signal);
+      if (!persisted) warningCode = 'TRANSLATION_SAVE_FAILED';
+    } catch (error) {
+      if (signal.aborted || OCRBackgroundCore.isAbortError(error)) throw error;
+      warningCode = 'TRANSLATION_SAVE_FAILED';
+    }
+  }
+  OCRBackgroundCore.throwIfAborted(signal);
+  return {
+    success: true, text, provider: request.provider, model: config.model,
+    targetLanguage: request.targetLanguage, translation: snapshot,
+    historyId, persisted, ...(warningCode ? { warningCode } : {})
+  };
+}
+
+function isImageWorkspace(sender) {
+  const pageUrl = typeof chrome.runtime.getURL === 'function' ? chrome.runtime.getURL('workspace.html') : '';
+  return Boolean(pageUrl && typeof sender?.url === 'string' && sender.url.split(/[?#]/, 1)[0] === pageUrl);
+}
+
+// Every UI port owns its task. Closing a popup, leaving the page, or replacing
+// the task aborts its fetch; unrelated OCR and other tabs are unaffected.
+if (typeof chrome.runtime.onConnect?.addListener === 'function') {
+  chrome.runtime.onConnect.addListener((port) => {
+    if (port.name === 'ocr-image-workspace') {
+      if (!isImageWorkspace(port.sender)) return;
+      let activeTask = null;
+      let disconnected = false;
+      port.onMessage.addListener((message) => {
+        if (disconnected) return;
+        if (message?.action === 'cancel') {
+          if (activeTask?.requestId === message.requestId) activeTask.controller.abort();
+          return;
+        }
+        if (message?.action !== 'performOCR' || typeof message.requestId !== 'string'
+          || !message.requestId || message.requestId.length > 128) return;
+        activeTask?.controller.abort();
+        const task = { requestId: message.requestId, controller: new AbortController() };
+        activeTask = task;
+        handleOCR(message.imageData, task.requestId, (result) => {
+          if (disconnected || activeTask !== task) return;
+          try { port.postMessage({ action: 'ocrResult', requestId: task.requestId, ...result }); }
+          catch { disconnected = true; task.controller.abort(); }
+        }, port.sender, task.controller).finally(() => {
+          if (activeTask === task) activeTask = null;
+        });
+      });
+      port.onDisconnect.addListener(() => {
+        disconnected = true;
+        activeTask?.controller.abort();
+        activeTask = null;
+      });
+      return;
+    }
+    if (port.name !== 'ocr-translation') return;
+    let activeTask = null;
+    let disconnected = false;
+    const postResult = (result) => {
+      if (disconnected) return;
+      try {
+        port.postMessage({ action: 'translationResult', ...result });
+      } catch {
+        disconnected = true;
+        activeTask?.controller.abort();
+      }
+    };
+    port.onMessage.addListener((message) => {
+      if (disconnected) return;
+      if (message?.action === 'cancel') {
+        if (activeTask?.requestId === message.requestId) activeTask.controller.abort();
+        return;
+      }
+      if (message?.action !== 'translate') return;
+      activeTask?.controller.abort();
+      const task = { requestId: message.requestId, controller: new AbortController() };
+      activeTask = task;
+      performTranslation(message, task.controller.signal)
+        .then((result) => {
+          if (activeTask === task) postResult({ requestId: task.requestId, ...result });
+        })
+        .catch((error) => {
+          if (activeTask !== task) return;
+          const errorCode = globalThis.OCRTranslationRuntime.errorCode(error, task.controller.signal);
+          postResult({
+            requestId: typeof task.requestId === 'string' && task.requestId.length <= 128 ? task.requestId : null,
+            success: false, errorCode,
+            ...(errorCode === 'TRANSLATION_CANCELLED' ? { cancelled: true } : {})
+          });
+        })
+        .finally(() => {
+          if (activeTask === task) activeTask = null;
+        });
+    });
+    port.onDisconnect.addListener(() => {
+      disconnected = true;
+      activeTask?.controller.abort();
+      activeTask = null;
+    });
+  });
+}
 
 /**
  * 处理截图请求
@@ -167,15 +409,15 @@ async function handleCapture(sendResponse, sender) {
  * @returns {Promise<void>}
  * @description 根据配置调用对应的API进行OCR识别，并保存历史记录
  */
-async function handleOCR(imageData, requestId, sendResponse, sender) {
+async function handleOCR(imageData, requestId, sendResponse, sender, taskController) {
   const effectiveRequestId = requestId || `legacy-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const controller = ocrRequestRegistry.start(effectiveRequestId);
+  const controller = taskController || ocrRequestRegistry.start(effectiveRequestId);
   const { signal } = controller;
 
   try {
     // 获取配置 - 优先从新的 apiConfigs 结构读取
     const result = await chrome.storage.local.get([
-      'apiProvider', 'apiConfigs', 'prompt', 'language',
+      'apiProvider', 'apiConfigs', 'prompt', 'language', 'autoCopy',
       // 以下是为了兼容旧版本配置
       'apiKey', 'model', 'customEndpoint', 'customModel', 'customSecret',
       'openaiApiKey', 'openaiModel', 'baiduApiKey',
@@ -194,13 +436,13 @@ async function handleOCR(imageData, requestId, sendResponse, sender) {
       case 'claude': {
         const claude = OCRProviderConfig.getProviderConfig(configs, provider);
         config.apiKey = claude.apiKey || result.apiKey;
-        config.model = claude.model || result.model || 'claude-sonnet-5';
+        config.model = claude.model || result.model || OCRProviderConfig.DEFAULT_MODELS.claude;
         break;
       }
       case 'openai': {
         const openai = OCRProviderConfig.getProviderConfig(configs, provider);
         config.apiKey = openai.apiKey || result.openaiApiKey;
-        config.model = openai.model || result.openaiModel || 'gpt-5-mini';
+        config.model = openai.model || result.openaiModel || OCRProviderConfig.DEFAULT_MODELS.openai;
         break;
       }
       case 'baidu': {
@@ -212,14 +454,14 @@ async function handleOCR(imageData, requestId, sendResponse, sender) {
       case 'aliyun': {
         const aliyun = OCRProviderConfig.getProviderConfig(configs, provider);
         config.apiKey = aliyun.apiKey || result.aliyunApiKey;
-        config.customModel = aliyun.model || result.aliyunModel || 'qwen-vl-max';
+        config.customModel = aliyun.model || result.aliyunModel || OCRProviderConfig.DEFAULT_MODELS.aliyun;
         config.model = config.customModel;
         break;
       }
       case 'zhipu': {
         const zhipu = OCRProviderConfig.getProviderConfig(configs, provider);
         config.apiKey = zhipu.apiKey || result.zhipuApiKey;
-        config.model = zhipu.model || result.zhipuModel || 'glm-4v';
+        config.model = zhipu.model || result.zhipuModel || OCRProviderConfig.DEFAULT_MODELS.zhipu;
         break;
       }
       case 'openai-compatible': {
@@ -245,12 +487,19 @@ async function handleOCR(imageData, requestId, sendResponse, sender) {
     }
 
     config.apiProvider = provider;
-    config.model = OCRProviderConfig.migrateRetiredModel(provider, config.model);
 
     if (!OCRProviderConfig.hasRequiredCredentials(configs, provider, result)) {
       sendResponse({ success: false, errorCode: 'MISSING_API_KEY', error: 'Missing API configuration' });
       return;
     }
+
+    OCRBackgroundCore.throwIfAborted(signal);
+    if (isImageWorkspace(sender) && !await OCRExtensionRuntime.hasEndpointPermission(
+      chrome, provider, config.customEndpoint
+    )) {
+      throw OCRBackgroundCore.createCodedError('IMAGE_ENDPOINT_PERMISSION_REQUIRED');
+    }
+    OCRBackgroundCore.throwIfAborted(signal);
 
     // 提取base64数据
     const base64Image = imageData.replace(/^data:image\/\w+;base64,/, '');
@@ -291,14 +540,15 @@ async function handleOCR(imageData, requestId, sendResponse, sender) {
       text: ocrResult,
       provider: config.apiProvider,
       language: config.language || 'auto',
-      sourceUrl: OCRBackgroundCore.sanitizeSourceUrl(sender?.tab?.url),
-      sourceTitle: sender?.tab?.title || ''
+      sourceUrl: isImageWorkspace(sender) ? '' : OCRBackgroundCore.sanitizeSourceUrl(sender?.tab?.url),
+      sourceTitle: isImageWorkspace(sender) ? 'Imported image' : sender?.tab?.title || ''
     }, signal);
 
     sendResponse({
       success: true,
       text: ocrResult,
       historyId: historyResult.historyId,
+      autoCopy: result.autoCopy === true,
       ...(historyResult.warningCode ? { warningCode: historyResult.warningCode } : {})
     });
   } catch (error) {
@@ -353,7 +603,7 @@ async function apiRequest(endpoint, headers, body, errorPrefix, signal) {
  * @param {string} base64Image - base64 编码的图片
  * @returns {Object} OpenAI兼容格式的请求体
  */
-function buildOpenAIRequestBody(model, prompt, base64Image, preferMaxCompletionTokens = false) {
+function buildOpenAIRequestBody(model, prompt, base64Image) {
   const body = {
     model,
     messages: [{
@@ -370,11 +620,7 @@ function buildOpenAIRequestBody(model, prompt, base64Image, preferMaxCompletionT
     }]
   };
 
-  if (preferMaxCompletionTokens && /^(gpt-5|o[1-9])/.test(model)) {
-    body.max_completion_tokens = 4096;
-  } else {
-    body.max_tokens = 4096;
-  }
+  Object.assign(body, OCRRequestRuntime.getChatTokenLimit(model));
 
   return body;
 }
@@ -388,7 +634,7 @@ function buildOpenAIRequestBody(model, prompt, base64Image, preferMaxCompletionT
  * @throws {Error} API调用失败时抛出
  */
 async function callClaudeAPI(base64Image, config, signal) {
-  const model = config.model || 'claude-sonnet-5';
+  const model = config.model || OCRProviderConfig.DEFAULT_MODELS.claude;
   const prompt = OCRBackgroundCore.buildRecognitionPrompt(config.prompt, config.language);
 
   const body = buildOpenAIRequestBody(model, prompt, base64Image);
@@ -427,7 +673,7 @@ async function callClaudeAPI(base64Image, config, signal) {
  * @throws {Error} API调用失败时抛出
  */
 async function callOpenAIAPI(base64Image, config, signal) {
-  const model = config.model || 'gpt-5-mini';
+  const model = config.model || OCRProviderConfig.DEFAULT_MODELS.openai;
   const prompt = OCRBackgroundCore.buildRecognitionPrompt(config.prompt, config.language);
 
   const data = await apiRequest(
@@ -436,7 +682,7 @@ async function callOpenAIAPI(base64Image, config, signal) {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${config.apiKey}`
     },
-    buildOpenAIRequestBody(model, prompt, base64Image, true),
+    buildOpenAIRequestBody(model, prompt, base64Image),
     'OpenAI API错误',
     signal
   );
@@ -580,7 +826,7 @@ async function callAliyunOCR(base64Image, config, signal) {
     throw new Error('阿里云OCR需要API Key');
   }
 
-  const model = config.customModel || 'qwen-vl-max';
+  const model = config.customModel || OCRProviderConfig.DEFAULT_MODELS.aliyun;
   const prompt = OCRBackgroundCore.buildRecognitionPrompt(config.prompt, config.language);
 
   const data = await apiRequest(
@@ -605,13 +851,13 @@ async function callAliyunOCR(base64Image, config, signal) {
  * @param {APIConfig} config - API配置
  * @returns {Promise<string>} 识别结果文本
  * @throws {Error} API调用失败时抛出
- * @description 智谱API不支持max_tokens参数，需要特殊处理
+ * @description 智谱请求不固定输出上限，使用服务商默认值
  */
 async function callZhipuAPI(base64Image, config, signal) {
-  const model = config.model || 'glm-4v';
+  const model = config.model || OCRProviderConfig.DEFAULT_MODELS.zhipu;
   const prompt = OCRBackgroundCore.buildRecognitionPrompt(config.prompt, config.language);
 
-  // 智谱API不支持 max_tokens 参数，需要手动构建请求体
+  // 使用服务商的默认输出上限，不假设所有模型具有相同参数支持
   const body = {
     model,
     messages: [{
@@ -650,11 +896,11 @@ async function callZhipuAPI(base64Image, config, signal) {
  * @param {APIConfig} config - API配置
  * @returns {Promise<string>} 识别结果文本
  * @throws {Error} API调用失败时抛出
- * @description 兼容多种响应格式，支持硅基流动、DeepSeek等服务商
+ * @description 兼容支持图像输入及 Bearer 认证的 Chat Completions 接口
  */
 async function callOpenAICompatibleAPI(base64Image, config, signal) {
   const endpoint = config.customEndpoint || 'https://api.openai.com/v1/chat/completions';
-  const model = config.customModel || 'gpt-5-mini';
+  const model = config.customModel || OCRProviderConfig.DEFAULT_MODELS.openai;
   const prompt = OCRBackgroundCore.buildRecognitionPrompt(config.prompt, config.language);
 
   if (!endpoint) {
@@ -701,13 +947,13 @@ async function testAPIConnection(config, sendResponse) {
     switch (config.apiProvider) {
       case 'aliyun':
         normalizedConfig.apiKey = config.apiKey;
-        normalizedConfig.customModel = config.customModel || config.model || 'qwen-vl-max';
+        normalizedConfig.customModel = config.customModel || config.model || OCRProviderConfig.DEFAULT_MODELS.aliyun;
         break;
       case 'openai':
-        normalizedConfig.model = config.model || 'gpt-5-mini';
+        normalizedConfig.model = config.model || OCRProviderConfig.DEFAULT_MODELS.openai;
         break;
       case 'zhipu':
-        normalizedConfig.model = config.model || 'glm-4v';
+        normalizedConfig.model = config.model || OCRProviderConfig.DEFAULT_MODELS.zhipu;
         break;
       case 'openai-compatible':
         normalizedConfig.customEndpoint = config.customEndpoint;

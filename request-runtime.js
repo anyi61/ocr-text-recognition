@@ -24,6 +24,19 @@
   function responseError(response, message) {
     const error = new Error(message || `HTTP ${response.status}`);
     error.status = response.status;
+    const codes = {
+      400: 'API_INVALID_REQUEST',
+      401: 'API_AUTHENTICATION_FAILED',
+      402: 'API_BILLING_REQUIRED',
+      403: 'API_ACCESS_DENIED',
+      404: 'API_NOT_FOUND',
+      408: 'REQUEST_TIMEOUT',
+      413: 'API_IMAGE_TOO_LARGE',
+      422: 'API_INVALID_REQUEST',
+      429: 'API_RATE_LIMITED'
+    };
+    error.code = codes[response.status]
+      || (response.status >= 500 ? 'API_UNAVAILABLE' : 'API_HTTP_ERROR');
     return error;
   }
 
@@ -82,7 +95,9 @@
             try {
               return await response.json();
             } catch {
-              throw new Error('服务器返回了无效的 JSON 数据');
+              const error = new Error('服务器返回了无效的 JSON 数据');
+              error.code = 'INVALID_API_RESPONSE';
+              throw error;
             }
           }
           const shouldRetry = settings.retryStatuses.includes(response.status) && attempt < attempts;
@@ -184,12 +199,20 @@
             { type: 'image_url', image_url: { url: imageUrl } }
           ]
         }],
-        max_tokens: 4096
+        ...getChatTokenLimit(model)
       };
     }
 
     if (model) body.model = model;
     return body;
+  }
+
+  // OpenAI's documented reasoning models use max_completion_tokens. Preserve
+  // max_tokens for unknown third-party models, whose APIs can differ.
+  function getChatTokenLimit(model) {
+    return /^(?:gpt-5(?:[.-]|$)|o[1-9](?:[.-]|$))/.test(String(model || ''))
+      ? { max_completion_tokens: 4096 }
+      : { max_tokens: 4096 };
   }
 
   function getValueAtPath(value, path) {
@@ -215,9 +238,11 @@
 
     const responsesContent = Array.isArray(data?.output)
       ? data.output
+        .filter((item) => !item?.type || item.type === 'message')
         .flatMap((item) => Array.isArray(item?.content) ? item.content : [])
-        .find((item) => typeof item?.text === 'string')
-        ?.text
+        .filter((item) => item?.type === 'output_text' && typeof item.text === 'string')
+        .map((item) => item.text)
+        .join('\n')
       : undefined;
     return normalizeOcrText(
       data?.choices?.[0]?.message?.content
@@ -236,6 +261,7 @@
     normalizeOcrText,
     buildCustomHeaders,
     buildCustomRequestBody,
+    getChatTokenLimit,
     extractCustomText
   };
   globalScope.OCRRequestRuntime = api;

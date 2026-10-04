@@ -56,22 +56,13 @@
   const AUTH_MODES = new Set(['bearer', 'api-key', 'custom-header', 'none']);
   const REQUEST_MODES = new Set(['chat-completions', 'responses']);
   const FORBIDDEN_HEADER_NAMES = new Set(['host', 'origin', 'content-length']);
-  const RETIRED_MODEL_MIGRATIONS = Object.freeze({
-    claude: Object.freeze({
-      'claude-3-opus-20240229': 'claude-sonnet-5',
-      'claude-3-opus-latest': 'claude-sonnet-5',
-      'claude-3-5-sonnet-latest': 'claude-sonnet-5',
-      'claude-3-5-sonnet-20240620': 'claude-sonnet-5',
-      'claude-3-5-sonnet-20241022': 'claude-sonnet-5',
-      'claude-3-5-haiku-latest': 'claude-haiku-4-5-20251001',
-      'claude-3-5-haiku-20241022': 'claude-haiku-4-5-20251001'
-    }),
-    openai: Object.freeze({
-      'gpt-4o': 'gpt-5-mini',
-      'gpt-4o-mini': 'gpt-5-mini',
-      'o1-preview': 'gpt-5-mini',
-      'o1-mini': 'gpt-5-mini'
-    })
+  // Defaults apply only to an absent model, never to an explicit user selection.
+  // Model availability and announced shutdowns are documented in the settings UI.
+  const DEFAULT_MODELS = Object.freeze({
+    claude: 'claude-sonnet-5',
+    openai: 'gpt-5-mini',
+    aliyun: 'qwen-vl-max',
+    zhipu: 'glm-4v'
   });
 
   function isPresent(value) {
@@ -184,11 +175,6 @@
     }
   }
 
-  function migrateRetiredModel(provider, model) {
-    const migrations = RETIRED_MODEL_MIGRATIONS[provider];
-    return migrations?.[model] || model;
-  }
-
   function mergeImportedApiConfigs(existingConfigs, importedConfigs) {
     const merged = { ...(existingConfigs || {}) };
     for (const [providerKey, importedConfig] of Object.entries(importedConfigs || {})) {
@@ -205,12 +191,12 @@
     const claude = apiConfigs?.claude;
     if (claude) {
       legacy.apiKey = claude.apiKey ?? existing.apiKey ?? '';
-      legacy.model = claude.model ?? existing.model ?? 'claude-sonnet-5';
+      legacy.model = claude.model ?? existing.model ?? DEFAULT_MODELS.claude;
     }
     const openai = apiConfigs?.openai;
     if (openai) {
       legacy.openaiApiKey = openai.apiKey ?? existing.openaiApiKey ?? '';
-      legacy.openaiModel = openai.model ?? existing.openaiModel ?? 'gpt-5-mini';
+      legacy.openaiModel = openai.model ?? existing.openaiModel ?? DEFAULT_MODELS.openai;
     }
     const baidu = apiConfigs?.baidu;
     if (baidu) {
@@ -220,12 +206,12 @@
     const aliyun = apiConfigs?.aliyun;
     if (aliyun) {
       legacy.aliyunApiKey = aliyun.apiKey ?? existing.aliyunApiKey ?? '';
-      legacy.aliyunModel = aliyun.model ?? existing.aliyunModel ?? 'qwen-vl-max';
+      legacy.aliyunModel = aliyun.model ?? existing.aliyunModel ?? DEFAULT_MODELS.aliyun;
     }
     const zhipu = apiConfigs?.zhipu;
     if (zhipu) {
       legacy.zhipuApiKey = zhipu.apiKey ?? existing.zhipuApiKey ?? '';
-      legacy.zhipuModel = zhipu.model ?? existing.zhipuModel ?? 'glm-4v';
+      legacy.zhipuModel = zhipu.model ?? existing.zhipuModel ?? DEFAULT_MODELS.zhipu;
     }
     const compatible = apiConfigs?.openaiCompatible;
     if (compatible) {
@@ -243,6 +229,7 @@
   }
 
   return Object.freeze({
+    DEFAULT_MODELS,
     getStorageKey,
     getProviderConfig,
     normalizeConfig,
@@ -250,7 +237,6 @@
     hasRequiredCredentials,
     redactApiConfigs,
     getEndpointOriginPattern,
-    migrateRetiredModel,
     mergeImportedApiConfigs,
     buildLegacySettings
   });

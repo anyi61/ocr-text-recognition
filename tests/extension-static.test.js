@@ -59,7 +59,7 @@ test('manifest keeps the minimum expected extension surface', () => {
 test('extension pages load shared configuration before their entry scripts', () => {
   assert.deepEqual(
     scriptSources('popup.html'),
-    ['i18n-runtime.js', 'provider-config.js', 'extension-runtime.js', 'popup.js']
+    ['i18n-runtime.js', 'provider-config.js', 'extension-runtime.js', 'translation-ui.js', 'draft-ui.js', 'popup.js']
   );
   assert.deepEqual(
     scriptSources('options.html'),
@@ -87,11 +87,12 @@ test('every referenced translation key exists in both locale catalogs', () => {
   ];
   const referenced = new Set();
   for (const relativePath of [
-    'manifest.json', 'popup.html', 'options.html',
-    'popup.js', 'options.js', 'content.js', 'i18n-runtime.js'
+    'manifest.json', 'popup.html', 'options.html', 'workspace.html',
+    'popup.js', 'options.js', 'content.js', 'i18n-runtime.js',
+    'workspace.js', 'translation-ui.js', 'draft-ui.js'
   ]) {
     const source = fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
-    for (const match of source.matchAll(/OCRI18n\.t\(\s*['"]([^'"]+)['"]/g)) {
+    for (const match of source.matchAll(/(?:OCRI18n\.|\b)t\(\s*['"]([^'"]+)['"]/g)) {
       referenced.add(match[1]);
     }
     for (const match of source.matchAll(/data-i18n(?:-placeholder|-title|-aria)?=['"]([^'"]+)['"]/g)) {
@@ -117,7 +118,7 @@ test('background and popup preserve dependency injection order', () => {
   );
   assert.match(
     extensionRuntime,
-    /'i18n-runtime\.js',\s*'capture-utils\.js',\s*'content\.js'/
+    /'i18n-runtime\.js',\s*'capture-utils\.js',\s*'text-utils\.js',\s*'translation-ui\.js',\s*'draft-ui\.js',\s*'content\.js'/
   );
 });
 

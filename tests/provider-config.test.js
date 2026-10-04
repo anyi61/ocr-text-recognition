@@ -7,7 +7,6 @@ const {
   hasRequiredCredentials,
   redactApiConfigs,
   getEndpointOriginPattern,
-  migrateRetiredModel,
   mergeImportedApiConfigs,
   buildLegacySettings,
   normalizeConfig,
@@ -136,11 +135,13 @@ test('builds an optional host permission pattern from a custom endpoint', () => 
   assert.equal(getEndpointOriginPattern('not a URL'), null);
 });
 
-test('migrates only known retired first-party model ids', () => {
-  assert.equal(migrateRetiredModel('claude', 'claude-3-opus-20240229'), 'claude-sonnet-5');
-  assert.equal(migrateRetiredModel('openai', 'gpt-4o'), 'gpt-5-mini');
-  assert.equal(migrateRetiredModel('openai-compatible', 'gpt-4o'), 'gpt-4o');
-  assert.equal(migrateRetiredModel('claude', 'user-custom-model'), 'user-custom-model');
+test('preserves explicitly chosen models including older and custom identifiers', () => {
+  for (const [provider, key, model] of [
+    ['claude', 'claude', 'claude-3-opus-20240229'],
+    ['openai', 'openai', 'gpt-4o'],
+    ['openai-compatible', 'openaiCompatible', 'gpt-4o'],
+    ['claude', 'claude', 'user-custom-model']
+  ]) assert.equal(getProviderConfig({ [key]: { model } }, provider).model, model);
 });
 
 test('redacted imports preserve modern and legacy credentials', () => {

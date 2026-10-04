@@ -52,17 +52,22 @@
         <span data-i18n="btn_capture">开始截图识别</span>
       </button>
       <p class="hint" data-i18n="hint_capture">点击后在页面上框选需要识别的文字区域</p>
+      <div class="secondary-actions">
+        <button id="repeatCaptureBtn" class="btn" type="button" disabled data-i18n="popup_repeat_capture">再次识别此区域</button>
+        <button id="imageImportBtn" class="btn" type="button" data-i18n="popup_import_image">导入图片</button>
+      </div>
+      <p id="repeatCaptureHint" class="hint" role="status" data-i18n="popup_repeat_no_region">先在当前页面完成一次框选识别。</p>
     </main>
 
     <!-- API配置提示 -->
-    <div id="configTip" class="config-tip hidden">
+    <button id="configTip" type="button" class="config-tip hidden">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"></circle>
         <line x1="12" y1="8" x2="12" y2="12"></line>
         <line x1="12" y1="16" x2="12.01" y2="16"></line>
       </svg>
       <span data-i18n="tip_config_api">请先配置API密钥</span>
-    </div>
+    </button>
 
     <!-- 历史记录区域 -->
     <section id="historyArea" class="history-area">
@@ -84,6 +89,7 @@
           </button>
         </div>
       </div>
+      <p class="history-retention-hint" data-i18n="history_retention_hint">自动保留最近 50 条普通记录；收藏和未完成草稿不受此上限影响。</p>
       <div id="historySearchWrap" class="history-search-wrap hidden">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
           <circle cx="11" cy="11" r="8"></circle>
@@ -117,11 +123,27 @@
             </svg>
           </button>
         </div>
+        <div class="history-protection-controls">
+          <button id="previewFavoriteBtn" class="btn" type="button" aria-pressed="false" data-i18n="history_favorite">收藏</button>
+          <label for="historyName" data-i18n="history_name_label">记录名称</label>
+          <input id="historyName" type="text" maxlength="120" data-i18n-placeholder="history_name_placeholder" placeholder="添加名称（可选）" autocomplete="off">
+          <div class="history-name-actions">
+            <button id="historyNameCancelBtn" class="btn" type="button" disabled data-i18n="history_name_cancel">取消命名</button>
+            <button id="historyNameSaveBtn" class="btn" type="button" disabled data-i18n="history_name_save">保存名称</button>
+          </div>
+          <p id="historyMetadataStatus" class="history-preview-status" role="status" aria-live="polite"></p>
+        </div>
         <div id="historyPreviewMeta" class="history-preview-meta"></div>
-        <textarea id="historyPreviewText" readonly data-i18n-aria="history_preview_aria" aria-label="历史记录详情"></textarea>
+        <div id="historyDraft"></div>
+        <textarea id="historyPreviewText" data-i18n-aria="history_preview_aria" aria-label="历史记录详情" aria-describedby="historyEditHint"></textarea>
+        <p id="historyEditHint" class="history-edit-hint" data-i18n="history_edit_hint">可修订文字；点击保存后更新历史记录。</p>
+        <p id="historyPreviewStatus" class="history-preview-status" role="status" aria-live="polite"></p>
         <div class="history-preview-actions">
+          <button id="previewRevertBtn" class="btn" type="button" disabled data-i18n="history_revert_changes">还原修改</button>
+          <button id="previewSaveBtn" class="btn btn-primary" type="button" disabled data-i18n="content_btn_save_changes">保存修改</button>
           <button id="previewCopyBtn" class="btn btn-primary" data-i18n="btn_copy_all">复制全文</button>
         </div>
+        <div id="historyTranslation"></div>
       </div>
     </section>
 
@@ -141,6 +163,8 @@
   <script src="i18n-runtime.js"></script>
   <script src="provider-config.js"></script>
   <script src="extension-runtime.js"></script>
+  <script src="translation-ui.js"></script>
+  <script src="draft-ui.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

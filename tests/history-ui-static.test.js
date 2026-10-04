@@ -14,7 +14,7 @@ function read(file) {
 test('result popup can persist corrected OCR text to its history record', () => {
   const content = read('content.js');
 
-  assert.match(content, /showResultPopup\(ocrResponse\.text,\s*ocrResponse\.historyId\)/);
+  assert.match(content, /showResultPopup\(response\.text,\s*response\.historyId,\s*response\.autoCopy === true\)/);
   assert.match(content, /action:\s*'updateHistoryRecord'/);
   assert.match(content, /historyId/);
   assert.match(content, /content_btn_save_changes/);

@@ -26,8 +26,38 @@ const OCRI18n = (function() {
     EMPTY_OCR_RESULT: 'error_empty_ocr_result',
     INVALID_OCR_RESULT: 'error_invalid_ocr_result',
     OCR_RESULT_TRUNCATED: 'error_ocr_result_truncated',
+    OCR_RESULT_FILTERED: 'error_ocr_result_filtered',
+    OCR_RESULT_INCOMPLETE: 'error_ocr_result_incomplete',
     HISTORY_SAVE_FAILED: 'error_history_save_failed',
     NETWORK_ERROR: 'error_network',
+    API_INVALID_REQUEST: 'error_api_invalid_request',
+    API_AUTHENTICATION_FAILED: 'error_api_authentication_failed',
+    API_BILLING_REQUIRED: 'error_api_billing_required',
+    API_ACCESS_DENIED: 'error_api_access_denied',
+    API_NOT_FOUND: 'error_api_not_found',
+    API_IMAGE_TOO_LARGE: 'error_api_image_too_large',
+    API_RATE_LIMITED: 'error_api_rate_limited',
+    API_UNAVAILABLE: 'error_api_unavailable',
+    API_HTTP_ERROR: 'error_api_http',
+    INVALID_API_RESPONSE: 'error_invalid_api_response',
+    BAIDU_TEST_IMAGE_RECOGNIZE_ERROR: 'warning_baidu_test_image',
+    TRANSLATION_EMPTY_TEXT: 'error_translation_empty_text',
+    TRANSLATION_TEXT_TOO_LONG: 'error_translation_text_too_long',
+    TRANSLATION_INVALID_LANGUAGE: 'error_translation_invalid_language',
+    TRANSLATION_PROVIDER_UNSUPPORTED: 'error_translation_provider_unsupported',
+    TRANSLATION_PROVIDER_UNCONFIGURED: 'error_translation_provider_unconfigured',
+    TRANSLATION_PERMISSION_REQUIRED: 'error_translation_permission_required',
+    TRANSLATION_INVALID_REQUEST: 'error_translation_invalid_request',
+    TRANSLATION_CANCELLED: 'error_translation_cancelled',
+    TRANSLATION_RESULT_EMPTY: 'error_translation_result_empty',
+    TRANSLATION_RESULT_INVALID: 'error_translation_result_invalid',
+    TRANSLATION_RESULT_TRUNCATED: 'error_translation_result_truncated',
+    TRANSLATION_RESULT_FILTERED: 'error_translation_result_filtered',
+    TRANSLATION_RESULT_INCOMPLETE: 'error_translation_result_incomplete',
+    TRANSLATION_REQUEST_TOO_LARGE: 'error_translation_request_too_large',
+    TRANSLATION_API_INVALID_REQUEST: 'error_translation_api_invalid_request',
+    TRANSLATION_SETTINGS_FAILED: 'error_translation_settings_failed',
+    TRANSLATION_FAILED: 'error_translation_failed',
     UNKNOWN_PROVIDER: 'error_unknown_provider'
   });
 
@@ -171,7 +201,7 @@ const OCRI18n = (function() {
         const subs = Array.isArray(substitutions) ? substitutions : [substitutions];
         subs.forEach((sub, index) => {
           // 支持 {0}, {1} 格式
-          message = message.replace(new RegExp(`\\{${index}\\}`, 'g'), sub);
+          message = message.replace(new RegExp(`\\{${index}\\}`, 'g'), () => String(sub));
         });
       }
 

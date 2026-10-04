@@ -9,6 +9,10 @@ test('release package uses an explicit production allowlist', async () => {
   assert.ok(PRODUCTION_FILES.includes('manifest.json'));
   assert.ok(PRODUCTION_FILES.includes('background.js'));
   assert.ok(PRODUCTION_FILES.includes('_locales'));
+  for (const required of ['translation-runtime.js', 'translation-preferences.js', 'translation-ui.js',
+    'draft-ui.js', 'text-utils.js', 'image-utils.js', 'workspace.html', 'workspace.js', 'workspace.css']) {
+    assert.ok(PRODUCTION_FILES.includes(required), `${required} must be packaged`);
+  }
   for (const excluded of ['tests', 'docs', 'node_modules', '.git', '.codegraph']) {
     assert.ok(!PRODUCTION_FILES.includes(excluded), `${excluded} must not be packaged`);
   }

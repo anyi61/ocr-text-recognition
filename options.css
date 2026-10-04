@@ -445,6 +445,7 @@ body {
 
 .status-message.success { background: var(--accent); color: var(--accent-inverse); }
 .status-message.error { background: var(--status-error); color: white; }
+.status-message.warning { background: #fef3c7; color: #78350f; border: 1px solid #d97706; }
 .status-message.loading { background: var(--bg-sub); color: var(--text-primary); border: 1px solid var(--border); }
 
 /* === 侧边栏 (Sidebar) === */
