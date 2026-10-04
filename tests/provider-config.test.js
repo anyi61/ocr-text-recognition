@@ -159,3 +159,24 @@ test('redacted imports preserve modern and legacy credentials', () => {
   assert.equal(legacy.openaiApiKey, 'modern-secret');
   assert.equal(legacy.openaiModel, 'gpt-5-mini');
 });
+
+test('credential validation rejects non-string values instead of accepting objects and arrays', () => {
+  for (const apiKey of [{}, [], 123, true, null]) {
+    assert.equal(hasRequiredCredentials({ claude: { apiKey } }, 'claude'), false);
+  }
+});
+
+test('backup resolution includes legacy settings and respects explicit modern blanks before redaction', () => {
+  const providers = require('../provider-config.js');
+  const resolved = providers.resolveApiConfigs({
+    apiKey: 'legacy-secret', model: 'legacy-model', openaiApiKey: 'stale-key',
+    apiConfigs: { openai: { apiKey: '', model: 'modern-model' } }
+  });
+  assert.deepEqual(resolved, {
+    claude: { apiKey: 'legacy-secret', model: 'legacy-model' },
+    openai: { apiKey: '', model: 'modern-model' }
+  });
+  assert.deepEqual(providers.redactApiConfigs(resolved), {
+    claude: { model: 'legacy-model' }, openai: { model: 'modern-model' }
+  });
+});

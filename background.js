@@ -10,13 +10,14 @@ importScripts(
   'request-runtime.js',
   'history-store.js',
   'translation-runtime.js',
-  'translation-preferences.js'
+  'translation-preferences.js',
+  'settings-store.js'
 );
 
 const ocrRequestRegistry = OCRBackgroundCore.createRequestRegistry();
 const baiduTokenCache = new Map();
 const historyStore = OCRHistoryStore.create(chrome.storage.local, { limit: 50 });
-const translationPreferences = globalThis.OCRTranslationPreferences.create(chrome.storage.local);
+const settingsStore = globalThis.OCRSettingsStore.create(chrome.storage.local);
 const backgroundMessage = (key, fallback) => chrome.i18n?.getMessage(key) || fallback;
 
 if (typeof chrome.storage.local.setAccessLevel === 'function') {
@@ -113,11 +114,45 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'getTranslationPreferences' || request.action === 'saveTranslationPreferences') {
     const saving = request.action === 'saveTranslationPreferences';
     Promise.resolve().then(() => saving
-      ? translationPreferences.save(request.preferences)
-      : translationPreferences.get())
+      ? settingsStore.saveTranslationPreferences(request.preferences)
+      : settingsStore.getTranslationPreferences())
       .then(sendResponse)
       .catch(() => sendResponse({ success: false, errorCode: saving
         ? 'TRANSLATION_PREFERENCES_WRITE_FAILED' : 'TRANSLATION_PREFERENCES_READ_FAILED' }));
+    return true;
+  }
+
+  if (request.action === 'saveSettings') {
+    // Only the options page may change credentials. Content scripts retain
+    // their separate, non-secret translation preference API.
+    const pageUrl = String(sender?.url || '').split(/[?#]/, 1)[0];
+    if (pageUrl !== chrome.runtime.getURL('options.html')) {
+      sendResponse({ success: false, errorCode: 'SETTINGS_ACCESS_DENIED' });
+      return true;
+    }
+    Promise.resolve().then(() => settingsStore.save(request.settings))
+      .then(sendResponse)
+      .catch((error) => sendResponse({ success: false, errorCode:
+        error.code === 'SETTINGS_INVALID' ? error.code : 'SETTINGS_SAVE_FAILED' }));
+    return true;
+  }
+
+  if (request.action === 'saveAppearancePreferences') {
+    const pageUrl = String(sender?.url || '').split(/[?#]/, 1)[0];
+    if (!['options.html', 'popup.html'].some((page) => pageUrl === chrome.runtime.getURL(page))) {
+      sendResponse({ success: false, errorCode: 'SETTINGS_ACCESS_DENIED' });
+      return true;
+    }
+    const patch = request.preferences;
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch)
+      || !Object.keys(patch).length || Object.keys(patch).some((key) => !['theme', 'uiLanguage'].includes(key))) {
+      sendResponse({ success: false, errorCode: 'SETTINGS_INVALID' });
+      return true;
+    }
+    Promise.resolve().then(() => settingsStore.save(patch))
+      .then(sendResponse)
+      .catch((error) => sendResponse({ success: false, errorCode:
+        error.code === 'SETTINGS_INVALID' ? error.code : 'SETTINGS_SAVE_FAILED' }));
     return true;
   }
 
@@ -157,23 +192,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'discardHistoryDraft') {
-    historyStore.discardDraft(request.historyId, request.expectedUpdatedAt)
+    historyStore.discardDraft(request.historyId, request.expectedUpdatedAt, request.ownerId)
       .then((discarded) => sendResponse(discarded
         ? discarded
         : { success: false, errorCode: 'HISTORY_RECORD_MISSING' }))
       .catch((error) => sendResponse({
         success: false,
-        errorCode: error.code === 'HISTORY_DRAFT_CONFLICT' ? error.code : 'HISTORY_WRITE_FAILED'
+        errorCode: ['HISTORY_DRAFT_CONFLICT', 'HISTORY_DRAFT_INVALID'].includes(error.code)
+          ? error.code : 'HISTORY_WRITE_FAILED'
       }));
     return true;
   }
 
   if (request.action === 'updateHistoryRecord') {
-    historyStore.updateText(request.historyId, request.text)
+    historyStore.updateText(request.historyId, request.text, request.expectedText)
       .then((updated) => sendResponse(updated
         ? { success: true }
         : { success: false, errorCode: 'HISTORY_RECORD_MISSING' }))
-      .catch(() => sendResponse({ success: false, errorCode: 'HISTORY_WRITE_FAILED' }));
+      .catch((error) => sendResponse({ success: false, errorCode:
+        ['HISTORY_TEXT_CONFLICT', 'HISTORY_TEXT_INVALID'].includes(error.code)
+          ? error.code : 'HISTORY_WRITE_FAILED' }));
     return true;
   }
 
@@ -494,10 +532,11 @@ async function handleOCR(imageData, requestId, sendResponse, sender, taskControl
     }
 
     OCRBackgroundCore.throwIfAborted(signal);
-    if (isImageWorkspace(sender) && !await OCRExtensionRuntime.hasEndpointPermission(
+    if (!await OCRExtensionRuntime.hasEndpointPermission(
       chrome, provider, config.customEndpoint
     )) {
-      throw OCRBackgroundCore.createCodedError('IMAGE_ENDPOINT_PERMISSION_REQUIRED');
+      throw OCRBackgroundCore.createCodedError(isImageWorkspace(sender)
+        ? 'IMAGE_ENDPOINT_PERMISSION_REQUIRED' : 'OCR_ENDPOINT_PERMISSION_REQUIRED');
     }
     OCRBackgroundCore.throwIfAborted(signal);
 

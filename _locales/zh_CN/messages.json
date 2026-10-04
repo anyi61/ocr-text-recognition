@@ -1557,5 +1557,14 @@
   },
   "translation_preferences_retry": {
     "message": "重试翻译偏好"
+  },
+  "error_ocr_endpoint_permission_required": {
+    "message": "尚未授权此 API 域名，请打开设置重新授权后重试原图。"
+  },
+  "content_msg_changes_conflict": {
+    "message": "原文已在其他窗口更新，当前编辑已保留。请复制当前编辑后重新打开历史记录，再核对保存。"
+  },
+  "msg_settings_save_failed": {
+    "message": "设置保存失败，已保留当前修改，请重试。"
   }
 }

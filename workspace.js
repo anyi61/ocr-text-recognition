@@ -114,9 +114,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateButtons();
     if (showMessage && !disposed) recognize.focus({ preventScroll: true });
   }
-  function destroyResult() {
+  function invalidateCopyFeedback() {
     copyGeneration += 1;
     autoCopyStatusKey = ''; autoCopyStatus.textContent = ''; autoCopyStatus.hidden = true;
+  }
+  function destroyResult() {
+    invalidateCopyFeedback();
     translation?.destroy(); translation = null;
     draft?.destroy(); draft = null;
     historyId = null; savedText = ''; source.value = '';
@@ -163,7 +166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       draft = globalThis.OCRDraftUI.mount({
         container: get('imageDraft'), sourceTextarea: source, historyId,
         getSavedText: () => savedText,
-        onRestore: () => { translation?.notifySourceChanged(); updateButtons(); }
+        onRestore: () => { invalidateCopyFeedback(); setResultStatus(''); translation?.notifySourceChanged(); updateButtons(); }
       });
     }
     setResultStatus(response.warningCode ? 'error_history_save_failed' : 'image_import_history_saved');
@@ -258,7 +261,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!files.length) return;
     event.preventDefault(); void selectFiles(files);
   });
-  source.addEventListener('input', () => { copyGeneration += 1; autoCopyStatus.hidden = true; autoCopyStatusKey = ''; setResultStatus(''); translation?.notifySourceChanged(); updateButtons(); });
+  source.addEventListener('input', () => { invalidateCopyFeedback(); setResultStatus(''); translation?.notifySourceChanged(); updateButtons(); });
   save.addEventListener('click', async () => {
     if (save.disabled || disposed) return;
     const submittedText = source.value;
@@ -269,9 +272,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     saving = true; updateButtons();
     source.focus({ preventScroll: true });
     try {
-      const response = await chrome.runtime.sendMessage({ action: 'updateHistoryRecord', historyId: savedHistoryId, text });
+      const response = await chrome.runtime.sendMessage({ action: 'updateHistoryRecord', historyId: savedHistoryId, text, expectedText: savedText });
       if (!isCurrent()) return;
-      if (!response?.success) throw new Error('History update failed');
+      if (!response?.success) {
+        const error = new Error('History update failed');
+        error.code = response?.errorCode;
+        throw error;
+      }
       // The request saves its submitted snapshot. Typing while storage is
       // pending belongs to a newer draft and must stay in the editor.
       if (source.value === submittedText) {
@@ -283,8 +290,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!isCurrent()) return;
       if (source.value.trim() !== savedText) void draft?.notifySourceChanged(true);
       setResultStatus('content_msg_changes_saved');
-    } catch {
-      if (isCurrent()) setResultStatus('content_msg_changes_save_failed');
+    } catch (error) {
+      if (isCurrent()) setResultStatus(error.code === 'HISTORY_TEXT_CONFLICT'
+        ? 'content_msg_changes_conflict' : 'content_msg_changes_save_failed');
     } finally {
       saving = false;
       if (!disposed) updateButtons();

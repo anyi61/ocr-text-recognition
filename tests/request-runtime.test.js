@@ -109,6 +109,36 @@ test('the request deadline also aborts Retry-After waiting', async () => {
   assert.ok(Date.now() - startedAt < 100, 'timeout should interrupt retry sleep');
 });
 
+test('a deadline during network failure backoff remains a timeout instead of cancellation', async () => {
+  let calls = 0;
+  await assert.rejects(
+    fetchJsonWithPolicy(async () => {
+      calls += 1;
+      throw new TypeError('Failed to fetch');
+    }, { url: 'https://example.test' }, {
+      timeoutMs: 10, maxAttempts: 2, retryDelayMs: 200
+    }),
+    (error) => error.code === 'REQUEST_TIMEOUT' && error.name !== 'AbortError'
+  );
+  assert.equal(calls, 1, 'the expired request must not start another upload');
+});
+
+test('caller cancellation during network backoff remains cancellation and prevents another upload', async () => {
+  const controller = new AbortController();
+  let calls = 0;
+  const pending = fetchJsonWithPolicy(async () => {
+    calls += 1;
+    throw new TypeError('Failed to fetch');
+  }, { url: 'https://example.test', signal: controller.signal }, {
+    timeoutMs: 1_000, maxAttempts: 2, retryDelayMs: 200
+  });
+  // Let the failed fetch enter its retry wait before cancelling the caller.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  controller.abort();
+  await assert.rejects(pending, (error) => error.name === 'AbortError' && error.code !== 'REQUEST_TIMEOUT');
+  assert.equal(calls, 1);
+});
+
 test('caps an untrusted Retry-After value before retrying', async () => {
   let calls = 0;
   const startedAt = Date.now();

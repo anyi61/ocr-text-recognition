@@ -58,7 +58,7 @@ test('updating corrected text preserves source metadata', async () => {
   });
 
   assert.equal(record.id, 'record-1');
-  assert.equal(await store.updateText(record.id, 'the'), true);
+  assert.equal(await store.updateText(record.id, 'the', 'teh'), true);
 
   const [updated] = await store.list();
   assert.equal(updated.text, 'the');
@@ -66,6 +66,32 @@ test('updating corrected text preserves source metadata', async () => {
   assert.equal(updated.language, 'en');
   assert.equal(updated.sourceUrl, 'https://example.test/page');
   assert.equal(updated.sourceTitle, 'Example');
+});
+
+test('concurrent formal saves compare their original body inside the write queue', async () => {
+  const original = { id: 'shared', text: 'Original', timestamp: 1, favorite: true,
+    name: 'Important', draft: { text: 'Another draft', baseText: 'Original', updatedAt: 1 },
+    translation: { sourceText: 'Original', text: '翻译' } };
+  const storage = createMemoryStorage([original], 5);
+  const store = create(storage);
+  const first = store.updateText('shared', 'First correction', 'Original');
+  const stale = store.updateText('shared', 'Stale correction', 'Original');
+  assert.equal(await first, true);
+  await assert.rejects(stale, { code: 'HISTORY_TEXT_CONFLICT' });
+  assert.deepEqual(storage.snapshot(), [{ ...original, text: 'First correction' }]);
+});
+
+test('formal saves require an explicit baseline and still allow reopening the latest text', async () => {
+  const original = { id: 'shared', text: 'Original', timestamp: 1 };
+  const storage = createMemoryStorage([original]);
+  const store = create(storage);
+  await assert.rejects(store.updateText('shared', 'Unsafe edit'), { code: 'HISTORY_TEXT_INVALID' });
+  await assert.rejects(store.updateText('shared', {}, 'Original'), { code: 'HISTORY_TEXT_INVALID' });
+  assert.deepEqual(storage.snapshot(), [original]);
+  await store.updateText('shared', ' First correction ', 'Original');
+  await store.updateText('shared', 'Reviewed correction', 'First correction');
+  assert.equal((await store.get('shared')).text, 'Reviewed correction');
+  assert.equal(await store.updateText('missing', 'Unstored', 'Original'), false);
 });
 
 test('delete removes only the requested record', async () => {

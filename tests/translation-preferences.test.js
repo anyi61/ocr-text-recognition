@@ -2,7 +2,12 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { create, normalize, DEFAULTS } = require('../translation-preferences.js');
+const { normalize, DEFAULTS } = require('../translation-preferences.js');
+const { create: createSettingsStore } = require('../settings-store.js');
+function create(storage) {
+  const store = createSettingsStore(storage);
+  return { get: store.getTranslationPreferences, save: store.saveTranslationPreferences };
+}
 const { createPreferenceSession } = require('../translation-ui.js');
 
 function deferred() {

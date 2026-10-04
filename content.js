@@ -1582,71 +1582,71 @@
    * @returns {Promise<string>} 裁剪后的图片Data URL
    * @description 使用Canvas根据选区裁剪图片
    */
-  function cropImage(dataUrl, rect) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+  async function cropImage(dataUrl, rect) {
+    const img = new Image();
+    try {
+      img.src = dataUrl;
+      await img.decode();
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error(OCRI18n.t('content_msg_capture_failed'));
 
-        const imageWidth = img.naturalWidth || img.width;
-        const imageHeight = img.naturalHeight || img.height;
-        const scale = OCRCaptureUtils.computeCropScale(
-          imageWidth,
-          imageHeight,
-          window.innerWidth,
-          window.innerHeight
+      const imageWidth = img.naturalWidth || img.width;
+      const imageHeight = img.naturalHeight || img.height;
+      const scale = OCRCaptureUtils.computeCropScale(
+        imageWidth,
+        imageHeight,
+        window.innerWidth,
+        window.innerHeight
+      );
+
+      const sourceLeft = Math.max(0, Math.min(imageWidth - 1, rect.left * scale.x));
+      const sourceTop = Math.max(0, Math.min(imageHeight - 1, rect.top * scale.y));
+      const sourceWidth = Math.max(0, Math.min(imageWidth - sourceLeft, rect.width * scale.x));
+      const sourceHeight = Math.max(0, Math.min(imageHeight - sourceTop, rect.height * scale.y));
+
+      if (sourceWidth < 15 || sourceHeight < 15) {
+        throw new Error(OCRI18n.t('content_msg_selection_small_edit'));
+      }
+
+      const limits = { maxEdge: 4096, maxPixels: 12_000_000 };
+      let fitted = OCRCaptureUtils.fitImageWithinLimits(sourceWidth, sourceHeight, limits);
+      const maxBase64Length = 3 * 1024 * 1024;
+
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        canvas.width = fitted.width;
+        canvas.height = fitted.height;
+        ctx.clearRect(0, 0, fitted.width, fitted.height);
+        ctx.drawImage(
+          img,
+          sourceLeft,
+          sourceTop,
+          sourceWidth,
+          sourceHeight,
+          0,
+          0,
+          fitted.width,
+          fitted.height
         );
 
-        const sourceLeft = Math.max(0, Math.min(imageWidth - 1, rect.left * scale.x));
-        const sourceTop = Math.max(0, Math.min(imageHeight - 1, rect.top * scale.y));
-        const sourceWidth = Math.max(0, Math.min(imageWidth - sourceLeft, rect.width * scale.x));
-        const sourceHeight = Math.max(0, Math.min(imageHeight - sourceTop, rect.height * scale.y));
-
-        if (sourceWidth < 15 || sourceHeight < 15) {
-          reject(new Error(OCRI18n.t('content_msg_selection_small_edit')));
-          return;
+        const normalizedImage = canvas.toDataURL('image/png');
+        const base64Payload = normalizedImage.slice(normalizedImage.indexOf(',') + 1);
+        if (base64Payload.length <= maxBase64Length) {
+          return normalizedImage;
         }
 
-        const limits = { maxEdge: 4096, maxPixels: 12_000_000 };
-        let fitted = OCRCaptureUtils.fitImageWithinLimits(sourceWidth, sourceHeight, limits);
-        const maxBase64Length = 3 * 1024 * 1024;
+        const nextScale = Math.min(0.9, Math.sqrt(maxBase64Length / base64Payload.length) * 0.95);
+        const nextWidth = Math.floor(fitted.width * nextScale);
+        const nextHeight = Math.floor(fitted.height * nextScale);
+        if (nextWidth < 15 || nextHeight < 15) break;
+        fitted = { width: nextWidth, height: nextHeight };
+      }
 
-        for (let attempt = 0; attempt < 12; attempt += 1) {
-          canvas.width = fitted.width;
-          canvas.height = fitted.height;
-          ctx.clearRect(0, 0, fitted.width, fitted.height);
-          ctx.drawImage(
-            img,
-            sourceLeft,
-            sourceTop,
-            sourceWidth,
-            sourceHeight,
-            0,
-            0,
-            fitted.width,
-            fitted.height
-          );
-
-          const normalizedImage = canvas.toDataURL('image/png');
-          const base64Payload = normalizedImage.slice(normalizedImage.indexOf(',') + 1);
-          if (base64Payload.length <= maxBase64Length) {
-            resolve(normalizedImage);
-            return;
-          }
-
-          const nextScale = Math.min(0.9, Math.sqrt(maxBase64Length / base64Payload.length) * 0.95);
-          const nextWidth = Math.floor(fitted.width * nextScale);
-          const nextHeight = Math.floor(fitted.height * nextScale);
-          if (nextWidth < 15 || nextHeight < 15) break;
-          fitted = { width: nextWidth, height: nextHeight };
-        }
-
-        reject(new Error(OCRI18n.t('content_msg_selection_small_edit')));
-      };
-      img.onerror = reject;
-      img.src = dataUrl;
-    });
+      throw new Error(OCRI18n.t('content_msg_selection_small_edit'));
+    } finally {
+      // Release decoded screenshot pixels on both successful and failed crops.
+      img.src = '';
+    }
   }
 
   /**
@@ -2078,10 +2078,14 @@
         const response = await chrome.runtime.sendMessage({
           action: 'updateHistoryRecord',
           historyId,
-          text: updatedText
+          text: updatedText,
+          expectedText: lastSavedText
         });
+        if (!popup.isConnected || isClosing) return;
         if (!response?.success) {
-          throw new Error(response?.error || OCRI18n.t('content_msg_changes_save_failed'));
+          const error = new Error(response?.error || OCRI18n.t('content_msg_changes_save_failed'));
+          error.code = response?.errorCode;
+          throw error;
         }
 
         // Edits/cleanup made while storage is saving must remain in the editor.
@@ -2091,6 +2095,7 @@
         }
         lastSavedText = updatedText;
         await draft.refresh();
+        if (!popup.isConnected || isClosing) return;
         if (textarea.value.trim() !== lastSavedText) void draft.notifySourceChanged(true);
         saveChangesBtn.textContent = OCRI18n.t(
           textarea.value.trim() === lastSavedText ? 'content_btn_saved' : 'content_btn_save_changes'
@@ -2104,12 +2109,15 @@
           }
         }, 1500);
       } catch (error) {
+        if (!popup.isConnected || isClosing) return;
         console.error('保存识别结果修改失败:', error);
-        showNotification(OCRI18n.t('content_msg_changes_save_failed'), 'error');
-        announceA11y(OCRI18n.t('content_msg_changes_save_failed'));
+        const key = error.code === 'HISTORY_TEXT_CONFLICT'
+          ? 'content_msg_changes_conflict' : 'content_msg_changes_save_failed';
+        showNotification(OCRI18n.t(key), 'error');
+        announceA11y(OCRI18n.t(key));
       } finally {
         isSaving = false;
-        updateSaveButtonState();
+        if (popup.isConnected && !isClosing) updateSaveButtonState();
       }
     });
 

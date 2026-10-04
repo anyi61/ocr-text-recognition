@@ -252,10 +252,40 @@ test('restored cancelling or failing replacement translation preserves the prior
   harness.session.start();
   harness.session.cancel();
   assert.equal(harness.session.getState().text, 'Previous');
+  assert.equal(harness.session.getState().canCopy, true);
   harness.session.start();
   harness.port.onMessage.emit({ action: 'translationResult', requestId: 'task-2', success: false, errorCode: 'API_RATE_LIMITED' });
   assert.equal(harness.session.getState().text, 'Previous');
   assert.equal(harness.session.getState().errorCode, 'API_RATE_LIMITED');
+  assert.equal(harness.session.getState().canCopy, true);
+});
+
+test('returning to the retained translation snapshot restores usability without another request', () => {
+  const harness = translationHarness();
+  harness.session.restore({ sourceText: 'Original', text: 'Previous', provider: 'openai', targetLanguage: 'en' });
+  for (const [field, changed, original] of [
+    ['text', 'Edited', 'Original'], ['provider', 'claude', 'openai'], ['targetLanguage', 'ja', 'en']
+  ]) {
+    harness.update({ [field]: changed });
+    assert.equal(harness.session.getState().status, 'stale');
+    assert.equal(harness.session.getState().canCopy, false);
+    harness.update({ [field]: original });
+    assert.equal(harness.session.getState().status, 'success');
+    assert.equal(harness.session.getState().canCopy, true);
+  }
+  assert.equal(harness.connects, 0);
+});
+
+test('failure or cancellation cannot make an older mismatched translation copyable', () => {
+  const harness = translationHarness();
+  harness.session.restore({ sourceText: 'Original', text: 'Previous', provider: 'openai', targetLanguage: 'en' });
+  harness.update({ text: 'Edited' });
+  harness.session.start();
+  harness.session.cancel();
+  assert.equal(harness.session.getState().canCopy, false);
+  harness.session.start();
+  harness.port.onMessage.emit({ action: 'translationResult', requestId: 'task-2', success: false, errorCode: 'API_RATE_LIMITED' });
+  assert.equal(harness.session.getState().canCopy, false);
 });
 
 test('restored translation connection loss is retryable and destroy cancels and disconnects once', () => {

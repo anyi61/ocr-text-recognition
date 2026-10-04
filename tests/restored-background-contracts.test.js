@@ -95,8 +95,95 @@ function createHarness(options = {}) {
   };
 }
 
+test('settings mutation is restricted to this extension options page and never returns credentials', async () => {
+  const harness = createHarness();
+  const request = { action: 'saveSettings', settings: { prompt: 'New prompt', apiConfigs: { openai: { apiKey: 'replacement-secret' } } } };
+  for (const sender of [{}, { url: 'https://example.test/options.html' },
+    { url: 'chrome-extension://other/options.html' }, { url: PAGE }]) {
+    const response = await harness.message(request, sender);
+    assert.equal(response.errorCode, 'SETTINGS_ACCESS_DENIED');
+  }
+  assert.equal(harness.writes.length, 0);
+  const response = await harness.message(request, { url: 'chrome-extension://fixture/options.html?source=review#provider' });
+  assert.deepEqual(response, { success: true });
+  assert.equal(harness.state.apiConfigs.openai.apiKey, 'replacement-secret');
+  assert.equal(harness.state.apiConfigs.openai.model, 'fixture-model');
+  assert.equal(harness.state.prompt, 'New prompt');
+});
+
+test('invalid settings import and failed storage cannot claim success or leak private errors', async () => {
+  const harness = createHarness();
+  const before = structuredClone(harness.state);
+  const sender = { url: 'chrome-extension://fixture/options.html' };
+  const response = await harness.message({ action: 'saveSettings', settings: {
+    prompt: 'Must not save', apiConfigs: { openai: { apiKey: { secret: 'invalid-object' } } }
+  } }, sender);
+  assert.deepEqual(response, { success: false, errorCode: 'SETTINGS_INVALID' });
+  assert.deepEqual(harness.state, before);
+  assert.equal(harness.writes.length, 0);
+  const failed = createHarness({ failWrites: true });
+  assert.deepEqual(await failed.message({ action: 'saveSettings', settings: { prompt: 'Valid' } }, sender),
+    { success: false, errorCode: 'SETTINGS_SAVE_FAILED' });
+});
+
+test('import and translation preference messages share one write queue', async () => {
+  const gate = deferred();
+  const harness = createHarness({ onSet: (_values, count) => count === 1 ? gate.promise : undefined });
+  const first = harness.message({ action: 'saveTranslationPreferences', preferences: { targetLanguage: 'ja' } });
+  await until(() => harness.writes.length === 1);
+  const second = harness.message({ action: 'saveTranslationPreferences', preferences: { provider: 'openai' } });
+  const imported = harness.message({ action: 'saveSettings', settings: {
+    translationProvider: 'custom', translationTargetLanguage: 'fr'
+  } }, { url: 'chrome-extension://fixture/options.html' });
+  gate.resolve();
+  const responses = await Promise.all([first, second, imported]);
+  assert.ok(responses.every((response) => response.success));
+  assert.deepEqual(await harness.message({ action: 'getTranslationPreferences' }), {
+    success: true, preferences: { provider: 'custom', targetLanguage: 'fr' }
+  });
+});
+
 const translationRequest = (changes = {}) => ({ action: 'translate', requestId: 'translate-1',
   provider: 'openai', targetLanguage: 'en', text: 'Original source', ...changes });
+
+test('appearance changes accept only known fields from extension settings and popup', async () => {
+  const harness = createHarness();
+  const request = { action: 'saveAppearancePreferences', preferences: { theme: 'dark', uiLanguage: 'zh_CN' } };
+  for (const sender of [{}, { url: PAGE }, { url: 'https://example.test/popup.html' },
+    { url: 'chrome-extension://other/popup.html' }]) {
+    assert.equal((await harness.message(request, sender)).errorCode, 'SETTINGS_ACCESS_DENIED');
+  }
+  const sender = { url: 'chrome-extension://fixture/popup.html?review=1' };
+  for (const preferences of [{}, [], { theme: 'invalid' }, { uiLanguage: 'ja' }, { apiConfigs: {} },
+    { theme: 'dark', prompt: 'Disallowed field' }]) {
+    assert.equal((await harness.message({ ...request, preferences }, sender)).errorCode, 'SETTINGS_INVALID');
+  }
+  assert.equal(harness.writes.length, 0);
+  assert.deepEqual(await harness.message(request, sender), { success: true });
+  assert.equal(harness.state.theme, 'dark');
+  assert.equal(harness.state.uiLanguage, 'zh_CN');
+  const failed = createHarness({ failWrites: true });
+  assert.deepEqual(await failed.message(request, sender), { success: false, errorCode: 'SETTINGS_SAVE_FAILED' });
+});
+
+test('popup appearance changes wait for earlier configuration imports in the shared queue', async () => {
+  const gate = deferred();
+  const harness = createHarness({ onSet: (_values, count) => count === 1 ? gate.promise : undefined });
+  const imported = harness.message({ action: 'saveSettings', settings: {
+    theme: 'light', uiLanguage: 'en', translationTargetLanguage: 'fr'
+  } }, { url: 'chrome-extension://fixture/options.html' });
+  await until(() => harness.writes.length === 1);
+  const appearance = harness.message({ action: 'saveAppearancePreferences', preferences: {
+    theme: 'dark', uiLanguage: 'zh_CN'
+  } }, { url: 'chrome-extension://fixture/popup.html' });
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(harness.writes.length, 1);
+  gate.resolve();
+  assert.ok((await Promise.all([imported, appearance])).every((response) => response.success));
+  assert.equal(harness.state.theme, 'dark');
+  assert.equal(harness.state.uiLanguage, 'zh_CN');
+  assert.equal(harness.state.translationTargetLanguage, 'fr');
+});
 
 test('restored capabilities expose supported models and limits without credentials or private endpoints', async () => {
   const harness = createHarness({ state: { apiProvider: 'baidu', apiConfigs: {
@@ -285,7 +372,7 @@ test('restored background draft messages preserve originals, detect stale owners
   assert.equal(discard.success, true);
   const next = await harness.message({ action: 'saveHistoryDraft', historyId: 'record-1', text: 'Corrected', baseText: 'Original', ownerId: 'editor-a', expectedUpdatedAt: discard.draftUpdatedAt });
   assert.equal(next.success, true);
-  await harness.message({ action: 'updateHistoryRecord', historyId: 'record-1', text: 'Corrected' });
+  await harness.message({ action: 'updateHistoryRecord', historyId: 'record-1', text: 'Corrected', expectedText: 'Original' });
   const saved = await harness.message({ action: 'getHistoryRecord', historyId: 'record-1' });
   assert.equal(saved.record.text, 'Corrected');
   assert.equal(saved.record.draft, undefined);
@@ -365,7 +452,7 @@ test('restored workspace closure while history is writing rolls back before anot
   port.send({ action: 'performOCR', requestId: 'image-1', imageData: IMAGE });
   await until(() => harness.writes.length === 1);
   port.disconnect();
-  const update = harness.message({ action: 'updateHistoryRecord', historyId: 'keep', text: 'Keep edited' });
+  const update = harness.message({ action: 'updateHistoryRecord', historyId: 'keep', text: 'Keep edited', expectedText: 'Keep' });
   gate.resolve();
   await update;
   assert.deepEqual(harness.writes[1].ocrHistory, original);
@@ -505,4 +592,45 @@ test('background invalid preference patches and write failures keep previous glo
   assert.equal(failed.state.translationProvider, 'openai');
   assert.equal((await failed.message({ action: 'openSettings' })).success, true);
   assert.equal(failed.openedSettings, 1);
+});
+
+test('page OCR checks endpoint permission for both configurable providers before uploading', async () => {
+  for (const provider of ['custom', 'openai-compatible']) {
+    const storageKey = provider === 'custom' ? 'custom' : 'openaiCompatible';
+    const harness = createHarness({ permission: false, state: { apiProvider: provider, apiConfigs: {
+      [storageKey]: { endpoint: 'https://example.test/ocr', apiKey: 'fixture-key', model: 'fixture-model' }
+    } } });
+    const result = await harness.message({ action: 'performOCR', requestId: 'page-1', imageData: IMAGE },
+      { tab: { id: 1, url: 'https://page.test/document' } });
+    assert.equal(result.success, false);
+    assert.equal(result.errorCode, 'OCR_ENDPOINT_PERMISSION_REQUIRED');
+    assert.equal(result.cancelled, undefined);
+    assert.deepEqual(harness.permissions, [{ origins: ['https://example.test/*'] }]);
+    assert.equal(harness.requests.length, 0);
+    assert.deepEqual(harness.state.ocrHistory, []);
+  }
+});
+
+test('retrying a failed page image rechecks revoked permission and resumes only after access is granted', async () => {
+  const options = { state: { apiProvider: 'openai-compatible', apiConfigs: { openaiCompatible: {
+    endpoint: 'https://example.test/ocr', apiKey: 'fixture-key', model: 'fixture-model'
+  } } }, fetch: (_url, _options, count) => Response.json(count === 1
+    ? { error: { message: 'Rejected first attempt' } }
+    : { choices: [{ message: { content: 'Recovered text' } }] }, { status: count === 1 ? 401 : 200 }) };
+  const harness = createHarness(options);
+  const sender = { tab: { id: 1, url: 'https://page.test/document' } };
+  const recognize = (requestId) => harness.message({ action: 'performOCR', requestId, imageData: IMAGE }, sender);
+  assert.equal((await recognize('page-first')).errorCode, 'API_AUTHENTICATION_FAILED');
+  options.permission = false;
+  const denied = await recognize('page-retry-denied');
+  assert.equal(denied.errorCode, 'OCR_ENDPOINT_PERMISSION_REQUIRED');
+  assert.equal(harness.requests.length, 1, 'revoked access must not allow a retry upload');
+  assert.deepEqual(harness.state.ocrHistory, []);
+  options.permission = true;
+  const recovered = await recognize('page-retry-granted');
+  assert.equal(recovered.success, true);
+  assert.equal(harness.requests.length, 2);
+  assert.equal(harness.requests[1].options.body, harness.requests[0].options.body);
+  assert.equal(harness.state.ocrHistory.length, 1);
+  assert.equal(harness.permissions.length, 3);
 });

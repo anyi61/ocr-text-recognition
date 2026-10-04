@@ -1557,5 +1557,14 @@
   },
   "translation_preferences_retry": {
     "message": "Retry preferences"
+  },
+  "error_ocr_endpoint_permission_required": {
+    "message": "This API domain is not authorized. Open settings to grant access, then retry the original image."
+  },
+  "content_msg_changes_conflict": {
+    "message": "The saved text changed in another window. Your edits are still here. Copy them, reopen this history record, and review before saving."
+  },
+  "msg_settings_save_failed": {
+    "message": "Could not save settings. Your edits are still here; try again."
   }
 }

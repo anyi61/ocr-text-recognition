@@ -165,13 +165,20 @@
       });
     }
 
-    async function updateText(id, text) {
+    async function updateText(id, text, expectedText) {
+      if (typeof text !== 'string' || typeof expectedText !== 'string') {
+        throw codedError('HISTORY_TEXT_INVALID');
+      }
+      const savedText = normalizeText(text);
       return enqueue(async () => {
         const history = await readHistory();
         const index = history.findIndex((item) => item?.id === id);
         if (index < 0) return false;
+        // Serializing writes prevents lost fields, but a stale editor must also
+        // prove that the body it edited is still the current saved version.
+        if (history[index].text !== expectedText) throw codedError('HISTORY_TEXT_CONFLICT');
 
-        const updated = { ...history[index], text: normalizeText(text) };
+        const updated = { ...history[index], text: savedText };
         // A concurrent editor may have saved a different draft. Only the draft
         // that was just committed is consumed by this formal save.
         if (typeof updated.draft?.text === 'string' && updated.draft.text.trim() === updated.text) delete updated.draft;
@@ -265,7 +272,10 @@
       });
     }
 
-    async function discardDraft(id, expectedUpdatedAt) {
+    async function discardDraft(id, expectedUpdatedAt, ownerId) {
+      if (ownerId !== undefined && (typeof ownerId !== 'string' || !ownerId || ownerId.length > 128)) {
+        throw codedError('HISTORY_DRAFT_INVALID');
+      }
       return enqueue(async () => {
         const history = await readHistory();
         const index = history.findIndex((item) => item?.id === id);
@@ -276,8 +286,11 @@
         }
         const updated = { ...history[index] };
         delete updated.draft;
-        if (updated.draftMeta) {
-          updated.draftMeta = { ownerId: '', updatedAt: Math.max(Date.now(), updated.draftMeta.updatedAt + 1) };
+        if (updated.draftMeta || ownerId !== undefined) {
+          // The editor can type again while its discard acknowledgement is in
+          // flight. Keep that owner's right to submit the next immediate input.
+          const revision = updated.draftMeta?.updatedAt ?? history[index].draft.updatedAt ?? 0;
+          updated.draftMeta = { ownerId: ownerId ?? '', updatedAt: Math.max(Date.now(), revision + 1) };
         }
         await storage.set({ ocrHistory: history.map((item, itemIndex) => itemIndex === index ? updated : item) });
         return { success: true, draftUpdatedAt: updated.draftMeta?.updatedAt ?? null };

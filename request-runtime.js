@@ -108,11 +108,8 @@
           );
           await waitForRetry(delayMs, requestController.signal);
         } catch (error) {
-          if (callerSignal?.aborted) throw abortError();
-          if (timeoutController.signal.aborted) throw timeoutError();
-          if (error?.name === 'AbortError' || error?.code === 'REQUEST_TIMEOUT') throw error;
           const isNetworkFailure = error instanceof TypeError;
-          if (!isNetworkFailure || attempt >= attempts) throw error;
+          if (requestController.signal.aborted || !isNetworkFailure || attempt >= attempts) throw error;
           const delayMs = Math.min(
             settings.maxRetryDelayMs,
             settings.retryDelayMs * (2 ** (attempt - 1))
@@ -124,6 +121,12 @@
         }
       }
       throw new Error('网络连接失败，请检查网络或代理设置');
+    } catch (error) {
+      // Both HTTP and network retry waits must report the same cancellation
+      // cause. A deadline during a network backoff is still a timeout.
+      if (callerSignal?.aborted) throw abortError();
+      if (timeoutController.signal.aborted) throw timeoutError();
+      throw error;
     } finally {
       clearTimeout(timeoutId);
     }

@@ -79,8 +79,8 @@ test('committing an unfinished draft returns it to ordinary retention unless sti
     record('favorite', 2, { favorite: true, draft: { text: 'Edited favorite', baseText: 'Text favorite', updatedAt: 2 } })
   ]);
   const store = create(storage, { limit: 1 });
-  await store.updateText('draft', 'Edited');
-  await store.updateText('favorite', 'Edited favorite');
+  await store.updateText('draft', 'Edited', 'Text draft');
+  await store.updateText('favorite', 'Edited favorite', 'Text favorite');
   await store.append(record('new', 3));
   assert.deepEqual((await store.list()).map((item) => item.id), ['new', 'favorite']);
 });
@@ -96,7 +96,7 @@ test('serialized metadata patches preserve concurrent text, draft ownership, and
     store.saveDraft('shared', { text: 'Still editing', baseText: 'Text shared' }, { ownerId: 'editor', expectedUpdatedAt: null }),
     store.patchMetadata('shared', { name: 'Shared item' }),
     store.saveTranslation('shared', translation),
-    store.updateText('shared', 'Formal edit')
+    store.updateText('shared', 'Formal edit', 'Text shared')
   ]);
   const updated = await store.get('shared');
   assert.equal(updated.favorite, true);
@@ -105,6 +105,40 @@ test('serialized metadata patches preserve concurrent text, draft ownership, and
   assert.equal(updated.draft.text, 'Still editing');
   assert.equal(updated.draftMeta.ownerId, 'editor');
   assert.deepEqual(updated.translation, translation);
+});
+
+test('discard retains the editor ownership for input sent before its acknowledgement', async () => {
+  const storage = memoryStorage([record('shared', 1)]);
+  const store = create(storage);
+  const saved = await store.saveDraft('shared', { text: 'Old draft', baseText: 'Text shared' },
+    { ownerId: 'editor-a', expectedUpdatedAt: null });
+  const revision = saved.draftUpdatedAt;
+  const discard = store.discardDraft('shared', revision, 'editor-a');
+  const input = store.saveDraft('shared', { text: 'Typed during discard', baseText: 'Text shared' },
+    { ownerId: 'editor-a', expectedUpdatedAt: revision });
+  assert.equal((await discard).success, true);
+  assert.equal((await input).success, true);
+  const staleOther = await store.saveDraft('shared', { text: 'Another editor', baseText: 'Text shared' },
+    { ownerId: 'editor-b', expectedUpdatedAt: revision });
+  assert.equal(staleOther.errorCode, 'HISTORY_DRAFT_CONFLICT');
+  assert.equal((await store.get('shared')).draft.text, 'Typed during discard');
+});
+
+test('managed discard keeps revision checks and cannot take ownership of an absent draft', async () => {
+  const storage = memoryStorage([record('shared', 1)]);
+  const store = create(storage);
+  const saved = await store.saveDraft('shared', { text: 'Draft', baseText: 'Text shared' },
+    { ownerId: 'editor-a', expectedUpdatedAt: null });
+  await assert.rejects(store.discardDraft('shared', saved.draftUpdatedAt - 1, 'editor-b'),
+    { code: 'HISTORY_DRAFT_CONFLICT' });
+  await store.discardDraft('shared', saved.draftUpdatedAt, 'editor-a');
+  const before = storage.snapshot();
+  await store.discardDraft('shared', saved.draftUpdatedAt, 'editor-b');
+  assert.deepEqual(storage.snapshot(), before);
+  for (const owner of ['', null, 4, 'x'.repeat(129)]) {
+    await assert.rejects(store.discardDraft('shared', saved.draftUpdatedAt, owner),
+      { code: 'HISTORY_DRAFT_INVALID' });
+  }
 });
 
 test('metadata snapshots cannot be changed by the caller while queued or after return', async () => {

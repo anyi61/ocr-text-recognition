@@ -58,15 +58,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 历史记录数据（用于点击查看）
   let historyData = [];
   let activePreviewId = null;
+  let previewRecord = null;
   let previewSavedText = '';
   let previewSaving = false;
+  let languageSaving = false;
   let previewTranslation = null;
   let previewDraft = null;
   let repeatAvailable = false;
   let previewSavedName = '';
   const pendingMetadata = new Set();
-  const metadataVersions = new Map();
-  let metadataVersion = 0;
+  const historyFieldVersions = new Map();
+  let historyFieldVersion = 0;
 
   const destroyPreviewTranslation = () => {
     previewTranslation?.destroy();
@@ -89,7 +91,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     previewFavoriteBtn.textContent = OCRI18n.t(favorite ? 'history_unfavorite' : 'history_favorite');
     previewFavoriteBtn.setAttribute('aria-pressed', String(favorite));
     previewFavoriteBtn.disabled = busy || !record;
-    historyName.disabled = busy || !record;
+    historyName.disabled = busy;
+    historyName.readOnly = !record;
     historyNameSaveBtn.disabled = busy || !record || !hasPreviewNameChanges();
     historyNameCancelBtn.disabled = busy || !hasPreviewNameChanges();
   };
@@ -99,9 +102,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     previewRevertBtn.disabled = previewSaving || !hasPreviewChanges();
     historyPreviewText.readOnly = previewSaving;
     closePreviewBtn.disabled = previewSaving;
-    for (const control of [captureBtn, imageImportBtn, settingsBtn, configTip, clearHistoryBtn, exportHistoryBtn, languageSelect]) {
+    for (const control of [captureBtn, imageImportBtn, settingsBtn, configTip, clearHistoryBtn, exportHistoryBtn]) {
       control.disabled = previewSaving;
     }
+    languageSelect.disabled = previewSaving || languageSaving;
     repeatCaptureBtn.disabled = previewSaving || !repeatAvailable;
   };
 
@@ -133,23 +137,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
+  let themeRevision = 0;
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes.theme) return;
+    themeRevision += 1;
+    applyTheme(changes.theme.newValue === 'dark' ? 'dark' : 'light');
+  });
+
   /**
    * 切换主题
    */
   const toggleTheme = async () => {
+    if (themeBtn.disabled) return;
     const currentTheme = document.documentElement.dataset.theme || 'light';
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    applyTheme(newTheme);
-    await chrome.storage.local.set({ theme: newTheme });
+    const revision = themeRevision;
+    themeBtn.disabled = true;
+    try {
+      const result = await chrome.runtime.sendMessage({ action: 'saveAppearancePreferences', preferences: { theme: newTheme } });
+      if (!result?.success) throw new Error('Settings write failed');
+      if (revision === themeRevision) applyTheme(newTheme);
+    } catch {
+      const message = OCRI18n.t('msg_settings_save_failed');
+      announcePopupStatus(message);
+      alert(message);
+    } finally {
+      themeBtn.disabled = false;
+    }
   };
 
   /**
    * 加载主题设置
    */
   const loadTheme = async () => {
+    const revision = themeRevision;
     const result = await chrome.storage.local.get(['theme']);
     const theme = result.theme || 'light';
-    applyTheme(theme);
+    if (revision === themeRevision) applyTheme(theme);
   };
 
   // 检查是否已配置API（支持多API配置）
@@ -242,23 +266,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     ].some((value) => String(value || '').toLocaleLowerCase().includes(query)));
   };
 
-  /**
-   * 显示历史详情预览
-   * @param {Object} item - 历史记录
-   */
-  const showHistoryPreview = (item, { preserveDraft = false } = {}) => {
-    const draft = preserveDraft ? historyPreviewText.value : null;
-    const name = preserveDraft ? historyName.value : null;
-    activePreviewId = item.id;
-    previewSavedName = item.name || '';
-    historyName.value = name ?? previewSavedName;
-    historyMetadataStatus.textContent = '';
-    updateMetadataControls();
-    previewSavedText = item.text || '';
-    historyPreviewText.value = draft ?? previewSavedText;
-    historyPreviewStatus.textContent = '';
+  const renderPreviewMetadata = (item) => {
     historyPreviewMeta.replaceChildren();
-
     const metadata = [
       `${OCRI18n.t('history_provider')}: ${providerLabels[item.provider] || item.provider || '-'}`,
       `${OCRI18n.t('history_language')}: ${getLanguageLabel(item.language)}`,
@@ -276,6 +285,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       historyPreviewMeta.appendChild(span);
     });
+  };
+
+  /**
+   * 显示历史详情预览
+   * @param {Object} item - 历史记录
+   */
+  const showHistoryPreview = (item) => {
+    activePreviewId = item.id;
+    previewRecord = item;
+    previewSavedName = item.name || '';
+    historyName.value = previewSavedName;
+    historyMetadataStatus.textContent = '';
+    updateMetadataControls();
+    previewSavedText = item.text || '';
+    historyPreviewText.value = previewSavedText;
+    historyPreviewStatus.textContent = '';
+    renderPreviewMetadata(item);
 
     historyPreview.classList.remove('hidden');
     historyList.classList.add('hidden');
@@ -283,35 +309,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     historyEmptyState.classList.add('hidden');
     historySearchWrap.classList.add('hidden');
     updatePreviewSaveState();
-    if (preserveDraft && previewTranslation) {
-      previewTranslation.refreshLabels();
-      previewDraft?.refreshLabels?.();
-    } else {
-      destroyPreviewTranslation();
-      previewTranslation = globalThis.OCRTranslationUI.mount({
-        container: historyTranslation,
-        sourceTextarea: historyPreviewText,
-        idPrefix: 'history-translation',
-        historyId: item.id,
-        announce: announcePopupStatus,
-        onPersisted: (translation) => {
-          historyData = historyData.map((record) => record.id === item.id ? { ...record, translation } : record);
-        },
-        openSettings: () => openSettings()
-      });
-      previewDraft = globalThis.OCRDraftUI.mount({
-        container: historyDraft,
-        sourceTextarea: historyPreviewText,
-        historyId: item.id,
-        getSavedText: () => previewSavedText,
-        onRestore: () => {
-          previewTranslation?.notifySourceChanged();
-          updatePreviewSaveState();
-        },
-        announce: announcePopupStatus
-      });
-    }
-    if (!preserveDraft) historyPreviewText.focus();
+    destroyPreviewTranslation();
+    previewTranslation = globalThis.OCRTranslationUI.mount({
+      container: historyTranslation,
+      sourceTextarea: historyPreviewText,
+      idPrefix: 'history-translation',
+      historyId: item.id,
+      announce: announcePopupStatus,
+      openSettings: () => openSettings()
+    });
+    previewDraft = globalThis.OCRDraftUI.mount({
+      container: historyDraft,
+      sourceTextarea: historyPreviewText,
+      historyId: item.id,
+      getSavedText: () => previewSavedText,
+      onRestore: () => {
+        previewTranslation?.notifySourceChanged();
+        updatePreviewSaveState();
+      },
+      announce: announcePopupStatus
+    });
+    historyPreviewText.focus();
   };
 
   /**
@@ -333,13 +351,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (previewSaveBtn.disabled) return;
     const historyId = activePreviewId;
     const text = historyPreviewText.value.trim();
+    const submittedTextVersion = historyFieldVersions.get(historyId)?.text;
     previewSaving = true;
     historyPreviewStatus.textContent = '';
     updatePreviewSaveState();
     try {
-      const response = await chrome.runtime.sendMessage({ action: 'updateHistoryRecord', historyId, text });
-      if (!response?.success) throw new Error('History update failed');
-      historyData = historyData.map((item) => item.id === historyId ? { ...item, text } : item);
+      const response = await chrome.runtime.sendMessage({
+        action: 'updateHistoryRecord', historyId, text, expectedText: previewSavedText
+      });
+      if (!response?.success) {
+        const error = new Error('History update failed');
+        error.code = response?.errorCode;
+        throw error;
+      }
+      // A later save may already have arrived through storage.onChanged while
+      // this reply was in flight. Preserve that version for the next opening.
+      if (historyFieldVersions.get(historyId)?.text === submittedTextVersion) {
+        historyData = historyData.map((item) => item.id === historyId ? { ...item, text } : item);
+      }
       previewSavedText = text;
       historyPreviewText.value = text;
       previewTranslation?.notifySourceChanged();
@@ -347,7 +376,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       historyPreviewStatus.textContent = OCRI18n.t('content_msg_changes_saved');
     } catch (error) {
       console.error('保存历史修改失败:', error);
-      historyPreviewStatus.textContent = OCRI18n.t('content_msg_changes_save_failed');
+      historyPreviewStatus.textContent = OCRI18n.t(error.code === 'HISTORY_TEXT_CONFLICT'
+        ? 'content_msg_changes_conflict' : 'content_msg_changes_save_failed');
     } finally {
       previewSaving = false;
       updatePreviewSaveState();
@@ -356,7 +386,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const saveHistoryMetadata = async (historyId, patch) => {
     if (pendingMetadata.has(historyId)) return false;
-    const submittedVersions = { ...metadataVersions.get(historyId) };
+    const submittedVersions = { ...historyFieldVersions.get(historyId) };
     pendingMetadata.add(historyId);
     updateMetadataControls();
     if (activePreviewId === historyId) historyMetadataStatus.textContent = '';
@@ -366,7 +396,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Storage events can carry a newer write from another popup before this
       // request's acknowledgement arrives. Such fields already have their
       // latest value; apply response fields only when no event changed them.
-      const latestVersions = metadataVersions.get(historyId) || {};
+      const latestVersions = historyFieldVersions.get(historyId) || {};
       const savedPatch = Object.fromEntries(Object.keys(patch)
         .filter((key) => latestVersions[key] === submittedVersions[key])
         .map((key) => [key, response.record[key]]));
@@ -532,7 +562,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           historyData = historyData.filter((record) => record.id !== item.id);
           if (activePreviewId === item.id) activePreviewId = null;
           announcePopupStatus(OCRI18n.t('a11y_history_deleted'));
-          renderHistory();
+          if (activePreviewId === null) renderHistory();
         } catch (error) {
           console.error('删除历史记录失败:', error);
           alert(OCRI18n.t('msg_history_action_failed'));
@@ -669,18 +699,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     const newRecords = new Map((Array.isArray(changes.ocrHistory.newValue) ? changes.ocrHistory.newValue : [])
       .map((item) => [item.id, item]));
     for (const id of new Set([...oldRecords.keys(), ...newRecords.keys()])) {
-      const versions = metadataVersions.get(id) || {};
-      for (const key of ['name', 'favorite']) {
+      const versions = historyFieldVersions.get(id) || {};
+      for (const key of ['name', 'favorite', 'text']) {
         if (oldRecords.get(id)?.[key] !== newRecords.get(id)?.[key]) {
-          versions[key] = ++metadataVersion;
+          versions[key] = ++historyFieldVersion;
         }
       }
-      metadataVersions.set(id, versions);
+      historyFieldVersions.set(id, versions);
     }
     historyData = Array.isArray(changes.ocrHistory.newValue) ? changes.ocrHistory.newValue : [];
     if (activePreviewId === null) renderHistory();
     else {
       const record = historyData.find((item) => item.id === activePreviewId);
+      if (record) previewRecord = record;
+      else if (oldRecords.has(activePreviewId)) previewDraft?.refresh();
       if (record && !hasPreviewNameChanges()) {
         previewSavedName = record.name || '';
         historyName.value = previewSavedName;
@@ -692,15 +724,40 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 主题切换按钮事件
   themeBtn.addEventListener('click', toggleTheme);
 
+  const refreshLanguageDisplay = () => {
+    languageSelect.value = OCRI18n.getLanguageSetting();
+    OCRI18n.applyToDom(document);
+    if (activePreviewId === null) renderHistory();
+    else {
+      // Changing labels must not reopen the record or discard its local edits,
+      // including when another window has deleted the stored record.
+      if (previewRecord) renderPreviewMetadata(previewRecord);
+      updateMetadataControls();
+      previewTranslation?.refreshLabels();
+      previewDraft?.refreshLabels();
+    }
+    refreshRepeatCapture();
+  };
+  window.addEventListener('ocr-i18n-changed', refreshLanguageDisplay);
+
   // 语言切换事件
   languageSelect.addEventListener('change', async (e) => {
+    if (languageSaving) return;
     const newLang = e.target.value;
-    await OCRI18n.setLanguage(newLang);
-    OCRI18n.applyToDom(document);
-    const activeItem = historyData.find((item) => item.id === activePreviewId);
-    if (activeItem) showHistoryPreview(activeItem, { preserveDraft: true });
-    else renderHistory();
-    refreshRepeatCapture();
+    languageSaving = true;
+    languageSelect.disabled = true;
+    try {
+      await OCRI18n.setLanguage(newLang);
+      refreshLanguageDisplay();
+    } catch {
+      languageSelect.value = OCRI18n.getLanguageSetting();
+      const message = OCRI18n.t('msg_settings_save_failed');
+      announcePopupStatus(message);
+      alert(message);
+    } finally {
+      languageSaving = false;
+      updatePreviewSaveState();
+    }
   });
 
   historySearch.addEventListener('input', renderHistory);

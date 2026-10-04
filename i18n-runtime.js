@@ -19,6 +19,7 @@ const OCRI18n = (function() {
   // 是否已初始化
   let initialized = false;
   let storageListenerBound = false;
+  let languageRevision = 0;
   const ERROR_MESSAGE_KEYS = Object.freeze({
     MISSING_API_KEY: 'error_missing_api_key',
     CAPTURE_TAB_CHANGED: 'error_capture_tab_changed',
@@ -29,6 +30,7 @@ const OCRI18n = (function() {
     OCR_RESULT_FILTERED: 'error_ocr_result_filtered',
     OCR_RESULT_INCOMPLETE: 'error_ocr_result_incomplete',
     HISTORY_SAVE_FAILED: 'error_history_save_failed',
+    OCR_ENDPOINT_PERMISSION_REQUIRED: 'error_ocr_endpoint_permission_required',
     NETWORK_ERROR: 'error_network',
     API_INVALID_REQUEST: 'error_api_invalid_request',
     API_AUTHENTICATION_FAILED: 'error_api_authentication_failed',
@@ -78,10 +80,12 @@ const OCRI18n = (function() {
         return;
       }
 
+      const revision = ++languageRevision;
       languageSetting = normalizeLanguageSetting(changes.uiLanguage.newValue);
       resolvedLanguage = resolveLanguage(languageSetting);
 
       loadDictionary(resolvedLanguage).then(() => {
+        if (revision !== languageRevision) return;
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('ocr-i18n-changed', {
             detail: {
@@ -160,19 +164,28 @@ const OCRI18n = (function() {
       return;
     }
 
+    const extensionPage = isExtensionPage();
+    // Observe changes before either the storage read or dictionary loading can
+    // yield. A newer notification must win over the initial read's snapshot.
+    if (extensionPage) bindStorageListener();
+    const revision = languageRevision;
+
     // 从存储中读取语言设置
     try {
-      const result = isExtensionPage()
+      const result = extensionPage
         ? await chrome.storage.local.get(['uiLanguage'])
         : await chrome.runtime.sendMessage({ action: 'getContentPreferences' });
-      languageSetting = normalizeLanguageSetting(result.uiLanguage);
+      if (revision === languageRevision) {
+        languageSetting = normalizeLanguageSetting(result.uiLanguage);
+        resolvedLanguage = resolveLanguage(languageSetting);
+      }
     } catch (error) {
       console.error('Error reading uiLanguage from storage:', error);
-      languageSetting = 'auto';
+      if (revision === languageRevision) {
+        languageSetting = 'auto';
+        resolvedLanguage = resolveLanguage(languageSetting);
+      }
     }
-
-    // 解析语言
-    resolvedLanguage = resolveLanguage(languageSetting);
 
     // 预加载两种语言字典
     await Promise.all([
@@ -180,7 +193,6 @@ const OCRI18n = (function() {
       loadDictionary('en')
     ]);
 
-    if (isExtensionPage()) bindStorageListener();
     initialized = true;
   }
 
@@ -270,18 +282,20 @@ const OCRI18n = (function() {
    * @returns {Promise<void>}
    */
   async function setLanguage(setting) {
-    languageSetting = normalizeLanguageSetting(setting);
-    resolvedLanguage = resolveLanguage(languageSetting);
-
-    // 确保字典已加载
-    await loadDictionary(resolvedLanguage);
-
-    // 持久化到存储
-    try {
-      await chrome.storage.local.set({ uiLanguage: languageSetting });
-    } catch (error) {
-      console.error('Error saving uiLanguage to storage:', error);
+    const requested = normalizeLanguageSetting(setting);
+    const revision = ++languageRevision;
+    const response = await chrome.runtime.sendMessage({
+      action: 'saveAppearancePreferences', preferences: { uiLanguage: requested }
+    });
+    if (!response?.success) {
+      throw Object.assign(new Error('Interface language was not saved'), { code: 'SETTINGS_SAVE_FAILED' });
     }
+    const language = resolveLanguage(requested);
+    await loadDictionary(language);
+    // Storage notifications and newer selections take priority over this reply.
+    if (revision !== languageRevision) return;
+    languageSetting = requested;
+    resolvedLanguage = language;
   }
 
   /**

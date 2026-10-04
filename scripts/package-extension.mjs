@@ -13,6 +13,7 @@ export const PRODUCTION_FILES = Object.freeze([
   'text-utils.js',
   'translation-runtime.js',
   'translation-preferences.js',
+  'settings-store.js',
   'translation-ui.js',
   'draft-ui.js',
   'image-utils.js',

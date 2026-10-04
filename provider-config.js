@@ -66,9 +66,7 @@
   });
 
   function isPresent(value) {
-    return typeof value === 'string'
-      ? value.trim().length > 0
-      : value !== undefined && value !== null;
+    return typeof value === 'string' && value.trim().length > 0;
   }
 
   function getStorageKey(provider) {
@@ -95,6 +93,91 @@
         .filter(([, legacyField]) => legacy[legacyField] !== undefined)
         .map(([field, legacyField]) => [field, legacy[legacyField]])
     );
+  }
+
+  const LEGACY_STORAGE_KEYS = Object.freeze([...new Set(Object.values(LEGACY_FIELDS)
+    .flatMap((fields) => Object.values(fields)))]);
+  const PROVIDER_FIELDS = Object.freeze({
+    claude: ['apiKey', 'model'], openai: ['apiKey', 'model'],
+    baidu: ['apiKey', 'secret'], aliyun: ['apiKey', 'model'], zhipu: ['apiKey', 'model'],
+    openaiCompatible: ['endpoint', 'apiKey', 'model', 'authMode', 'requestMode', 'headerName', 'responsePath'],
+    custom: ['endpoint', 'apiKey', 'model', 'authMode', 'requestMode', 'headerName', 'responsePath']
+  });
+
+  function isRecord(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  // Resolve presence, not truthiness: an explicitly cleared modern credential
+  // must never be resurrected from its legacy copy.
+  function resolveApiConfigs(settings = {}) {
+    const configs = {};
+    for (const [provider, key] of Object.entries(STORAGE_KEYS)) {
+      const modern = isRecord(settings.apiConfigs?.[key]) ? settings.apiConfigs[key] : {};
+      const config = { ...getLegacyConfig(settings, provider), ...modern };
+      if (Object.keys(config).length) configs[key] = config;
+    }
+    return configs;
+  }
+
+  function validateApiConfigs(configs) {
+    if (!isRecord(configs)) return 'apiConfigs';
+    for (const [key, config] of Object.entries(configs)) {
+      if (!Object.hasOwn(PROVIDER_FIELDS, key) || !isRecord(config)) return `apiConfigs.${key}`;
+      for (const [field, value] of Object.entries(config)) {
+        if (!PROVIDER_FIELDS[key].includes(field) || typeof value !== 'string') return `apiConfigs.${key}.${field}`;
+        if (field === 'authMode' && !AUTH_MODES.has(value)) return `apiConfigs.${key}.${field}`;
+        if (field === 'requestMode' && !REQUEST_MODES.has(value)) return `apiConfigs.${key}.${field}`;
+        if (field === 'endpoint' && value && !getEndpointOriginPattern(value)) return `apiConfigs.${key}.${field}`;
+        if (field === 'headerName' && value && !isValidHeaderName(value)) return `apiConfigs.${key}.${field}`;
+      }
+    }
+    return null;
+  }
+
+  const SETTING_ENUMS = Object.freeze({
+    apiProvider: Object.keys(STORAGE_KEYS),
+    language: ['auto', 'zh', 'en', 'ja', 'ko'], theme: ['light', 'dark'], uiLanguage: ['auto', 'zh_CN', 'en'],
+    translationProvider: Object.keys(STORAGE_KEYS),
+    translationTargetLanguage: ['zh_CN', 'zh_TW', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'pt', 'ru', 'ar']
+  });
+  const SETTINGS_STORAGE_KEYS = Object.freeze(['apiConfigs', 'prompt', 'autoCopy',
+    ...Object.keys(SETTING_ENUMS), ...LEGACY_STORAGE_KEYS]);
+
+  function prepareSettingsPatch(config) {
+    const invalid = (field) => {
+      throw Object.assign(new Error('Invalid configuration field'), { code: 'SETTINGS_INVALID', field });
+    };
+    if (!isRecord(config)) invalid('config');
+    for (const [key, value] of Object.entries(config)) {
+      if (!SETTINGS_STORAGE_KEYS.includes(key) && !['version', 'exportDate', 'appName'].includes(key)) invalid(key);
+      if (LEGACY_STORAGE_KEYS.includes(key) && typeof value !== 'string') invalid(key);
+    }
+    if (Object.hasOwn(config, 'apiConfigs')) {
+      const invalidField = validateApiConfigs(config.apiConfigs);
+      if (invalidField) invalid(invalidField);
+    }
+    const patch = {};
+    for (const [key, allowed] of Object.entries(SETTING_ENUMS)) {
+      if (Object.hasOwn(config, key)) {
+        if (!allowed.includes(config[key])) invalid(key);
+        patch[key] = config[key];
+      }
+    }
+    if (Object.hasOwn(config, 'prompt')) {
+      if (typeof config.prompt !== 'string') invalid('prompt');
+      patch.prompt = config.prompt;
+    }
+    if (Object.hasOwn(config, 'autoCopy')) {
+      if (typeof config.autoCopy !== 'boolean') invalid('autoCopy');
+      patch.autoCopy = config.autoCopy;
+    }
+    if (Object.hasOwn(config, 'apiConfigs') || LEGACY_STORAGE_KEYS.some((key) => Object.hasOwn(config, key))) {
+      patch.apiConfigs = resolveApiConfigs(config);
+      const invalidField = validateApiConfigs(patch.apiConfigs);
+      if (invalidField) invalid(invalidField);
+    }
+    return patch;
   }
 
   function normalizeConfig(provider, config) {
@@ -230,6 +313,12 @@
 
   return Object.freeze({
     DEFAULT_MODELS,
+    LEGACY_STORAGE_KEYS,
+    SETTINGS_STORAGE_KEYS,
+    prepareSettingsPatch,
+    isRecord,
+    resolveApiConfigs,
+    validateApiConfigs,
     getStorageKey,
     getProviderConfig,
     normalizeConfig,

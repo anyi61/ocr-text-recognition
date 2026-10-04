@@ -18,6 +18,13 @@
     };
     const error = (response) => response?.errorCode || 'HISTORY_WRITE_FAILED';
     const validDraft = (draft) => draft && typeof draft.text === 'string' && typeof draft.baseText === 'string';
+    const publishWithoutStoredDraft = () => {
+      // Reading or discarding a stored draft does not acknowledge different
+      // local edits. Keep those edits visibly unsaved and eligible for retry.
+      const unsaved = getText() !== getSavedText();
+      publish({ status: unsaved ? 'error' : 'idle', draft: null,
+        errorCode: unsaved ? 'HISTORY_WRITE_FAILED' : '' });
+    };
     async function refresh() {
       if (destroyed || !historyId) return;
       const token = ++loadGeneration;
@@ -36,7 +43,7 @@
         draftVersion = draft?.updatedAt ?? response.record.draftMeta?.updatedAt ?? null;
         if (response.record.text !== getSavedText()) {
           publish({ status: 'conflict', draft: null, errorCode: 'HISTORY_DRAFT_CONFLICT' });
-        } else if (!storedDraft) publish({ status: 'idle', draft: null, errorCode: '' });
+        } else if (!storedDraft) publishWithoutStoredDraft();
         else if (storedDraft.text === getText() && getText() !== getSavedText()) {
           publish({ status: storedDraft.baseText === getSavedText() ? 'saved' : 'conflict', draft: null, errorCode: '' });
         } else {
@@ -100,7 +107,7 @@
       const token = ++revision;
       publish({ status: 'discarding', errorCode: '' });
       try {
-        const response = await sendMessage({ action: 'discardHistoryDraft', historyId,
+        const response = await sendMessage({ action: 'discardHistoryDraft', historyId, ownerId,
           ...(Number.isFinite(draft.updatedAt) ? { expectedUpdatedAt: draft.updatedAt } : {}) });
         if (destroyed || token !== revision) return false;
         if (!response?.success) {
@@ -114,15 +121,29 @@
           observed = { text: getText(), baseText: getSavedText() };
           onRestore(getText());
         }
-        publish({ status: 'idle', draft: null, errorCode: '' });
+        publishWithoutStoredDraft();
         return true;
       } catch {
         if (!destroyed && token === revision) publish({ status: 'error', errorCode: 'HISTORY_WRITE_FAILED' });
         return false;
       }
     }
+    async function retry() {
+      if (destroyed) return;
+      if (state.status === 'error' && getText() !== getSavedText()) {
+        return notifySourceChanged(true);
+      }
+      await refresh();
+      // A conflicting draft may have been discarded since our last attempt.
+      // Retry only after the read confirms no competing draft and a matching
+      // formal baseline. The revision check still protects subsequent writes.
+      if (!destroyed && !storedDraft && state.status === 'error'
+        && state.errorCode === 'HISTORY_WRITE_FAILED' && getText() !== getSavedText()) {
+        return notifySourceChanged(true);
+      }
+    }
     const ready = refresh();
-    return { ready, refresh, notifySourceChanged, restore, discard,
+    return { ready, refresh, retry, notifySourceChanged, restore, discard,
       getState: () => ({ ...state, draft: state.draft ? { ...state.draft } : null }),
       destroy() { destroyed = true; loadGeneration += 1; } };
   }
@@ -192,9 +213,7 @@
     };
     const onRetryClick = (event) => {
       if (!event.isTrusted || retry.disabled || destroyed) return;
-      if (session.getState().status === 'error' && sourceTextarea.value !== getSavedText()) {
-        session.notifySourceChanged(true);
-      } else session.refresh();
+      session.retry();
     };
     sourceTextarea.addEventListener('input', onInput);
     restore.addEventListener('click', onRestoreClick);

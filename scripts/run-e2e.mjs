@@ -10,9 +10,6 @@ const child = spawn(
   [
     cli,
     'test',
-    'tests/e2e',
-    '--workers=1',
-    '--reporter=line',
     ...process.argv.slice(2)
   ],
   { cwd: root, stdio: 'inherit' }

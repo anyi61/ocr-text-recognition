@@ -41,14 +41,15 @@ class Element {
   fire(name, overrides = {}) { return this.listeners.get(name)?.({ isTrusted: true, preventDefault() {}, stopPropagation() {}, ...overrides }); }
 }
 
-function contentHarness({ realResult = false, clipboard = async () => {} } = {}) {
+function contentHarness({ realResult = false, clipboard = async () => {}, imageClass, canvas, sendMessage } = {}) {
   const root = new Element();
   const sent = [];
   const requests = [];
   const observations = { progress: false, notices: [], results: [] };
   const document = new Element();
-  document.createElement = () => new Element();
+  document.createElement = (tag) => tag === 'canvas' && canvas ? canvas : new Element();
   const window = new Element();
+  window.innerWidth = 1000; window.innerHeight = 700;
   const chrome = {
     runtime: {
       onMessage: { addListener() {}, removeListener() {} },
@@ -57,14 +58,14 @@ function contentHarness({ realResult = false, clipboard = async () => {} } = {})
         if (message.action === 'performOCR') {
           const pending = deferred(); requests.push(pending); return pending.promise;
         }
-        return Promise.resolve({ success: true });
+        return sendMessage ? sendMessage(message) : Promise.resolve({ success: true });
       }
     }
   };
   const context = vm.createContext({
-    console: { log() {}, error() {}, debug() {} }, window, document, chrome,
+    console: { log() {}, error() {}, debug() {} }, window, document, chrome, Image: imageClass,
     OCRI18n: { init: async () => {}, t: (key) => key, errorMessage: () => 'recognition error' },
-    OCRCaptureUtils: { createRequestId: (() => { let id = 0; return () => `request-${++id}`; })() },
+    OCRCaptureUtils: { ...require('../capture-utils.js'), createRequestId: (() => { let id = 0; return () => `request-${++id}`; })() },
     navigator: { clipboard: { writeText: clipboard } },
     OCRTranslationUI: { mount: () => ({ destroy() {}, notifySourceChanged() {} }) },
     OCRDraftUI: { mount: () => ({ destroy() {}, notifySourceChanged() {} }) },
@@ -83,6 +84,7 @@ function contentHarness({ realResult = false, clipboard = async () => {} } = {})
       begin: (id) => { isCancelled = false; isProcessing = true; captureSessionId = id; },
       cancel: () => { isCancelled = true; isProcessing = false; captureSessionId = null; activeRequestId = null; },
       recognize: recognizeCapturedImage,
+      crop: cropImage,
       recover: showRecovery,
       clear: clearRecovery,
       cleanup: fullCleanup,
@@ -207,6 +209,7 @@ async function workspaceHarness({ clipboard = async () => {}, permission = async
   const ports = [];
   const normalized = [];
   const draftEvents = [];
+  const draftMounts = [];
   const chrome = {
     storage: {
       local: { get: async () => ({ apiProvider: 'openai' }) },
@@ -237,10 +240,13 @@ async function workspaceHarness({ clipboard = async () => {}, permission = async
     OCRCaptureUtils: { createRequestId: (() => { let id = 0; return () => `image-${++id}`; })() },
     OCRImageUtils: { normalizeFile: async (file) => { normalized.push(file); return { dataUrl: `data:image/png;base64,${file.name}`, width: 100, height: 100 }; } },
     OCRTranslationUI: { mount: () => ({ destroy() {}, notifySourceChanged() {}, refreshLabels() {} }) },
-    OCRDraftUI: { mount: (options) => ({
-      destroy() {}, refresh: async () => {}, refreshLabels() {},
-      notifySourceChanged(force) { draftEvents.push({ force, text: options.sourceTextarea.value, baseText: options.getSavedText() }); }
-    }) }
+    OCRDraftUI: { mount: (options) => {
+      draftMounts.push(options);
+      return {
+        destroy() {}, refresh: async () => {}, refreshLabels() {},
+        notifySourceChanged(force) { draftEvents.push({ force, text: options.sourceTextarea.value, baseText: options.getSavedText() }); }
+      };
+    } }
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../workspace.js'), 'utf8'), context);
   await document.fire('DOMContentLoaded');
@@ -251,7 +257,7 @@ async function workspaceHarness({ clipboard = async () => {}, permission = async
     get('imageFile').fire('change');
     await flush();
   }
-  return { get, ports, normalized, select, window, document, draftEvents };
+  return { get, ports, normalized, select, window, document, draftEvents, draftMounts };
 }
 
 test('image workspace retry reuses the retained normalized image and rejects duplicate success responses', async () => {
@@ -368,6 +374,7 @@ test('workspace saving uses its submitted snapshot while newer input stays edita
   pending.resolve({ success: true });
   await saving;
   assert.equal(messages[0].text, 'submitted');
+  assert.equal(messages[0].expectedText, 'original');
   assert.equal(source.value, 'newer edits');
   assert.equal(get('saveImageResult').disabled, false);
   assert.deepEqual(draftEvents.at(-1), { force: true, text: 'newer edits', baseText: 'submitted' });
@@ -416,3 +423,93 @@ test('workspace Escape cancels recognition and restores keyboard focus without d
   assert.equal(get('recognizeImage').focused, true);
   assert.equal(get('imagePreview').src, 'data:image/png;base64,keyboard');
 });
+
+
+for (const failure of ['decode', 'context', 'draw', 'serialize']) {
+  test(`crop rejects ${failure} failures and releases the decoded screenshot`, async () => {
+    const images = [];
+    class Image {
+      constructor() { this.naturalWidth = 1000; this.naturalHeight = 700; images.push(this); }
+      async decode() { if (failure === 'decode') throw new Error('decode failed'); }
+    }
+    const context = {
+      clearRect() {},
+      drawImage() { if (failure === 'draw') throw new Error('draw failed'); }
+    };
+    const canvas = {
+      getContext: () => failure === 'context' ? null : context,
+      toDataURL() { if (failure === 'serialize') throw new Error('serialize failed'); return 'data:image/png;base64,YQ=='; }
+    };
+    const { api } = contentHarness({ imageClass: Image, canvas });
+    await assert.rejects(api.crop('data:image/png;base64,screenshot', { left: 10, top: 10, width: 100, height: 100 }));
+    assert.equal(images[0].src, '');
+  });
+}
+
+test('content formal-save conflict keeps edited text and its original expected baseline', async () => {
+  const { api, root, sent, observations } = contentHarness({ realResult: true,
+    sendMessage: async () => ({ success: false, errorCode: 'HISTORY_TEXT_CONFLICT' }) });
+  api.result('original', 'id');
+  const popup = root.lastChild;
+  const source = popup.querySelector('#ocr-result-text');
+  source.value = 'my edits'; source.fire('input');
+  await popup.querySelector('.save-changes-btn').fire('click');
+  assert.equal(sent.at(-1).expectedText, 'original');
+  assert.equal(source.value, 'my edits');
+  assert.equal(popup.querySelector('.save-changes-btn').disabled, false);
+  assert.equal(observations.notices.at(-1), 'content_msg_changes_conflict');
+});
+
+test('workspace formal-save conflict preserves newer input and the saved baseline', async () => {
+  const messages = [];
+  const { get, ports, select } = await workspaceHarness({ sendMessage: async (message) => {
+    messages.push(message); return { success: false, errorCode: 'HISTORY_TEXT_CONFLICT' };
+  } });
+  await select('editing');
+  await get('recognizeImage').fire('click');
+  ports[0].result({ success: true, text: 'original', historyId: 'id' });
+  const source = get('imageResultText');
+  source.value = 'my edits'; source.fire('input');
+  await get('saveImageResult').fire('click');
+  assert.equal(messages.at(-1).expectedText, 'original');
+  assert.equal(source.value, 'my edits');
+  assert.equal(get('saveImageResult').disabled, false);
+  assert.equal(get('imageResultStatus').textContent, 'content_msg_changes_conflict');
+  await get('saveImageResult').fire('click');
+  assert.equal(messages.at(-1).expectedText, 'original');
+});
+
+test('workspace restoring a draft invalidates prior automatic and manual copy feedback', async () => {
+  const { get, ports, select, draftMounts } = await workspaceHarness();
+  await select('editing');
+  await get('recognizeImage').fire('click');
+  ports[0].result({ success: true, text: 'original', historyId: 'id', autoCopy: true });
+  await flush();
+  assert.equal(get('imageAutoCopyStatus').hidden, false);
+  get('imageResultText').value = 'restored draft';
+  draftMounts[0].onRestore();
+  assert.equal(get('imageAutoCopyStatus').hidden, true);
+  await get('copyImageResult').fire('click');
+  await flush();
+  assert.equal(get('imageResultStatus').textContent, 'btn_copied');
+  get('imageResultText').value = 'original';
+  draftMounts[0].onRestore();
+  assert.equal(get('imageResultStatus').textContent, '');
+});
+
+
+for (const response of [{ success: true }, { success: false, errorCode: 'HISTORY_TEXT_CONFLICT' }]) {
+  test(`closing a content result suppresses its delayed ${response.success ? 'successful' : 'failed'} save feedback`, async () => {
+    const pending = deferred();
+    const { api, root, observations } = contentHarness({ realResult: true, sendMessage: () => pending.promise });
+    api.result('original', 'id');
+    const popup = root.lastChild;
+    popup.querySelector('#ocr-result-text').value = 'submitted';
+    popup.querySelector('#ocr-result-text').fire('input');
+    const saving = popup.querySelector('.save-changes-btn').fire('click');
+    popup.querySelector('.ocr-close-btn').fire('click');
+    pending.resolve(response);
+    await saving;
+    assert.deepEqual(observations.notices, []);
+  });
+}

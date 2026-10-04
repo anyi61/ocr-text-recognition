@@ -103,9 +103,14 @@
       sourceText: '', timestamp: '', persisted: false };
     const same = (left, right) => left.text === right.text
       && left.provider === right.provider && left.targetLanguage === right.targetLanguage;
+    // The last request can fail or be cancelled while the retained result is
+    // still valid. Keep its usability separate from the request lifecycle.
+    const hasCurrentResult = (snapshot = getSnapshot()) => Boolean(state.text)
+      && same(snapshot, { text: state.sourceText, provider: state.provider, targetLanguage: state.targetLanguage });
+    const getState = () => ({ ...state, canCopy: hasCurrentResult() });
     const publish = (patch) => {
       state = { ...state, ...patch };
-      if (!destroyed) onChange({ ...state });
+      if (!destroyed) onChange(getState());
     };
     const cancelRequest = () => {
       generation += 1;
@@ -162,10 +167,10 @@
       if (!force && same(observed, snapshot)) return;
       observed = snapshot;
       const wasPending = cancelRequest();
-      publish({ status: state.text || wasPending ? 'stale' : 'idle', errorCode: '' });
+      publish({ status: hasCurrentResult(snapshot) ? 'success' : state.text || wasPending ? 'stale' : 'idle', errorCode: '' });
     }
     return {
-      getState: () => ({ ...state }),
+      getState,
       notifySourceChanged,
       restore(translation) {
         if (destroyed || request || !translation || typeof translation.text !== 'string' || !translation.text.trim()
@@ -388,7 +393,7 @@
       outputMeta.textContent = state.model ? t('translation_result_model', [state.model]) : '';
       if (state.persisted) outputMeta.textContent += `${outputMeta.textContent ? ' · ' : ''}${t('translation_saved')}`;
       outputMeta.hidden = !outputMeta.textContent;
-      copy.disabled = state.status !== 'success';
+      copy.disabled = !state.canCopy;
       const selected = selectedProvider();
       summary.textContent = t('translation_provider_summary', [PROVIDERS[provider.value] || provider.value || '—', selected?.model || '—']);
       let message = localStatus;

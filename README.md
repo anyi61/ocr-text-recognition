@@ -39,7 +39,7 @@
 4. 等待识别完成，在结果弹窗中复制、整理、修订或翻译文字；失败后可重试原图或重新框选。
 5. 在扩展 Popup 中查看、命名、收藏、搜索、恢复草稿、复用译文、导出或删除历史。
 
-本轮安装 ZIP 生成于 `dist/ocr-text-recognition-extension-1.2.0.zip`。解压后按上述“加载已解压的扩展程序”步骤安装；它不是已签名的 CRX 文件。
+本轮安装 ZIP 生成于 `dist/ocr-text-recognition-extension-1.2.2.zip`。解压后按上述“加载已解压的扩展程序”步骤安装；它不是已签名的 CRX 文件。
 
 Chrome、Edge 内部页面、扩展页面、Chrome Web Store 以及未开启文件网址访问权限的本地文件页面无法注入框选界面；扩展会在启动前提示可用的下一步操作。
 
@@ -65,6 +65,8 @@ API Key 保存在 `chrome.storage.local`，并限制为扩展可信页面与后�
 
 配置导出默认移除 API Key 和 Secret。只有主动勾选“在导出文件中包含 API Key”时才会导出明文凭据；此类文件应只存放在可信设备上。
 
+设置按修改的字段保存，多个设置窗口不会把未编辑的旧值写回。导入先验证完整结构，再一次写入；兼容旧版平铺配置，脱敏导出省略的凭据会保留本机值，显式空字符串会清除对应凭据。
+
 ## 开发与验证
 
 需要 Node.js 20+：
@@ -82,12 +84,14 @@ npm run package
 - `npm run package`：校验 `package.json`、manifest 与配置导出版本一致，并在 `dist/` 生成只包含生产文件的商店 ZIP。
 - 端到端测试不需要任何真实 API Key，也不会请求第三方 OCR 服务。
 - 浏览器测试只在临时扩展副本开放 Shadow DOM 和增加 Mock 权限；生产包保持封闭 Shadow DOM 和原有最小权限。
+- 代码审查的复现、修复与验证记录见 [1.2.1 审查](docs/code-review-1.2.1.md) 和 [1.2.2 独立子代理复查](docs/code-review-1.2.2.md)。
 
 ## 核心文件
 
 - `background.js`：截图、Provider 路由、API 请求、取消和历史。
 - `content.js`：页面选区、裁剪、进度和结果 UI。
 - `provider-config.js`：Provider 存储映射、凭据校验、脱敏和模型迁移。
+- `settings-store.js`：设置、导入和翻译偏好的统一写入队列与字段合并。
 - `extension-runtime.js`：自定义域名授权与内容脚本按需注入。
 - `background-core.js`：语言提示、百度语言映射、请求注册表和可取消历史写入。
 - `request-runtime.js`：超时、重试、取消、响应校验和自定义接口请求契约。

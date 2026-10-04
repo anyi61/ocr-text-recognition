@@ -80,18 +80,37 @@ test('restored: a failed or cancelled replacement keeps the previous saved trans
   await page.locator('[data-translation=start]').click();
   await expect(page.locator('[data-translation=panel]')).toHaveAttribute('data-state', 'error');
   await expect(page.locator('[data-translation=text]')).toHaveValue('First successful translation');
+  await expect(page.locator('[data-translation=copy]')).toBeEnabled();
   await expect(page.locator('#ocr-result-text')).toHaveValue(RESULT_TEXT);
   mock.state.queue.push({ delay: 10_000, text: 'Cancelled translation' });
   await page.locator('[data-translation=start]').click();
   await mock.waitForRequestCount(4);
   await page.locator('[data-translation=cancel]').click();
   await mock.waitForAbortCount(1);
+  await expect(page.locator('[data-translation=copy]')).toBeEnabled();
+  await browser.context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.locator('[data-translation=copy]').click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('First successful translation');
   expect((await readHistory(browser.serviceWorker))[0].translation.text).toBe('First successful translation');
   await page.locator('.ocr-close-btn').click();
   const popup = await openPopupForTab(browser, page);
   await popup.locator('.history-item-text').first().click();
   await expect(popup.locator('[data-translation=text]')).toHaveValue('First successful translation');
   expect(mock.state.requests).toHaveLength(4);
+});
+
+test('restoring matching source text reuses the previous translation without another provider call', async ({ extBrowser: browser, page, mock }) => {
+  await recognize(browser, page);
+  await translate(page, mock, 'Reusable translation');
+  await page.locator('#ocr-result-text').fill('Temporarily edited source');
+  await expect(page.locator('[data-translation=copy]')).toBeDisabled();
+  await page.locator('#ocr-result-text').fill(RESULT_TEXT);
+  await expect(page.locator('[data-translation=panel]')).toHaveAttribute('data-state', 'success');
+  await expect(page.locator('[data-translation=copy]')).toBeEnabled();
+  await browser.context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.locator('[data-translation=copy]').click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('Reusable translation');
+  expect(mock.state.requests).toHaveLength(2);
 });
 
 test('restored: saved history translation reopens without a request and remains stale after source commit', async ({ extBrowser: browser, page, mock }) => {
